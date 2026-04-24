@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   ArrowRight, CheckCircle, Globe, Shield, CreditCard,
-  Smartphone, Zap, Users, TrendingUp, Menu, X, ChevronRight,
+  Smartphone, Zap, TrendingUp, Menu, X, ChevronRight,
   ArrowUp, Code2, Webhook, BarChart3, Lock
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -205,9 +205,6 @@ export default function Home() {
 
           {/* LEFT */}
           <div className="pp-ani">
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#FFF3EA', border: '1px solid #FFDAB8', color: '#FF6B00', fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 100, marginBottom: 26 }}>
-              <Zap size={12} /> 15+ providers · 40+ pays · Commission 1%
-            </div>
             <h1 style={{ fontSize: 'clamp(38px,4.8vw,64px)', fontWeight: 900, lineHeight: 1.07, letterSpacing: '-.03em', marginBottom: 22, color: '#0A0A0A' }}>
               Acceptez les paiements<br />
               <span style={{ color: '#222' }}>en </span><WordSlider /><br />
@@ -407,62 +404,67 @@ export default function Home() {
       {/* ── PRICING ── */}
       <section id="pricing" style={{ background: '#fff', borderTop: '1px solid #EBEBEB', padding: '90px 32px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 52 }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#FF6B00', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12, justifyContent: 'center' }}>
-              <TrendingUp size={11} /> Tarifs
+              <TrendingUp size={11} /> Tarification
             </div>
             <h2 style={{ fontSize: 'clamp(26px,3.5vw,42px)', fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.025em', lineHeight: 1.1, marginBottom: 14 }}>
-              Payez uniquement<br />quand vous encaissez
+              Simple. Transparent.<br />Pas d'abonnement.
             </h2>
-            <p style={{ fontSize: 16, color: '#777', maxWidth: 380, margin: '0 auto' }}>Pas de frais cachés. Commission sur les transactions seulement.</p>
+            <p style={{ fontSize: 16, color: '#777', maxWidth: 440, margin: '0 auto' }}>
+              Aucun frais fixe, aucun abonnement. Vous ne payez que lorsque vous encaissez.
+            </p>
           </div>
 
-          <div className="pp-pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 18 }}>
-            {/* Starter */}
-            <div className="pp-plan" style={{ border: '1.5px solid #EBEBEB', borderRadius: 22, padding: '36px', display: 'flex', flexDirection: 'column', background: '#FAFAFA', transition: 'all .3s' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#bbb', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Starter</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: '#111', letterSpacing: '-.02em', lineHeight: 1 }}>0 XOF</div>
-              <div style={{ fontSize: 12, color: '#bbb', marginTop: 6, marginBottom: 4 }}>/ mois · Pour démarrer</div>
-              <div style={{ height: 1, background: '#EBEBEB', margin: '22px 0' }} />
-              {['1% par transaction', "Jusqu'à 1M XOF/mois", 'Support email', 'Dashboard basique'].map((t, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: '#555', marginBottom: 12 }}>
-                  <CheckCircle size={13} style={{ color: '#00A550', flexShrink: 0 }} /> {t}
-                </div>
-              ))}
-              <div style={{ flex: 1 }} />
-              <Link to="/register" className="pp-btn-outline" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontSize: 14, fontWeight: 600, padding: '13px 20px', borderRadius: 12, border: '1.5px solid #DDD', color: '#555', transition: 'all .25s', marginTop: 24 }}>Commencer</Link>
+          {/* Big commission card */}
+          <div style={{ maxWidth: 680, margin: '0 auto 40px', background: 'linear-gradient(135deg,#FFF8F2,#FFF3EA)', border: '2px solid #FFDAB8', borderRadius: 28, padding: '52px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            {/* decorative circle */}
+            <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,107,0,.06)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: -40, left: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,170,0,.08)', pointerEvents: 'none' }} />
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid #FFDAB8', color: '#FF6B00', fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 100, marginBottom: 28 }}>
+              <Zap size={12} /> Modèle unique
             </div>
 
-            {/* Pro */}
-            <div style={{ background: '#fff', border: '2px solid #FF6B00', borderRadius: 22, padding: '36px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: '0 12px 52px rgba(255,107,0,.13)' }}>
-              <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#FF6B00,#FFAA00)', color: '#fff', fontSize: 10, fontWeight: 800, padding: '4px 16px', borderRadius: 100, letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>⚡ Le plus populaire</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#FF6B00', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Pro</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: '#111', letterSpacing: '-.02em', lineHeight: 1 }}>9 999 XOF</div>
-              <div style={{ fontSize: 12, color: '#bbb', marginTop: 6, marginBottom: 4 }}>/ mois · Pour les entreprises</div>
-              <div style={{ height: 1, background: '#EBEBEB', margin: '22px 0' }} />
-              {['0.5% par transaction', 'Volume illimité', 'API avancée + Webhooks', 'Support prioritaire', 'Dashboard complet'].map((t, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: '#555', marginBottom: 12 }}>
-                  <CheckCircle size={13} style={{ color: '#FF6B00', flexShrink: 0 }} /> {t}
-                </div>
-              ))}
-              <div style={{ flex: 1 }} />
-              <Link to="/register" className="pp-btn-gold" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontSize: 14, fontWeight: 700, padding: '13px 20px', borderRadius: 12, background: 'linear-gradient(135deg,#FF6B00,#FFAA00)', color: '#fff', boxShadow: '0 5px 20px rgba(255,107,0,.3)', transition: 'all .25s', marginTop: 24 }}>Essai gratuit 14 jours</Link>
+            <div style={{ fontSize: 'clamp(72px,12vw,110px)', fontWeight: 900, color: '#FF6B00', lineHeight: 1, letterSpacing: '-.04em', marginBottom: 8 }}>
+              1<span style={{ fontSize: '0.55em', verticalAlign: 'super' }}>%</span>
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: '#333', marginBottom: 10 }}>par transaction</div>
+            <div style={{ fontSize: 15, color: '#888', lineHeight: 1.65, maxWidth: 360, margin: '0 auto 36px' }}>
+              C'est tout. Pas d'abonnement, pas de frais cachés, pas de frais d'installation. Payez uniquement quand vos clients paient.
             </div>
 
-            {/* Enterprise */}
-            <div className="pp-plan" style={{ border: '1.5px solid #EBEBEB', borderRadius: 22, padding: '36px', display: 'flex', flexDirection: 'column', background: '#FAFAFA', transition: 'all .3s' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#bbb', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 6 }}>Enterprise</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: '#111', letterSpacing: '-.02em', lineHeight: 1 }}>Sur mesure</div>
-              <div style={{ fontSize: 12, color: '#bbb', marginTop: 6, marginBottom: 4 }}>Commission négociée · Volume élevé</div>
-              <div style={{ height: 1, background: '#EBEBEB', margin: '22px 0' }} />
-              {['Commission négociable', 'Multi-utilisateurs', 'SLA garanti 99.99%', 'Formation & onboarding', 'Support dédié 24/7'].map((t, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: '#555', marginBottom: 12 }}>
-                  <CheckCircle size={13} style={{ color: '#9B00E8', flexShrink: 0 }} /> {t}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 36 }}>
+              {[
+                { label: 'Inscription', value: 'Gratuite' },
+                { label: 'Frais mensuels', value: '0 XOF' },
+                { label: 'Commission', value: '1% / tx' },
+                { label: 'Retrait', value: 'Inclus' },
+              ].map((item, i) => (
+                <div key={i} style={{ background: '#fff', border: '1px solid #EBEBEB', borderRadius: 14, padding: '14px 22px', textAlign: 'center', minWidth: 110 }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#111', letterSpacing: '-.02em' }}>{item.value}</div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 3, fontWeight: 500 }}>{item.label}</div>
                 </div>
               ))}
-              <div style={{ flex: 1 }} />
-              <Link to="/contact" className="pp-btn-outline" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontSize: 14, fontWeight: 600, padding: '13px 20px', borderRadius: 12, border: '1.5px solid #DDD', color: '#555', transition: 'all .25s', marginTop: 24 }}>Nous contacter</Link>
             </div>
+
+            <Link to="/register" className="pp-btn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none', fontSize: 15, fontWeight: 700, padding: '15px 36px', borderRadius: 14, background: 'linear-gradient(135deg,#FF6B00,#FFAA00)', color: '#fff', boxShadow: '0 6px 24px rgba(255,107,0,.35)', transition: 'all .25s' }}>
+              Commencer gratuitement <ArrowRight size={17} />
+            </Link>
+          </div>
+
+          {/* Reassurance row */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+            {[
+              { icon: CheckCircle, color: '#00A550', text: 'Sans engagement' },
+              { icon: Shield, color: '#0057FF', text: 'Transactions sécurisées PCI DSS' },
+              { icon: Zap, color: '#FF6B00', text: 'Activation instantanée' },
+              { icon: Globe, color: '#9B00E8', text: '40+ pays supportés' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#666', background: '#FAFAFA', border: '1px solid #EBEBEB', padding: '9px 16px', borderRadius: 100 }}>
+                <item.icon size={13} style={{ color: item.color }} /> {item.text}
+              </div>
+            ))}
           </div>
         </div>
       </section>
