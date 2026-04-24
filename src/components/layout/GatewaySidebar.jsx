@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Layout, Users, CreditCard, Settings, Globe, Code, FileText, ArrowLeft, LogOut } from 'lucide-react';
+import { Layout, Users, CreditCard, Settings, Globe, Code, ArrowLeft, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -55,7 +55,7 @@ export default function GatewaySidebar() {
         <div className={`p-3 border-t border-gray-800 ${collapsed ? 'text-center' : ''}`}>
           <Link to="/dashboard" className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-all">
             <ArrowLeft size={16}/>
-            {!collapsed && <span>Facture App</span>}
+            {!collapsed && <span>Dashboard</span>}
           </Link>
           {!collapsed && (
             <button onClick={logout} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-gray-800 transition-all w-full mt-1">
