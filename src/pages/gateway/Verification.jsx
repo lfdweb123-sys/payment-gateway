@@ -42,7 +42,7 @@ export default function Verification() {
     if (snap.exists()) {
       const data = snap.data();
       setMerchant(data);
-      if (data.verificationStatus === 'pending') setSubmitted(true);
+      setSubmitted(data.verificationStatus === 'pending');
       if (data.verificationData) setFormData(prev => ({ ...prev, ...data.verificationData }));
     }
   };
@@ -80,8 +80,10 @@ export default function Verification() {
         verificationData: formData,
         updatedAt: new Date().toISOString()
       });
-      setSubmitted(true);
       toast.success('Documents soumis ! En attente de validation.');
+      // Recharger les données
+      await loadMerchant();
+      setSubmitted(true);
     } catch { toast.error('Erreur lors de la soumission'); }
     finally { setLoading(false); }
   };
@@ -100,7 +102,6 @@ export default function Verification() {
   const inputClass = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-1 focus:ring-orange-500 outline-none transition-all";
   const labelClass = "block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1.5";
 
-  // Statut approuvé
   if (merchant?.verificationStatus === 'approved') {
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6">
@@ -115,7 +116,6 @@ export default function Verification() {
     );
   }
 
-  // En attente
   if (submitted && merchant?.verificationStatus === 'pending') {
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6">
@@ -125,12 +125,14 @@ export default function Verification() {
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-1">Vérification en cours ⏳</h2>
           <p className="text-sm text-gray-500">Vos documents sont en cours d'examen. Délai : 24 à 48h.</p>
+          <button onClick={handleRetry} className="mt-4 text-sm text-gray-500 hover:text-gray-900 underline">
+            Soumettre à nouveau
+          </button>
         </div>
       </div>
     );
   }
 
-  // Rejeté
   if (merchant?.verificationStatus === 'rejected') {
     return (
       <div className="max-w-lg mx-auto p-4 sm:p-6">
@@ -140,7 +142,7 @@ export default function Verification() {
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-1">Vérification refusée ❌</h2>
           <p className="text-sm text-gray-500 mb-4">Vos documents n'ont pas été acceptés.</p>
-          <button onClick={handleRetry} className="bg-orange-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium">
+          <button onClick={handleRetry} className="bg-orange-500 text-white px-6 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-600">
             Soumettre à nouveau
           </button>
         </div>
@@ -148,7 +150,6 @@ export default function Verification() {
     );
   }
 
-  // Formulaire
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
