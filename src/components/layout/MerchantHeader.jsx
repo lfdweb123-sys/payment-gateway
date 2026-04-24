@@ -19,7 +19,7 @@ export default function MerchantHeader() {
           <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
             <Globe size={16} className="text-white" />
           </div>
-          <span className="text-sm font-semibold text-gray-900">Paiement Pro</span>
+          <span className="text-sm font-semibold text-gray-900">Payment Gateway</span>
         </Link>
       </div>
 
