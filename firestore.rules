@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAdmin() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Utilisateurs
+    match /users/{userId} {
+      allow read, update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null && isAdmin();
+    }
+    
+    // Marchands de la passerelle
+    match /gateway_merchants/{merchantId} {
+      allow read: if request.auth != null && (request.auth.uid == merchantId || isAdmin());
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (request.auth.uid == merchantId || isAdmin());
+    }
+    
+    // Configuration des providers (admin uniquement)
+    match /gateway_providers/{providerId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+    
+    // Transactions (lecture par le marchand concerné, création publique)
+    match /gateway_transactions/{txId} {
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update: if request.auth != null && isAdmin();
+    }
+    
+    // Paramètres de la passerelle
+    match /gateway_settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null && isAdmin();
+    }
+    
+    // Par défaut : tout refuser
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
