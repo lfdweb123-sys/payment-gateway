@@ -1,4 +1,3 @@
-// api/gateway/balance.js
 const admin = require('firebase-admin');
 
 if (!admin.apps.length) {
@@ -12,6 +11,23 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+const requestCounts = new Map();
+const MAX_REQUESTS = 30;
+const WINDOW_MS = 60 * 1000;
+
+function checkRateLimit(key) {
+  const now = Date.now();
+  const k = key || 'anonymous';
+  if (!requestCounts.has(k)) requestCounts.set(k, []);
+  const timestamps = requestCounts.get(k).filter(t => now - t < WINDOW_MS);
+  if (timestamps.length >= MAX_REQUESTS) {
+    return { allowed: false, retryAfter: Math.ceil((timestamps[0] + WINDOW_MS - now) / 1000) };
+  }
+  timestamps.push(now);
+  requestCounts.set(k, timestamps);
+  return { allowed: true };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -21,37 +37,26 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET requis' });
 
   const apiKey = req.headers['x-api-key'] || req.query.token;
+  if (!apiKey) return res.status(401).json({ error: 'Clé API requise' });
 
-  if (!apiKey) {
-    return res.status(401).json({ error: 'Clé API requise' });
+  const rateLimit = checkRateLimit(apiKey);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: 'Trop de requêtes', retryAfter: rateLimit.retryAfter });
   }
 
   try {
-    const merchantSnap = await db.collection('gateway_merchants')
-      .where('apiKey', '==', apiKey)
-      .limit(1)
-      .get();
-
-    if (merchantSnap.empty) {
-      return res.status(401).json({ error: 'Clé API invalide' });
-    }
+    const merchantSnap = await db.collection('gateway_merchants').where('apiKey', '==', apiKey).limit(1).get();
+    if (merchantSnap.empty) return res.status(401).json({ error: 'Clé API invalide' });
 
     const merchant = { id: merchantSnap.docs[0].id, ...merchantSnap.docs[0].data() };
 
-    // Calculer le solde en attente
     const pendingSnap = await db.collection('gateway_transactions')
-      .where('merchantId', '==', merchant.id)
-      .where('status', '==', 'pending')
-      .get();
-
+      .where('merchantId', '==', merchant.id).where('status', '==', 'pending').get();
     const pendingBalance = pendingSnap.docs.reduce((sum, d) => sum + (parseFloat(d.data().netAmount) || 0), 0);
 
     return res.status(200).json({
-      success: true,
-      balance: merchant.balance || 0,
-      pendingBalance,
-      currency: 'XOF',
-      totalTransactions: merchant.totalTransactions || 0
+      success: true, balance: merchant.balance || 0,
+      pendingBalance, currency: 'XOF', totalTransactions: merchant.totalTransactions || 0
     });
   } catch (error) {
     console.error('Erreur solde:', error);

@@ -1,4 +1,3 @@
-// api/gateway/verify/[reference].js
 const admin = require('firebase-admin');
 const PROVIDERS = {
   feexpay: require('../../../src/services/providers/feexpay').default,
@@ -29,6 +28,24 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+// Rate limiting
+const requestCounts = new Map();
+const MAX_REQUESTS = 60;
+const WINDOW_MS = 60 * 1000;
+
+function checkRateLimit(key) {
+  const now = Date.now();
+  const k = key || 'anonymous';
+  if (!requestCounts.has(k)) requestCounts.set(k, []);
+  const timestamps = requestCounts.get(k).filter(t => now - t < WINDOW_MS);
+  if (timestamps.length >= MAX_REQUESTS) {
+    return { allowed: false, retryAfter: Math.ceil((timestamps[0] + WINDOW_MS - now) / 1000) };
+  }
+  timestamps.push(now);
+  requestCounts.set(k, timestamps);
+  return { allowed: true };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -38,72 +55,47 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET requis' });
 
   const { reference } = req.query;
-  
-  if (!reference) {
-    return res.status(400).json({ error: 'Référence requise' });
+  if (!reference) return res.status(400).json({ error: 'Référence requise' });
+
+  const rateLimit = checkRateLimit(req.headers['x-api-key'] || reference);
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: 'Trop de requêtes', retryAfter: rateLimit.retryAfter });
   }
 
   try {
-    // Chercher la transaction dans Firestore
     const txSnap = await db.collection('gateway_transactions')
-      .where('providerRef', '==', reference)
-      .limit(1)
-      .get();
+      .where('providerRef', '==', reference).limit(1).get();
 
     if (txSnap.empty) {
-      // Chercher par ID de transaction
       const txDoc = await db.collection('gateway_transactions').doc(reference).get();
-      if (!txDoc.exists) {
-        return res.status(404).json({ error: 'Transaction introuvable' });
-      }
-      
+      if (!txDoc.exists) return res.status(404).json({ error: 'Transaction introuvable' });
+
       const tx = { id: txDoc.id, ...txDoc.data() };
       const provider = PROVIDERS[tx.provider];
-      
-      if (!provider) {
-        return res.status(200).json({ success: true, status: tx.status, transaction: tx });
-      }
+      if (!provider) return res.status(200).json({ success: true, status: tx.status, transaction: tx });
 
       const result = await provider.verifyPayment(tx.providerRef);
-      
-      // Mettre à jour le statut si différent
       if (result.success && result.status !== tx.status) {
         await db.collection('gateway_transactions').doc(reference).update({
           status: result.status === 'SUCCESSFUL' ? 'completed' : 'failed',
           updatedAt: new Date().toISOString()
         });
       }
-
-      return res.status(200).json({
-        success: true,
-        status: result.status || tx.status,
-        reference: tx.providerRef,
-        transaction: tx
-      });
+      return res.status(200).json({ success: true, status: result.status || tx.status, reference: tx.providerRef, transaction: tx });
     }
 
     const tx = { id: txSnap.docs[0].id, ...txSnap.docs[0].data() };
     const provider = PROVIDERS[tx.provider];
-    
-    if (!provider) {
-      return res.status(200).json({ success: true, status: tx.status, transaction: tx });
-    }
+    if (!provider) return res.status(200).json({ success: true, status: tx.status, transaction: tx });
 
     const result = await provider.verifyPayment(reference);
-    
     if (result.success && result.status !== tx.status) {
       await db.collection('gateway_transactions').doc(tx.id).update({
         status: result.status === 'SUCCESSFUL' ? 'completed' : 'failed',
         updatedAt: new Date().toISOString()
       });
     }
-
-    return res.status(200).json({
-      success: true,
-      status: result.status || tx.status,
-      reference,
-      transaction: tx
-    });
+    return res.status(200).json({ success: true, status: result.status || tx.status, reference, transaction: tx });
   } catch (error) {
     console.error('Erreur vérification:', error);
     return res.status(500).json({ error: error.message });
