@@ -14,6 +14,15 @@ import GatewayApiDocs from './pages/gateway/GatewayApiDocs';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import Developer from './pages/gateway/Developer';
+
+import Help from './pages/Help';
+import Privacy from './pages/Privacy';
+import Contact from './pages/Contact';
+import Terms from './pages/Terms';
+import Cookies from './pages/Cookies';
+import Legal from './pages/Legal';
+
 
 function PublicRoute({ children }) {
   const { user } = useAuth();
@@ -53,8 +62,18 @@ function AppContent() {
             <Route path="/dashboard" element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
             <Route path="/providers" element={<ProtectedRoute><MerchantProviders /></ProtectedRoute>} />
             <Route path="/transactions" element={<ProtectedRoute><GatewayTransactions /></ProtectedRoute>} />
+            <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             
+
+            <Route path="/help" element={<Help />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/cookies" element={<Cookies />} />
+            <Route path="/legal" element={<Legal />} />
+
+
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

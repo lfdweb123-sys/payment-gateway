@@ -3,17 +3,14 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { TrendingUp, DollarSign, CreditCard, Copy, Key, Eye, EyeOff, Clock, CheckCircle, ExternalLink, Plus } from 'lucide-react';
+import { TrendingUp, DollarSign, CreditCard, Key, Clock, CheckCircle, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import toast from 'react-hot-toast';
 
 export default function GatewayDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState({ balance: 0, totalTransactions: 0, todayTransactions: 0, recentTransactions: [], providersCount: 0 });
   const [loading, setLoading] = useState(true);
-  const [showKey, setShowKey] = useState(false);
-  const [merchant, setMerchant] = useState(null);
 
   useEffect(() => {
     if (!user) return;
@@ -24,7 +21,6 @@ export default function GatewayDashboard() {
     try {
       const merchantSnap = await getDoc(doc(db, 'gateway_merchants', user.uid));
       const merchantData = merchantSnap.exists() ? merchantSnap.data() : {};
-      setMerchant(merchantData);
 
       const txQuery = query(
         collection(db, 'gateway_transactions'),
@@ -54,12 +50,6 @@ export default function GatewayDashboard() {
     finally { setLoading(false); }
   };
 
-  const apiKey = merchant?.apiKey || '';
-  const paymentLink = `${window.location.origin}/pay?token=${apiKey}`;
-
-  const copyKey = () => { navigator.clipboard.writeText(apiKey); toast.success('Clé API copiée !'); };
-  const copyLink = () => { navigator.clipboard.writeText(paymentLink); toast.success('Lien de paiement copié !'); };
-
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"/></div>;
 
   return (
@@ -70,14 +60,9 @@ export default function GatewayDashboard() {
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-xs text-gray-500">Bienvenue, {user?.displayName || user?.email}</p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/providers" className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
-            <Key size={14} /> Providers ({stats.providersCount})
-          </Link>
-          <Link to="/api-documentation" className="bg-orange-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-orange-600 flex items-center gap-1.5">
-            <ExternalLink size={14} /> API Docs
-          </Link>
-        </div>
+        <Link to="/providers" className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 flex items-center gap-1.5">
+          <Key size={14} /> Providers ({stats.providersCount})
+        </Link>
       </div>
 
       {/* Stats */}
@@ -102,29 +87,6 @@ export default function GatewayDashboard() {
           </div>
           <p className="text-sm text-gray-500">Aujourd'hui</p>
           <p className="text-xl font-bold text-gray-900">{stats.todayTransactions}</p>
-        </div>
-      </div>
-
-      {/* Clé API */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2"><Key size={16}/> Votre clé API</h3>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mb-3">
-          <code className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-mono text-sm text-gray-700 truncate">
-            {showKey ? apiKey : apiKey?.substring(0, 24) + '...'}
-          </code>
-          <div className="flex gap-2">
-            <button onClick={() => setShowKey(!showKey)} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 flex-1 sm:flex-none">
-              {showKey ? <EyeOff size={16}/> : <Eye size={16}/>}
-            </button>
-            <button onClick={copyKey} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 flex-1 sm:flex-none"><Copy size={16}/></button>
-          </div>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-2">Lien de paiement direct :</p>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <code className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-xs text-gray-600 truncate">{paymentLink}</code>
-            <button onClick={copyLink} className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 flex-1 sm:flex-none"><Copy size={14}/></button>
-          </div>
         </div>
       </div>
 

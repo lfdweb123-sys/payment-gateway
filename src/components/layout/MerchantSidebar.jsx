@@ -12,6 +12,7 @@ export default function MerchantSidebar() {
     { title: 'Dashboard', icon: Layout, path: '/dashboard' },
     { title: 'Providers', icon: Key, path: '/providers' },
     { title: 'Transactions', icon: CreditCard, path: '/transactions' },
+    { title: 'Développeur', icon: Code, path: '/developer' },
     { title: 'API Docs', icon: FileText, path: '/api-documentation' },
     { title: 'Paramètres', icon: Settings, path: '/settings' }
   ];
