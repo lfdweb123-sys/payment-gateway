@@ -22,6 +22,8 @@ import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Cookies from './pages/Cookies';
 import Legal from './pages/Legal';
+import Verification from './pages/gateway/Verification';
+
 
 
 function PublicRoute({ children }) {
@@ -64,6 +66,8 @@ function AppContent() {
             <Route path="/transactions" element={<ProtectedRoute><GatewayTransactions /></ProtectedRoute>} />
             <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
+            <Route path="/verification" element={<ProtectedRoute><Verification /></ProtectedRoute>} />
+
             
 
             <Route path="/help" element={<Help />} />

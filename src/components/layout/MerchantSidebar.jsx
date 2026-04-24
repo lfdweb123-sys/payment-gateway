@@ -1,19 +1,32 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Layout, CreditCard, Settings, Key, LogOut, HelpCircle, FileText, Code } from 'lucide-react';
-import { useState } from 'react';
+import { Layout, CreditCard, Settings, Key, LogOut, HelpCircle, FileText, Code, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 export default function MerchantSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [merchant, setMerchant] = useState(null);
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, 'gateway_merchants', user.uid)).then(snap => {
+      setMerchant(snap.exists() ? snap.data() : {});
+    });
+  }, [user]);
+
+  const isVerified = merchant?.verificationStatus === 'approved';
+  const isPending = merchant?.verificationStatus === 'pending';
 
   const menuItems = [
-    { title: 'Dashboard', icon: Layout, path: '/dashboard' },
-    { title: 'Providers', icon: Key, path: '/providers' },
-    { title: 'Transactions', icon: CreditCard, path: '/transactions' },
-    { title: 'Développeur', icon: Code, path: '/developer' },
-    { title: 'Paramètres', icon: Settings, path: '/settings' }
+    { title: 'Dashboard', icon: Layout, path: '/dashboard', requireVerification: false },
+    { title: 'Providers', icon: Key, path: '/providers', requireVerification: true },
+    { title: 'Transactions', icon: CreditCard, path: '/transactions', requireVerification: true },
+    { title: 'Développeur', icon: Code, path: '/developer', requireVerification: true },
+    { title: 'Paramètres', icon: Settings, path: '/settings', requireVerification: false }
   ];
 
   return (
@@ -26,7 +39,19 @@ export default function MerchantSidebar() {
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-2">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const isDisabled = item.requireVerification && !isVerified;
             const Icon = item.icon;
+
+            if (isDisabled) {
+              return (
+                <div key={item.path} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed select-none ${collapsed ? 'justify-center' : ''}`}>
+                  <Icon size={20} className="text-gray-400" />
+                  {!collapsed && <span className="text-gray-400">{item.title}</span>}
+                  {!collapsed && <span className="ml-auto text-xs text-gray-400">🔒</span>}
+                </div>
+              );
+            }
+
             return (
               <Link key={item.path} to={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-orange-500 text-white' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'} ${collapsed ? 'justify-center' : ''}`}>
@@ -35,6 +60,16 @@ export default function MerchantSidebar() {
               </Link>
             );
           })}
+
+          {/* Vérification */}
+          {!isVerified && (
+            <Link to="/verification"
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${location.pathname === '/verification' ? 'bg-amber-50 text-amber-900' : 'text-amber-600 hover:bg-amber-50'} ${collapsed ? 'justify-center' : ''}`}>
+              <Shield size={20} />
+              {!collapsed && <span>Vérification</span>}
+              {!collapsed && isPending && <span className="ml-auto w-2 h-2 bg-amber-500 rounded-full animate-pulse"/>}
+            </Link>
+          )}
         </nav>
         
         <div className="p-3 border-t border-gray-100">
@@ -59,7 +94,18 @@ export default function MerchantSidebar() {
         <div className="flex items-center justify-around h-16">
           {menuItems.map((item) => {
             const isActive = location.pathname === item.path;
+            const isDisabled = item.requireVerification && !isVerified;
             const Icon = item.icon;
+
+            if (isDisabled) {
+              return (
+                <div key={item.path} className="flex flex-col items-center gap-0.5 px-3 py-2 text-xs font-medium text-gray-300 opacity-40 cursor-not-allowed">
+                  <Icon size={20} />
+                  <span className="truncate max-w-[60px]">{item.title}</span>
+                </div>
+              );
+            }
+
             return (
               <Link key={item.path} to={item.path}
                 className={`flex flex-col items-center gap-0.5 px-3 py-2 text-xs font-medium ${isActive ? 'text-orange-500' : 'text-gray-400'}`}>
