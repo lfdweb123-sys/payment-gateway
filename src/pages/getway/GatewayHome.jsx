@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   ArrowRight, CheckCircle, Globe, Shield, CreditCard, 
   Smartphone, Zap, Users, Star, Menu, X, TrendingUp,
