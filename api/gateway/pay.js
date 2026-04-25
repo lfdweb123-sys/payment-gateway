@@ -1,3 +1,5 @@
+import { validatePhone } from '../services/phoneValidator.js';
+
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -463,6 +465,12 @@ export default async function handler(req, res) {
   const { amount, country, method, phone, email, description } = req.body;
   if (!apiKey)                return res.status(401).json({ error: 'Clé API requise' });
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Montant invalide' });
+
+  // Validation numéro de téléphone
+  const phoneCheck = validatePhone(phone, country, method);
+  if (!phoneCheck.valid) {
+    return res.status(400).json({ error: phoneCheck.error });
+  }
 
   try {
     const merchantSnap = await db.collection('gateway_merchants').where('apiKey', '==', apiKey).limit(1).get();

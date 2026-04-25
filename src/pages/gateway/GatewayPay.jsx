@@ -5,6 +5,7 @@ import { db } from '../../services/firebase';
 import { Shield, Lock, Smartphone, CreditCard, ChevronRight, CheckCircle2, Globe, ArrowLeft, Zap } from 'lucide-react';
 import { getMethodsForCountryWithProviders, getCountriesForProviders } from '../../services/countryMethods';
 import toast from 'react-hot-toast';
+import { validatePhone } from '../../services/phoneValidator';
 
 /* ─── Constantes ───────────────────────────────────────── */
 const DEFAULT_SETTINGS = {
@@ -208,6 +209,12 @@ export default function GatewayPay() {
     setLoading(true);
     try {
       const fullPhone = getFullPhoneNumber();
+      const phoneCheck = validatePhone(fullPhone, country, selectedMethod?.id);
+      if (!phoneCheck.valid) {
+        toast.error(phoneCheck.error);
+        setLoading(false);
+        return;
+      }
       const res = await fetch('/api/gateway/pay', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-api-key':token },
