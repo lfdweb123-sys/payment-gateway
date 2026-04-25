@@ -21,21 +21,22 @@ export default async function handler(req, res) {
   if (!reference) return res.status(400).json({ error: 'Référence requise' });
 
   try {
-    const txSnap = await db.collection('gateway_transactions')
-      .where('providerRef', '==', reference).limit(1).get();
-
-    if (!txSnap.empty) {
-      const tx = { id: txSnap.docs[0].id, ...txSnap.docs[0].data() };
-      return res.status(200).json({ success: true, status: tx.status, reference: tx.providerRef, transaction: tx });
+    // Chercher par ID Firestore d'abord
+    let txDoc = await db.collection('gateway_transactions').doc(reference).get();
+    
+    // Si pas trouvé, chercher par providerRef
+    if (!txDoc.exists) {
+      const txSnap = await db.collection('gateway_transactions')
+        .where('providerRef', '==', reference).limit(1).get();
+      if (!txSnap.empty) txDoc = txSnap.docs[0];
     }
 
-    const txDoc = await db.collection('gateway_transactions').doc(reference).get();
-    if (txDoc.exists) {
-      const tx = { id: txDoc.id, ...txDoc.data() };
-      return res.status(200).json({ success: true, status: tx.status, reference, transaction: tx });
+    if (!txDoc || !txDoc.exists) {
+      return res.status(404).json({ error: 'Transaction introuvable', status: 'pending' });
     }
 
-    return res.status(404).json({ error: 'Transaction introuvable' });
+    const tx = { id: txDoc.id, ...txDoc.data() };
+    return res.status(200).json({ success: true, status: tx.status, reference: tx.providerRef, transaction: tx });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }

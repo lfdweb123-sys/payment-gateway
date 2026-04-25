@@ -97,7 +97,7 @@ export default function GatewayPay() {
         return;
       }
       try {
-        const r = await fetch(`/api/gateway/verify/${id}`, {
+        const r = await fetch(`/api/gateway/verify/${id}?merchantId=${merchant?.id}`, {
           headers: { 'x-api-key': token }
         });
         const d = await r.json();
