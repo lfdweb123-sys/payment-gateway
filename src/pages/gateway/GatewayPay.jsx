@@ -121,7 +121,22 @@ export default function GatewayPay() {
       })
       .catch(()=>toast.error('Impossible de charger le marchand'))
       .finally(()=>setFetchingMerchant(false));
-    try { const s=localStorage.getItem('gw_saved_phones'); if(s) setSavedPhones(JSON.parse(s)); } catch{}
+    try {
+      const s = localStorage.getItem('gw_saved_phones');
+      if (s) {
+        const parsed = JSON.parse(s);
+        // Dédupliquer par numéro au chargement
+        const seen = new Set();
+        const deduped = parsed.filter(p => {
+          if (seen.has(p.number)) return false;
+          seen.add(p.number);
+          return true;
+        });
+        setSavedPhones(deduped);
+        // Réécrire le localStorage propre
+        localStorage.setItem('gw_saved_phones', JSON.stringify(deduped));
+      }
+    } catch {}
   }, [token]);
 
   const handleSelectCountry = (code) => {
