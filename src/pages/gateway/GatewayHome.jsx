@@ -402,6 +402,7 @@ export default function Home() {
       </section>
 
       {/* ── PRICING ── */}
+      {/*
       <section id="pricing" style={{ background: '#fff', borderTop: '1px solid #EBEBEB', padding: '90px 32px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
@@ -416,9 +417,9 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Big commission card */}
+          {/* Big commission card 
           <div style={{ maxWidth: 680, margin: '0 auto 40px', background: 'linear-gradient(135deg,#FFF8F2,#FFF3EA)', border: '2px solid #FFDAB8', borderRadius: 28, padding: '52px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            {/* decorative circle */}
+            {/* decorative circle 
             <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,107,0,.06)', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', bottom: -40, left: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,170,0,.08)', pointerEvents: 'none' }} />
 
@@ -453,7 +454,7 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Reassurance row */}
+          {/* Reassurance row 
           <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
             {[
               { icon: CheckCircle, color: '#00A550', text: 'Sans engagement' },
@@ -468,6 +469,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      */}
 
       {/* ── CTA BAND ── */}
       <div style={{ background: 'linear-gradient(135deg,#FF6B00 0%,#FFAA00 100%)', padding: '72px 32px', textAlign: 'center' }}>
