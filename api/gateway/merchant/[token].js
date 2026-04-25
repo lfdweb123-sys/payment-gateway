@@ -21,10 +21,30 @@ export default async function handler(req, res) {
   if (!token) return res.status(400).json({ error: 'Token requis' });
 
   try {
-    const merchantSnap = await db.collection('gateway_merchants').where('apiKey', '==', token).limit(1).get();
+    const merchantSnap = await db.collection('gateway_merchants')
+      .where('apiKey', '==', token)
+      .limit(1)
+      .get();
+
     if (merchantSnap.empty) return res.status(404).json({ error: 'Marchand introuvable' });
-    const merchant = merchantSnap.docs[0].data();
-    return res.status(200).json({ success: true, name: merchant.name, active: merchant.active });
+
+    const merchantDoc = merchantSnap.docs[0];
+    const merchant = { id: merchantDoc.id, ...merchantDoc.data() };
+
+    // Extraire les providers actifs
+    const providers = merchant.providers || {};
+    const activeProviders = Object.entries(providers)
+      .filter(([, config]) => config.active)
+      .map(([key]) => key);
+
+    return res.status(200).json({
+      success: true,
+      id: merchant.id,
+      name: merchant.name,
+      active: merchant.active,
+      verificationStatus: merchant.verificationStatus,
+      activeProviders
+    });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
