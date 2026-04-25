@@ -89,10 +89,16 @@ export function validatePhone(phone, country, method) {
 
   // Extraire le numéro local : enlever l'indicatif pays
   const cleaned = phone.replace(/\s/g, '');
-  let local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
+  const local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
 
-  // Prendre les 2 premiers chiffres du numéro local
-  const prefix2 = local.slice(0, 2);
+  // Au Bénin, depuis nov. 2024 tous les numéros ont "01" devant
+  // Les 2 chiffres significatifs sont à la position 2 et 3
+  let prefix2;
+  if (country === 'bj') {
+    prefix2 = local.slice(2, 4);
+  } else {
+    prefix2 = local.slice(0, 2);
+  }
 
   if (!operatorData.prefixes.includes(prefix2)) {
     return {
@@ -113,7 +119,13 @@ export function detectNetwork(phone, country) {
 
   const cleaned = phone.replace(/\s/g, '');
   const local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
-  const prefix2 = local.slice(0, 2);
+
+  let prefix2;
+  if (country === 'bj') {
+    prefix2 = local.slice(2, 4);
+  } else {
+    prefix2 = local.slice(0, 2);
+  }
 
   for (const [methodId, data] of Object.entries(countryData)) {
     if (data.prefixes && data.prefixes.includes(prefix2)) {
