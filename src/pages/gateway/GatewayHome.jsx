@@ -7,6 +7,10 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
+import screen1 from '../../assets/1.png';
+import screen2 from '../../assets/2.png';
+import screen3 from '../../assets/3.png';
+
 const SLIDE_WORDS = [
   { word: "l'Afrique",  color: '#FF6B00' },
   { word: "l'Europe",   color: '#0057FF' },
@@ -76,6 +80,207 @@ function FloatingBadge({ style, iconColor, icon: Icon, children }) {
   );
 }
 
+/* ── LIGHTBOX ── */
+function Lightbox({ src, label, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1200,
+        background: 'rgba(0,0,0,0.82)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+        animation: 'lbFadeIn .2s ease',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          maxWidth: '90vw', maxHeight: '88vh',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+        }}
+      >
+        <img
+          src={src}
+          alt={label}
+          style={{
+            maxWidth: '88vw', maxHeight: '80vh',
+            borderRadius: 16,
+            objectFit: 'contain',
+            boxShadow: '0 32px 80px rgba(0,0,0,.5)',
+            display: 'block',
+          }}
+        />
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', fontWeight: 500 }}>{label}</span>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: -14, right: -14,
+            width: 34, height: 34, borderRadius: '50%',
+            background: '#fff', border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(0,0,0,.25)',
+          }}
+        >
+          <X size={16} color="#333" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── SCREENSHOT CARD ── */
+function ScreenCard({ src, label, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        cursor: 'pointer',
+        borderRadius: 16,
+        overflow: 'hidden',
+        border: `2px solid ${hovered ? '#FF6B00' : '#E8E8E8'}`,
+        boxShadow: hovered
+          ? '0 16px 48px rgba(255,107,0,0.22)'
+          : '0 6px 24px rgba(0,0,0,0.08)',
+        transform: hovered ? 'translateY(-6px) scale(1.025)' : 'translateY(0) scale(1)',
+        transition: 'all .28s ease',
+        background: '#fff',
+        position: 'relative',
+      }}
+    >
+      <img
+        src={src}
+        alt={label}
+        style={{
+          width: '100%',
+          height: 190,
+          objectFit: 'cover',
+          objectPosition: 'top',
+          display: 'block',
+        }}
+      />
+      {/* zoom hint overlay */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'rgba(255,107,0,0)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: hovered ? 1 : 0,
+        transition: 'opacity .22s',
+      }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.92)',
+          borderRadius: 10,
+          padding: '8px 16px',
+          fontSize: 12,
+          fontWeight: 700,
+          color: '#FF6B00',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          🔍 Voir en grand
+        </div>
+      </div>
+      <div style={{
+        padding: '10px 14px',
+        fontSize: 12, fontWeight: 600, color: '#444',
+        borderTop: '1px solid #F0F0F0',
+        background: '#FAFAFA',
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* ── SCREENSHOTS SECTION ── */
+const SCREENS = [
+  { src: screen1, label: 'Tableau de bord principal' },
+  { src: screen2, label: 'Gestion des transactions' },
+  { src: screen3, label: 'Rapports & analytics' },
+];
+
+function ScreenshotsSection() {
+  const [lightbox, setLightbox] = useState(null); // index | null
+
+  return (
+    <section style={{ background: '#F7F8FC', borderTop: '1px solid #EBEBEB', borderBottom: '1px solid #EBEBEB' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 32px' }}>
+
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#FF6B00', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12 }}>
+            <BarChart3 size={11} /> Aperçu
+          </div>
+          <h2 style={{ fontSize: 'clamp(26px,3.5vw,42px)', fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.025em', lineHeight: 1.1, marginBottom: 14 }}>
+            Une interface pensée<br />pour votre quotidien
+          </h2>
+          <p style={{ fontSize: 16, color: '#777', lineHeight: 1.65, maxWidth: 440, margin: '0 auto' }}>
+            Dashboard intuitif, suivi des transactions en temps réel et rapports détaillés. Cliquez sur une image pour l'agrandir.
+          </p>
+        </div>
+
+        {/*
+          ── TRIANGLE LAYOUT ──
+          Ligne 1 : image du centre (seule, centrée) → sommet
+          Ligne 2 : les deux autres côte à côte → base
+        */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+
+          {/* Sommet du triangle — image 1 centrée */}
+          <div style={{ width: '100%', maxWidth: 360 }}>
+            <ScreenCard
+              src={SCREENS[0].src}
+              label={SCREENS[0].label}
+              onClick={() => setLightbox(0)}
+            />
+          </div>
+
+          {/* Base du triangle — images 2 & 3 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 20,
+            width: '100%',
+            maxWidth: 760,
+          }}>
+            {SCREENS.slice(1).map((s, i) => (
+              <ScreenCard
+                key={i}
+                src={s.src}
+                label={s.label}
+                onClick={() => setLightbox(i + 1)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Hint clavier */}
+        <p style={{ textAlign: 'center', marginTop: 28, fontSize: 12, color: '#BBB', fontWeight: 500 }}>
+          Appuyez sur <kbd style={{ background: '#EEE', border: '1px solid #DDD', borderRadius: 5, padding: '2px 7px', fontSize: 11, color: '#666' }}>Échap</kbd> pour fermer
+        </p>
+      </div>
+
+      {/* Lightbox */}
+      {lightbox !== null && (
+        <Lightbox
+          src={SCREENS[lightbox].src}
+          label={SCREENS[lightbox].label}
+          onClose={() => setLightbox(null)}
+        />
+      )}
+    </section>
+  );
+}
+
 const PROVIDERS = [
   { name: 'FeexPay', region: 'Afrique' },
   { name: 'Stripe', region: 'Global' },
@@ -118,6 +323,7 @@ export default function Home() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes lbFadeIn { from{opacity:0} to{opacity:1} }
         .pp-ani { animation: fadeUp .65s ease both; }
         .pp-float { animation: floatY 4s ease-in-out infinite; }
         .pp-nav-link:hover { color:#FF6B00 !important; }
@@ -143,6 +349,7 @@ export default function Home() {
         @media(max-width:600px){
           .pp-feat-grid { grid-template-columns:1fr!important; }
           .pp-footer-grid { grid-template-columns:1fr!important; }
+          .pp-screens-base { grid-template-columns:1fr!important; }
         }
       `}</style>
 
@@ -157,7 +364,7 @@ export default function Home() {
           </a>
 
           <div className="pp-desktop-nav" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API']].map(([href, label]) => (
+            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API'],['#screenshots','Aperçu']].map(([href, label]) => (
               <a key={href} href={href} className="pp-nav-link" style={{ fontSize: 14, color: '#555', textDecoration: 'none', fontWeight: 500, transition: 'color .2s' }}>{label}</a>
             ))}
           </div>
@@ -184,7 +391,7 @@ export default function Home() {
 
         {mobileMenuOpen && (
           <div style={{ background: '#fff', borderTop: '1px solid #EEE', padding: '16px 28px 24px' }}>
-            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API']].map(([href, label], i, arr) => (
+            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API'],['#screenshots','Aperçu']].map(([href, label], i, arr) => (
               <a key={href} href={href} style={{ display: 'block', padding: '12px 0', fontSize: 15, color: '#444', borderBottom: i < arr.length-1 ? '1px solid #F3F3F3' : 'none', textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>{label}</a>
             ))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
@@ -394,6 +601,11 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── SCREENSHOTS ── */}
+      <div id="screenshots">
+        <ScreenshotsSection />
+      </div>
+
       {/* ── CTA BAND ── */}
       <div style={{ background: 'linear-gradient(135deg,#FF6B00 0%,#FFAA00 100%)', padding: '72px 32px', textAlign: 'center' }}>
         <h2 style={{ fontSize: 'clamp(26px,4vw,44px)', fontWeight: 900, color: '#fff', letterSpacing: '-.025em', marginBottom: 14 }}>
@@ -409,7 +621,7 @@ export default function Home() {
       </div>
 
       {/* ── FOOTER ── */}
-<footer style={{ background: '#0A0A0F', padding: '64px 32px 36px' }}>
+      <footer style={{ background: '#0A0A0F', padding: '64px 32px 36px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <div className="pp-footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 48, marginBottom: 48 }}>
             <div>
@@ -430,7 +642,7 @@ export default function Home() {
             </div>
 
             {[
-              { title: 'Produit', links: [['/#features','Fonctionnalités'],['/#api','API'],['/#providers','Providers']] },
+              { title: 'Produit', links: [['/#features','Fonctionnalités'],['/#api','API'],['/#providers','Providers'],['/#screenshots','Aperçu']] },
               { title: 'Ressources', links: [['/api-documentation','Documentation API'],['/help','Aide & Support'],['/contact','Contact']] },
               { title: 'Légal', links: [['/privacy','Confidentialité'],['/terms','CGU'],['/cookies','Cookies'],['/legal','Mentions légales']] },
             ].map((col, ci) => (
