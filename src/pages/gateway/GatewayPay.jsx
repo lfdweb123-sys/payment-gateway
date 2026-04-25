@@ -5,14 +5,15 @@ import { getMethodsForCountry, getAllCountries } from '../../services/countryMet
 import toast from 'react-hot-toast';
 
 const ACTIVE_PROVIDERS_METHODS = {
-  feexpay: {
+feexpay: {
     countries: {
-      bj: ['mtn_money', 'moov_money', 'celtiis_money'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money'],
-      tg: ['togocom_money', 'moov_money'],
-      sn: ['orange_money', 'free_money'],
-      bf: ['orange_money', 'moov_money'],
-      cg: ['mtn_money']
+      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card', 'wallet'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card', 'wallet'],
+      tg: ['togocom_money', 'moov_money', 'card', 'wallet'],
+      sn: ['orange_money', 'free_money', 'card', 'wallet'],
+      bf: ['orange_money', 'moov_money', 'card', 'wallet'],
+      ml: ['orange_money', 'moov_money', 'card', 'wallet'],
+      cg: ['mtn_money', 'card', 'wallet']
     }
   },
   stripe: {
@@ -123,6 +124,7 @@ const METHOD_NAMES = {
   card: 'Carte Bancaire', bank_transfer: 'Virement Bancaire', ussd: 'USSD',
   paypal: 'PayPal', apple_pay: 'Apple Pay', google_pay: 'Google Pay',
   chipper_wallet: 'Chipper Wallet', mobile_money: 'Mobile Money',
+  wallet: { name: 'Wallet (Coris)', icon: '💼' },
   ideal: 'iDEAL', giropay: 'Giropay', sofort: 'Sofort', bancontact: 'Bancontact'
 };
 
