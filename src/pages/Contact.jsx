@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Mail, Phone, MapPin, Send, CheckCircle, Loader } from 'lucide-react';
-import { sendEmail } from '../../services/emailService';
+import { sendEmail } from '../../services/brevo';
 import toast from 'react-hot-toast';
 
 const SUPPORT_EMAIL = import.meta.env.VITE_BREVO_SENDER_EMAIL || 'support@payment-gateway.com';
