@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { TrendingUp, DollarSign, CreditCard, Key, Clock, CheckCircle, Plus, Shield, AlertTriangle, Search, SlidersHorizontal, X, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, DollarSign, CreditCard, Key, Clock, CheckCircle, Plus, Shield, AlertTriangle, Search, X, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -18,7 +18,7 @@ export default function GatewayDashboard() {
   const [loading, setLoading] = useState(true);
   const [merchant, setMerchant] = useState(null);
 
-  const [showFilters, setShowFilters]     = useState(false);
+  
   const [search, setSearch]               = useState('');
   const [statusFilter, setStatusFilter]   = useState('Tous');
   const [providerFilter, setProviderFilter] = useState('Tous');
@@ -171,94 +171,72 @@ export default function GatewayDashboard() {
       <div className={`bg-white rounded-2xl border border-gray-100 overflow-hidden ${!isVerified ? 'opacity-50 pointer-events-none select-none' : ''}`}>
 
         {/* Header du bloc */}
-        <div className="px-5 py-4 border-b border-gray-100">
+        <div className="px-5 py-4 border-b border-gray-100 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold text-gray-900">Transactions récentes</h3>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowFilters(v => !v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                  showFilters || hasFilters
-                    ? 'bg-orange-50 border-orange-200 text-orange-600'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <SlidersHorizontal size={12} />
-                Filtres
-                {hasFilters && (
-                  <span className="bg-orange-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
-                    {[statusFilter !== 'Tous', providerFilter !== 'Tous', !!search].filter(Boolean).length}
-                  </span>
-                )}
-              </button>
+              {hasFilters && (
+                <button onClick={resetFilters} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+                  <X size={11} /> Réinitialiser
+                </button>
+              )}
               {isVerified && (
                 <Link to="/transactions" className="text-xs text-orange-500 hover:text-orange-600">Voir tout</Link>
               )}
             </div>
           </div>
 
-          {/* Panneau filtres */}
-          {showFilters && (
-            <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
-              {/* Recherche */}
-              <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={e => handleFilter(() => setSearch(e.target.value))}
-                  placeholder="Rechercher par provider, montant, pays…"
-                  className="w-full pl-8 pr-8 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-orange-400 focus:bg-white transition-colors"
-                />
-                {search && (
-                  <button onClick={() => handleFilter(() => setSearch(''))} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-
-              <div className="flex gap-2 flex-wrap items-center">
-                {/* Statut */}
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={e => handleFilter(() => setStatusFilter(e.target.value))}
-                    className="appearance-none text-xs border border-gray-200 rounded-lg bg-gray-50 pl-3 pr-7 py-2 focus:outline-none focus:border-orange-400 cursor-pointer"
-                  >
-                    {STATUS_FILTERS.map(s => (
-                      <option key={s} value={s}>{s === 'Tous' ? 'Tous les statuts' : STATUS_LABELS[s]}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-
-                {/* Provider */}
-                <div className="relative">
-                  <select
-                    value={providerFilter}
-                    onChange={e => handleFilter(() => setProviderFilter(e.target.value))}
-                    className="appearance-none text-xs border border-gray-200 rounded-lg bg-gray-50 pl-3 pr-7 py-2 focus:outline-none focus:border-orange-400 cursor-pointer"
-                  >
-                    {allProviders.map(p => (
-                      <option key={p} value={p}>{p === 'Tous' ? 'Tous les providers' : p}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-
-                {/* Reset */}
-                {hasFilters && (
-                  <button onClick={resetFilters} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-2">
-                    <X size={11} /> Réinitialiser
-                  </button>
-                )}
-
-                <span className="text-xs text-gray-400 ml-auto">
-                  {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}
-                </span>
-              </div>
+          {/* Filtres toujours visibles */}
+          <div className="flex gap-2 flex-wrap items-center">
+            {/* Recherche */}
+            <div className="relative flex-1 min-w-[160px]">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => handleFilter(() => setSearch(e.target.value))}
+                placeholder="Rechercher…"
+                className="w-full pl-8 pr-7 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 focus:outline-none focus:border-orange-400 focus:bg-white transition-colors"
+              />
+              {search && (
+                <button onClick={() => handleFilter(() => setSearch(''))} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X size={11} />
+                </button>
+              )}
             </div>
-          )}
+
+            {/* Statut */}
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={e => handleFilter(() => setStatusFilter(e.target.value))}
+                className="appearance-none text-xs border border-gray-200 rounded-lg bg-gray-50 pl-3 pr-7 py-2 focus:outline-none focus:border-orange-400 cursor-pointer"
+              >
+                {STATUS_FILTERS.map(s => (
+                  <option key={s} value={s}>{s === 'Tous' ? 'Tous les statuts' : STATUS_LABELS[s]}</option>
+                ))}
+              </select>
+              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* Provider */}
+            <div className="relative">
+              <select
+                value={providerFilter}
+                onChange={e => handleFilter(() => setProviderFilter(e.target.value))}
+                className="appearance-none text-xs border border-gray-200 rounded-lg bg-gray-50 pl-3 pr-7 py-2 focus:outline-none focus:border-orange-400 cursor-pointer"
+              >
+                {allProviders.map(p => (
+                  <option key={p} value={p}>{p === 'Tous' ? 'Tous les providers' : p}</option>
+                ))}
+              </select>
+              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+
+            <span className="text-xs text-gray-400 ml-auto">
+              {filtered.length} résultat{filtered.length !== 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
 
         {/* Liste */}
