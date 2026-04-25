@@ -8,10 +8,10 @@ import {
 import { useState, useEffect } from 'react';
 
 const SLIDE_WORDS = [
-  { word: 'Afrique',  color: '#FF6B00' },
-  { word: 'Europe',   color: '#0057FF' },
-  { word: 'Amérique', color: '#00A550' },
-  { word: 'le Monde', color: '#9B00E8' },
+  { word: "l'Afrique",  color: '#FF6B00' },
+  { word: "l'Europe",   color: '#0057FF' },
+  { word: "l'Amérique", color: '#00A550' },
+  { word: 'le Monde',   color: '#9B00E8' },
 ];
 
 function WordSlider() {
@@ -32,11 +32,9 @@ function WordSlider() {
   );
 }
 
-/* ── Dashboard mock for hero right side ── */
 function DashboardMock() {
   return (
     <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 28px 90px rgba(0,0,0,0.14)', padding: '24px', width: 320, border: '1px solid #F0F0F0', fontFamily: 'inherit' }}>
-      {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#bbb', textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 2 }}>Revenus du jour</div>
@@ -44,13 +42,11 @@ function DashboardMock() {
         </div>
         <span style={{ background: '#ECFDF5', color: '#00A550', fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 100 }}>+18% ↑</span>
       </div>
-      {/* mini bar chart */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 48, marginBottom: 18 }}>
         {[30, 55, 40, 70, 50, 90, 65, 85, 60, 100, 75, 88].map((h, i) => (
           <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 4, background: i === 10 ? '#FF6B00' : '#F0F0F0', transition: 'height .3s' }} />
         ))}
       </div>
-      {/* transactions */}
       {[
         { label: 'MTN Mobile Money', country: '🇧🇯', amount: '+125 000', color: '#FFAA00' },
         { label: 'Stripe · Visa', country: '🇫🇷', amount: '+89 500', color: '#0057FF' },
@@ -207,7 +203,7 @@ export default function Home() {
           <div className="pp-ani">
             <h1 style={{ fontSize: 'clamp(38px,4.8vw,64px)', fontWeight: 900, lineHeight: 1.07, letterSpacing: '-.03em', marginBottom: 22, color: '#0A0A0A' }}>
               Acceptez les paiements<br />
-              <span style={{ color: '#222' }}>en </span><WordSlider /><br />
+              <span style={{ color: '#222' }}>pour </span><WordSlider /><br />
               <span style={{ color: '#222' }}>en un instant.</span>
             </h1>
             <p style={{ fontSize: 17, color: '#666', lineHeight: 1.7, maxWidth: 460, marginBottom: 34 }}>
@@ -333,7 +329,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Methods pills */}
           <div style={{ marginTop: 28, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {['MTN Mobile Money','Orange Money','Moov Money','Wave','M-Pesa','Visa','Mastercard','American Express','PayPal','Virement SEPA','Apple Pay','Google Pay','USSD'].map((m) => (
               <span key={m} style={{ fontSize: 12, fontWeight: 500, color: '#666', background: '#fff', border: '1px solid #E8E8E8', padding: '5px 12px', borderRadius: 100 }}>{m}</span>
@@ -347,7 +342,6 @@ export default function Home() {
       <section id="api">
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 32px' }}>
           <div className="pp-api-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, alignItems: 'center' }}>
-            {/* Left — code */}
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#FF6B00', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12 }}>
                 <Code2 size={11} /> API
@@ -378,7 +372,6 @@ export default function Home() {
 </form>`}</pre>
               </div>
             </div>
-            {/* Right — features */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
                 { icon: Code2, title: 'Clé API unique', desc: 'Une seule clé pour tous les providers. Pas de configuration par provider.', color: '#FF6B00', bg: '#FFF3EA' },
@@ -416,7 +409,7 @@ export default function Home() {
       </div>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background: '#0A0A0F', padding: '64px 32px 36px' }}>
+<footer style={{ background: '#0A0A0F', padding: '64px 32px 36px' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
           <div className="pp-footer-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 48, marginBottom: 48 }}>
             <div>
@@ -438,7 +431,7 @@ export default function Home() {
 
             {[
               { title: 'Produit', links: [['/#features','Fonctionnalités'],['/#api','API'],['/#providers','Providers']] },
-              { title: 'Ressources', links: [['/api-documentation','Documentation API'],['a/help','Aide & Support'],['a/contact','Contact']] },
+              { title: 'Ressources', links: [['/api-documentation','Documentation API'],['/help','Aide & Support'],['/contact','Contact']] },
               { title: 'Légal', links: [['/privacy','Confidentialité'],['/terms','CGU'],['/cookies','Cookies'],['/legal','Mentions légales']] },
             ].map((col, ci) => (
               <div key={ci}>
@@ -453,7 +446,14 @@ export default function Home() {
             ))}
           </div>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          {/* Disclaimer légal */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 20, marginBottom: 16 }}>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', textAlign: 'center', lineHeight: 1.7, maxWidth: 860, margin: '0 auto' }}>
+              Payment Gateway est une plateforme de passerelle de paiement technique. Nous ne sommes ni un agrégateur de paiement, ni un établissement de paiement, ni un organisme financier. Nous ne collectons, ne détenons ni ne transférons de fonds. Toutes les transactions sont traitées directement par les prestataires de services de paiement agréés intégrés à notre plateforme.
+            </p>
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 20, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
             <span style={{ fontSize: 12, color: '#fff' }}>© {new Date().getFullYear()} Paiement Pro. Tous droits réservés.</span>
             <span style={{ fontSize: 12, color: '#fff' }}>Développé avec ❤️ depuis le Bénin</span>
           </div>
