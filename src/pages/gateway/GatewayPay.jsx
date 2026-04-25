@@ -4,6 +4,26 @@ import { Shield, Lock, Smartphone, CreditCard, ChevronRight, CheckCircle2, Globe
 import { getMethodsForCountryWithProviders, getCountriesForProviders } from '../../services/countryMethods';
 import toast from 'react-hot-toast';
 
+// Barre de chargement animée en haut de page
+function TopLoadingBar({ visible }) {
+  if (!visible) return null;
+  return (
+    <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-transparent overflow-hidden">
+      <div
+        className="h-full bg-gray-900 rounded-full"
+        style={{ animation: 'topbar 1.6s ease-in-out infinite' }}
+      />
+      <style>{`
+        @keyframes topbar {
+          0%   { width: 0%;  margin-left: 0%; }
+          50%  { width: 65%; margin-left: 18%; }
+          100% { width: 0%;  margin-left: 100%; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function getMethodIcon(methodId, size = 20) {
   const cardTypes = ['card','paypal','apple_pay','google_pay','chipper_wallet','bank_transfer','ideal','bancontact','giropay','sofort'];
   return cardTypes.includes(methodId) ? <CreditCard size={size} /> : <Smartphone size={size} />;
@@ -90,6 +110,7 @@ export default function GatewayPay() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <TopLoadingBar visible={loading} />
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 w-full max-w-xl overflow-hidden">
 
         {/* Header */}
