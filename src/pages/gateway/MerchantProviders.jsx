@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { sendEmail } from '../../services/brevo';
 import {
   CheckCircle, Eye, EyeOff, Save,
   ExternalLink, X, Globe, Plus, AlertCircle, Send, Info
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const SUPPORT_EMAIL = import.meta.env.VITE_BREVO_SENDER_EMAIL || 'support@payment-gateway.com';
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
@@ -208,11 +211,43 @@ const PROVIDER_LIST = [
 function SuggestModal({ onClose }) {
   const [form, setForm] = useState({ name:'', website:'', countries:'', methods:'', reason:'' });
   const [sent, setSent] = useState(false);
-  const handleSubmit = () => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
     if (!form.name.trim()) { toast.error('Le nom du provider est requis'); return; }
-    setSent(true);
-    setTimeout(onClose, 2400);
+    setLoading(true);
+    try {
+      const result = await sendEmail({
+        to: SUPPORT_EMAIL,
+        toName: 'Support Payment Gateway',
+        subject: `[Suggestion Provider] ${form.name}`,
+        htmlContent: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f9fafb;">
+            <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:28px;">
+              <h2 style="color:#111827;margin:0 0 20px;font-size:18px;">💡 Nouvelle suggestion de provider</h2>
+              <table style="width:100%;border-collapse:collapse;">
+                <tr><td style="padding:8px 0;color:#6b7280;font-size:13px;width:130px;vertical-align:top;"><strong>Provider</strong></td><td style="padding:8px 0;color:#111827;font-size:13px;">${form.name}</td></tr>
+                ${form.website ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:13px;vertical-align:top;"><strong>Site web</strong></td><td style="padding:8px 0;font-size:13px;"><a href="${form.website}" style="color:#f97316;">${form.website}</a></td></tr>` : ''}
+                ${form.countries ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:13px;vertical-align:top;"><strong>Pays couverts</strong></td><td style="padding:8px 0;color:#111827;font-size:13px;">${form.countries}</td></tr>` : ''}
+                ${form.methods ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:13px;vertical-align:top;"><strong>Méthodes</strong></td><td style="padding:8px 0;color:#111827;font-size:13px;">${form.methods}</td></tr>` : ''}
+                ${form.reason ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:13px;vertical-align:top;"><strong>Raison</strong></td><td style="padding:8px 0;color:#111827;font-size:13px;">${form.reason}</td></tr>` : ''}
+              </table>
+              <p style="color:#9ca3af;font-size:11px;margin-top:20px;border-top:1px solid #f3f4f6;padding-top:12px;">Reçu le ${new Date().toLocaleString('fr-FR')} • Payment Gateway</p>
+            </div>
+          </div>
+        `,
+      });
+      if (!result.success) throw new Error(result.error);
+      setSent(true);
+      setTimeout(onClose, 2400);
+    } catch(err) {
+      console.error(err);
+      toast.error('Erreur lors de l\'envoi');
+    } finally {
+      setLoading(false);
+    }
   };
+
   const fields = [
     { key:'name',     label:"Nom du provider / agrégateur", placeholder:'Ex : WavePay', required:true },
     { key:'website',  label:'Site web',                     placeholder:'https://...' },
@@ -220,6 +255,7 @@ function SuggestModal({ onClose }) {
     { key:'methods',  label:'Méthodes de paiement',         placeholder:'Ex : Mobile Money, Carte Bancaire' },
     { key:'reason',   label:"Pourquoi l'ajouter ?",         placeholder:'Optionnel' },
   ];
+
   return (
     <div className="mp-overlay" onClick={onClose}>
       <div className="mp-modal" onClick={e=>e.stopPropagation()}>
@@ -245,8 +281,12 @@ function SuggestModal({ onClose }) {
                   onChange={e=>setForm(p=>({...p,[key]:e.target.value}))} placeholder={placeholder}/>
               </div>
             ))}
-            <button className="mp-btn-save" onClick={handleSubmit} style={{marginTop:4}}>
-              <Send size={13}/> Envoyer la suggestion
+            <button className="mp-btn-save" onClick={handleSubmit} disabled={loading} style={{marginTop:4}}>
+              {loading
+                ? <span className="mp-spinner"/>
+                : <Send size={13}/>
+              }
+              {loading ? 'Envoi en cours…' : 'Envoyer la suggestion'}
             </button>
           </div>
         )}
@@ -292,7 +332,7 @@ function MethodsModal({ provider, onClose }) {
   );
 }
 
-/* ── Provider card — full size, fully expanded when active ── */
+/* ── Provider card ── */
 function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
   const [showKeys, setShowKeys] = useState({});
   const [localKeys, setLocalKeys] = useState(
@@ -320,7 +360,6 @@ function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
 
   return (
     <div className={`mp-card ${provider.active?'active':''}`}>
-      {/* Header */}
       <div className="mp-card-header">
         <div className="mp-provider-logo">{provider.name.slice(0,2).toUpperCase()}</div>
         <div style={{flex:1,minWidth:0}}>
@@ -341,7 +380,6 @@ function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
         </label>
       </div>
 
-      {/* Body — shown when active */}
       {provider.active && (
         <div className="mp-card-body">
           <div className="mp-action-row">
@@ -352,9 +390,7 @@ function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
               <Globe size={11}/> Site web <ExternalLink size={10}/>
             </a>
           </div>
-
           <hr className="mp-divider" style={{margin:'0 0 14px'}}/>
-
           {provider.keys.map(key=>(
             <div key={key.name} className="mp-field">
               <label className="mp-label">{key.name}<span className="mp-label-req">*</span></label>
@@ -379,7 +415,6 @@ function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
               )}
             </div>
           ))}
-
           <button className="mp-btn-save" onClick={handleSave} disabled={saving===provider.id}>
             {saving===provider.id ? <span className="mp-spinner"/> : <Save size={13}/>}
             Enregistrer
