@@ -63,7 +63,7 @@ function AppContent() {
         {/* Sidebar marchand (pas sur admin, pas sur auth, pas sur public) */}
         {user && !isAuthPage && !isPublicPage && !isAdminRoute && <MerchantSidebar />}
         
-        <main className={`flex-1 ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'lg:ml-64' : ''} ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'pt-16 pb-16 lg:pb-0' : ''}`}>
+        <main className={`flex-1 min-w-0 overflow-x-hidden ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'lg:ml-64' : ''} ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'pt-16 pb-16 lg:pb-0' : ''}`}>
           <Routes>
             {/* Pages publiques */}
             <Route path="/" element={<GatewayHome />} />
