@@ -41,7 +41,7 @@ export default function GatewayPay() {
   const [country, setCountry] = useState(null);
   const [countryData, setCountryData] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState(null);
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneSuffix, setPhoneSuffix] = useState('');
   const [amount] = useState(amountParam || '5000');
   const [loading, setLoading] = useState(false);
   const [merchant, setMerchant] = useState(null);
@@ -66,7 +66,13 @@ export default function GatewayPay() {
   const handleSelectCountry = (code) => {
     setCountry(code);
     setCountryData(getMethodsForCountryWithProviders(code, merchant?.activeProviders || []));
+    setPhoneSuffix('');
     setStep(2);
+  };
+
+  const getFullPhoneNumber = () => {
+    const prefix = COUNTRY_PREFIXES[country] || '';
+    return prefix ? `${prefix} ${phoneSuffix}`.trim() : phoneSuffix;
   };
 
   const savePhoneNumber = (phone) => {
@@ -104,10 +110,10 @@ export default function GatewayPay() {
     try {
       const res = await fetch('/api/gateway/pay', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': token },
-        body: JSON.stringify({ amount: parseFloat(amount), country, method: selectedMethod?.id, phone: phoneNumber, description }),
+        body: JSON.stringify({ amount: parseFloat(amount), country, method: selectedMethod?.id, phone: getFullPhoneNumber(), description }),
       });
       const data = await res.json();
-      if (data.success) { setLoading(false); savePhoneNumber(phoneNumber); pollStatus(data.transactionId); }
+      if (data.success) { setLoading(false); savePhoneNumber(getFullPhoneNumber()); pollStatus(data.transactionId); }
       else { toast.error(data.error || 'Une erreur est survenue'); setLoading(false); }
     } catch { toast.error('Erreur de connexion'); setLoading(false); }
   };
@@ -211,19 +217,39 @@ export default function GatewayPay() {
 
           {step === 3 && selectedMethod && (
             <div>
-              <button onClick={() => { setStep(2); setSelectedMethod(null); }} className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-900 mb-5"><ArrowLeft size={14} /> Changer de méthode</button>
+              <button onClick={() => { setStep(2); setSelectedMethod(null); setPhoneSuffix(''); }} className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-900 mb-5"><ArrowLeft size={14} /> Changer de méthode</button>
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl mb-6"><div className="w-11 h-11 bg-gray-900 rounded-xl flex items-center justify-center text-white shrink-0">{getMethodIcon(selectedMethod.id)}</div><div><p className="text-sm font-semibold text-gray-900">{selectedMethod.name}</p><p className="text-xs text-gray-400">{countryData?.flag} {countryData?.name}</p></div></div>
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Numéro de téléphone</label>
-                  <input type="tel" value={phoneNumber} onChange={e => { setPhoneNumber(e.target.value); setShowSuggestions(e.target.value.length === 0); }} onFocus={() => setShowSuggestions(phoneNumber.length === 0)}
-                    className="w-full px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 outline-none transition-shadow"
-                    placeholder={`Ex: ${COUNTRY_PREFIXES[country] || ''} 97 00 00 00`} required />
-                  {showSuggestions && filteredSuggestions.length > 0 && phoneNumber.length === 0 && (
+                  <div className="relative">
+                    <input 
+                      type="tel" 
+                      value={`${COUNTRY_PREFIXES[country] || ''} ${phoneSuffix}`}
+                      onChange={e => {
+                        const prefix = COUNTRY_PREFIXES[country] || '';
+                        const val = e.target.value;
+                        if (prefix && !val.startsWith(prefix)) return;
+                        const suffix = prefix ? val.slice(prefix.length).trim() : val;
+                        setPhoneSuffix(suffix);
+                        setShowSuggestions(suffix.length === 0);
+                      }} 
+                      onFocus={() => setShowSuggestions(phoneSuffix.length === 0)}
+                      className="w-full px-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 outline-none transition-shadow font-mono"
+                      required 
+                    />
+                  </div>
+                  {showSuggestions && filteredSuggestions.length > 0 && phoneSuffix.length === 0 && (
                     <div className="mt-2 space-y-1.5">
                       <p className="text-xs text-gray-400">Numéros déjà utilisés :</p>
                       {filteredSuggestions.map((p, i) => (
-                        <button key={i} type="button" onClick={() => { setPhoneNumber(p.number); setShowSuggestions(false); }}
+                        <button key={i} type="button" onClick={() => { 
+                          const prefix = COUNTRY_PREFIXES[country] || '';
+                          const savedPhone = p.number;
+                          const savedSuffix = prefix ? savedPhone.replace(prefix + ' ', '').replace(prefix, '') : savedPhone;
+                          setPhoneSuffix(savedSuffix); 
+                          setShowSuggestions(false); 
+                        }}
                           className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm text-gray-700 transition-colors flex items-center gap-2">
                           <Smartphone size={14} className="text-gray-400" />
                           <span className="font-mono">{maskPhone(p.number)}</span>
