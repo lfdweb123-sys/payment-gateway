@@ -15,14 +15,16 @@ export default function GatewayPay() {
   const [countryData, setCountryData] = useState(null);
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [amount, setAmount] = useState(amountParam || '');
+  const [amount, setAmount] = useState(amountParam || '5000');
   const [loading, setLoading] = useState(false);
   const [merchantName, setMerchantName] = useState('');
   const [countries, setCountries] = useState([]);
   const [status, setStatus] = useState(null);
+  const [customAmount, setCustomAmount] = useState(!amountParam);
 
   useEffect(() => {
-    setCountries(getAllCountries());
+    const allCountries = getAllCountries();
+    setCountries(allCountries);
     if (token) {
       fetch(`/api/gateway/merchant/${token}`)
         .then(r => r.json())
@@ -68,6 +70,12 @@ export default function GatewayPay() {
     return <Smartphone size={22} />;
   };
 
+  // Filtrer les pays qui ont des méthodes
+  const availableCountries = countries.filter(c => {
+    const methods = getMethodsForCountry(c.code);
+    return methods && methods.methods && methods.methods.length > 0;
+  });
+
   if (status === 'success') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -76,7 +84,7 @@ export default function GatewayPay() {
             <CheckCircle size={32} className="text-emerald-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Paiement initié !</h2>
-          <p className="text-gray-500 text-sm mb-4">Suivez les instructions sur votre téléphone pour finaliser le paiement.</p>
+          <p className="text-gray-500 text-sm mb-4">Suivez les instructions sur votre téléphone.</p>
           <div className="bg-gray-50 rounded-xl p-4">
             <p className="text-2xl font-bold text-gray-900">{parseFloat(amount).toLocaleString()} {countryData?.currency || 'XOF'}</p>
             <p className="text-xs text-gray-500 mt-1">{description}</p>
@@ -99,14 +107,18 @@ export default function GatewayPay() {
             {merchantName && <span className="text-xs text-gray-400">{merchantName}</span>}
           </div>
           <div className="text-center">
-            <p className="text-3xl font-bold">{parseFloat(amount || 0).toLocaleString()} <span className="text-lg text-gray-400">{countryData?.currency || 'XOF'}</span></p>
+            {customAmount ? (
+              <div>
+                <p className="text-3xl font-bold">
+                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+                    className="bg-transparent border-b-2 border-white/30 text-center w-40 outline-none text-white" placeholder="0" />
+                  <span className="text-lg text-gray-400 ml-1">{countryData?.currency || 'XOF'}</span>
+                </p>
+              </div>
+            ) : (
+              <p className="text-3xl font-bold">{parseFloat(amount || 0).toLocaleString()} <span className="text-lg text-gray-400">{countryData?.currency || 'XOF'}</span></p>
+            )}
             <p className="text-sm text-gray-400 mt-1">{description}</p>
-          </div>
-          {/* Étapes */}
-          <div className="flex items-center justify-center gap-2 mt-5">
-            {[1, 2, 3].map(s => (
-              <div key={s} className={`w-8 h-1 rounded-full ${step >= s ? 'bg-white' : 'bg-gray-600'}`} />
-            ))}
           </div>
         </div>
 
@@ -115,36 +127,36 @@ export default function GatewayPay() {
           {step === 1 && (
             <div>
               <p className="text-sm font-semibold text-gray-900 mb-3">Sélectionnez votre pays</p>
-              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                {countries.filter(c => getMethodsForCountry(c.code)?.methods?.length > 0).map(c => (
-                  <button key={c.code} onClick={() => handleSelectCountry(c.code)}
-                    className="p-4 rounded-xl border border-gray-200 text-left hover:border-gray-400 hover:shadow-sm transition-all group">
-                    <span className="text-2xl">{c.flag}</span>
-                    <div className="flex items-center justify-between mt-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                        <p className="text-xs text-gray-500">{c.currency}</p>
+              {availableCountries.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                  {availableCountries.map(c => (
+                    <button key={c.code} onClick={() => handleSelectCountry(c.code)}
+                      className="p-4 rounded-xl border border-gray-200 text-left hover:border-gray-400 hover:shadow-sm transition-all group">
+                      <span className="text-2xl">{c.flag}</span>
+                      <div className="flex items-center justify-between mt-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                          <p className="text-xs text-gray-500">{c.currency}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-900" />
                       </div>
-                      <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-900" />
-                    </div>
-                  </button>
-                ))}
-                {countries.filter(c => getMethodsForCountry(c.code)?.methods?.length > 0).length === 0 && (
-                  <div className="col-span-2 text-center py-8 text-sm text-gray-400">
-                    <Globe size={32} className="mx-auto mb-2 text-gray-300" />
-                    Aucun moyen de paiement disponible pour le moment
-                  </div>
-                )}
-              </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-xl">
+                  <Globe size={40} className="mx-auto mb-3 text-gray-300" />
+                  <p className="text-sm text-gray-500 font-medium">Aucun moyen de paiement disponible</p>
+                  <p className="text-xs text-gray-400 mt-1">Le marchand n'a pas encore configuré ses providers.</p>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Étape 2 : Méthode */}
+          {/* Étape 2 */}
           {step === 2 && countryData && (
             <div>
-              <button onClick={() => setStep(1)} className="text-sm text-gray-500 hover:text-gray-900 mb-3 flex items-center gap-1">
-                ← Retour
-              </button>
+              <button onClick={() => setStep(1)} className="text-sm text-gray-500 hover:text-gray-900 mb-3 flex items-center gap-1">← Retour</button>
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl mb-3">
                 <span className="text-2xl">{countryData.flag}</span>
                 <div>
@@ -167,24 +179,17 @@ export default function GatewayPay() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-sm text-gray-400">
-                  <Smartphone size={32} className="mx-auto mb-2 text-gray-300" />
-                  Aucune méthode disponible pour ce pays
-                </div>
+                <div className="text-center py-8 text-sm text-gray-400">Aucune méthode disponible pour ce pays</div>
               )}
             </div>
           )}
 
-          {/* Étape 3 : Paiement */}
+          {/* Étape 3 */}
           {step === 3 && selectedMethod && (
             <div>
-              <button onClick={() => setStep(2)} className="text-sm text-gray-500 hover:text-gray-900 mb-3 flex items-center gap-1">
-                ← Retour
-              </button>
+              <button onClick={() => setStep(2)} className="text-sm text-gray-500 hover:text-gray-900 mb-3 flex items-center gap-1">← Retour</button>
               <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl mb-4">
-                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white">
-                  {getMethodIcon(selectedMethod.id)}
-                </div>
+                <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white">{getMethodIcon(selectedMethod.id)}</div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{selectedMethod.name}</p>
                   <p className="text-xs text-gray-500">{countryData?.flag} {countryData?.name}</p>
@@ -193,28 +198,21 @@ export default function GatewayPay() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Montant ({countryData?.currency || 'XOF'})</label>
-                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-lg font-bold text-center focus:ring-2 focus:ring-gray-900 outline-none" />
+                  <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Numéro de téléphone</label>
+                  <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 outline-none"
+                    placeholder="Ex: 229 97 00 00 00" required />
                 </div>
-                {selectedMethod.id !== 'paypal' && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 uppercase mb-1.5">Numéro de téléphone</label>
-                    <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-gray-900 outline-none"
-                      placeholder="Ex: 229 97 00 00 00" required />
-                  </div>
-                )}
                 <button type="submit" disabled={loading}
-                  className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center gap-2 text-lg">
-                  {loading ? 'Traitement...' : <>Payer {parseFloat(amount || 0).toLocaleString()} {countryData?.currency || 'XOF'} <ArrowRight size={20} /></>}
+                  className="w-full bg-gray-900 text-white font-semibold py-4 rounded-xl hover:bg-gray-800 disabled:opacity-50 text-lg">
+                  {loading ? 'Traitement...' : `Payer ${parseFloat(amount || 0).toLocaleString()} ${countryData?.currency || 'XOF'}`}
                 </button>
               </form>
             </div>
           )}
 
           <p className="text-xs text-gray-400 text-center flex items-center justify-center gap-1 pt-2">
-            <Lock size={11} /> Paiement sécurisé • 1% commission
+            <Lock size={11} /> Paiement sécurisé
           </p>
         </div>
       </div>
