@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { sendEmail, getVerificationApprovedTemplate, getVerificationRejectedTemplate } from '../../services/brevo';
 import { CheckCircle, XCircle, Eye, ArrowLeft, X, Shield, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -34,6 +35,23 @@ export default function AdminVerifications() {
         updatedAt: new Date().toISOString()
       };
       await updateDoc(doc(db, 'gateway_merchants', merchantId), updateData);
+      
+      const merchant = merchants.find(m => m.id === merchantId);
+      
+      // Envoyer email de notification
+      if (merchant?.email) {
+        const template = status === 'approved' 
+          ? getVerificationApprovedTemplate(merchant.name || merchant.email)
+          : getVerificationRejectedTemplate(merchant.name || merchant.email);
+        
+        sendEmail({
+          to: merchant.email,
+          toName: merchant.name || merchant.email,
+          subject: status === 'approved' ? '✅ Compte vérifié - Passerelle de Paiement' : '❌ Vérification refusée - Passerelle de Paiement',
+          htmlContent: template
+        });
+      }
+
       setMerchants(prev => prev.filter(m => m.id !== merchantId));
       setSelected(null);
       toast.success(status === 'approved' ? '✅ Compte approuvé et activé' : '❌ Compte rejeté');
@@ -48,7 +66,6 @@ export default function AdminVerifications() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5">
-      {/* Popup preview */}
       {previewImage && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
           <div className="max-w-4xl max-h-[90vh]" onClick={e => e.stopPropagation()}>
@@ -110,52 +127,26 @@ export default function AdminVerifications() {
                   ) : <p className="text-xs text-gray-400 py-12">Non fourni</p>}
                 </div>
               </div>
-              {selected.verificationData?.companyDocBase64 && (
-                <div className="mt-4 border border-blue-200 rounded-xl p-4 text-center bg-blue-50">
-                  <p className="text-xs text-gray-500 uppercase mb-3">Registre de Commerce</p>
-                  <img src={selected.verificationData.companyDocBase64} alt="RCCM" className="w-full h-48 object-contain rounded-lg cursor-pointer" onClick={() => setPreviewImage(selected.verificationData.companyDocBase64)} />
-                </div>
-              )}
             </div>
           </div>
         </div>
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Vérifications en attente</h1>
-              <p className="text-xs text-gray-500">{merchants.length} demande{merchants.length > 1 ? 's' : ''}</p>
-            </div>
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"/>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs w-40"/>
-            </div>
+            <div><h1 className="text-xl font-bold text-gray-900">Vérifications en attente</h1><p className="text-xs text-gray-500">{merchants.length} demande{merchants.length > 1 ? 's' : ''}</p></div>
+            <div className="relative"><Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher..." className="pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs w-40"/></div>
           </div>
-
           {filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-              <CheckCircle size={48} className="text-emerald-300 mx-auto mb-3"/>
-              <p className="text-gray-500">Aucune vérification en attente</p>
-            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center"><CheckCircle size={48} className="text-emerald-300 mx-auto mb-3"/><p className="text-gray-500">Aucune vérification en attente</p></div>
           ) : (
             <div className="space-y-2">
               {filtered.map(m => (
                 <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center justify-between hover:border-gray-200 transition-all">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold">
-                      {m.name?.charAt(0) || m.email?.charAt(0) || '?'}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">{m.name || m.email}</p>
-                      <p className="text-xs text-gray-500">
-                        {m.verificationData?.documentType || 'Document'} 
-                        {m.verificationData?.submittedAt ? ` • ${format(new Date(m.verificationData.submittedAt), 'dd/MM/yy', {locale: fr})}` : ''}
-                      </p>
-                    </div>
+                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold">{m.name?.charAt(0) || m.email?.charAt(0) || '?'}</div>
+                    <div><p className="text-sm font-semibold text-gray-900">{m.name || m.email}</p><p className="text-xs text-gray-500">{m.verificationData?.documentType || 'Document'} {m.verificationData?.submittedAt ? ` • ${format(new Date(m.verificationData.submittedAt), 'dd/MM/yy', {locale: fr})}` : ''}</p></div>
                   </div>
-                  <button onClick={() => setSelected(m)} className="text-sm bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center gap-1.5">
-                    <Eye size={14}/> Examiner
-                  </button>
+                  <button onClick={() => setSelected(m)} className="text-sm bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center gap-1.5"><Eye size={14}/> Examiner</button>
                 </div>
               ))}
             </div>

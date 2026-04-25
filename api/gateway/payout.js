@@ -11,9 +11,36 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// ═══════════════════════════════════════════
-// PROVIDERS AVEC API PAYOUT
-// ═══════════════════════════════════════════
+// Templates email
+function getPayoutSentTemplate(name, amount, reference) {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#f9fafb;">
+      <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:24px;text-align:center;">
+        <div style="font-size:32px;margin-bottom:12px;">📤</div>
+        <h2 style="color:#111827;margin:0 0 8px;">Retrait envoyé</h2>
+        <p style="color:#6b7280;font-size:14px;">Bonjour ${name},</p>
+        <p style="color:#6b7280;font-size:14px;">Retrait de <strong>${amount.toLocaleString()} XOF</strong> envoyé sur votre numéro.</p>
+        <p style="color:#9ca3af;font-size:12px;margin-top:8px;">Réf: ${reference}</p>
+        <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Passerelle de Paiement</p>
+      </div>
+    </div>`;
+}
+
+async function sendBrevoEmail({ to, toName, subject, htmlContent }) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) return;
+  try {
+    await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'api-key': apiKey },
+      body: JSON.stringify({
+        sender: { name: 'Passerelle de Paiement', email: process.env.BREVO_SENDER_EMAIL || 'noreply@payment-gateway.com' },
+        to: [{ email: to, name: toName || to }],
+        subject, htmlContent
+      })
+    });
+  } catch (e) { console.error('Erreur Brevo:', e); }
+}
 
 const PAYOUT_PROVIDERS = {
   feexpay: {
@@ -29,7 +56,6 @@ const PAYOUT_PROVIDERS = {
       return { success: true, reference: data.reference, status: data.status, provider: 'feexpay' };
     }
   },
-
   kkiapay: {
     name: 'KKiaPay',
     payout: async (config, { amount, phone }) => {
@@ -43,7 +69,6 @@ const PAYOUT_PROVIDERS = {
       return { success: true, reference: data.transaction_id, status: data.status, provider: 'kkiapay' };
     }
   },
-
   fedapay: {
     name: 'FedaPay',
     payout: async (config, { amount, phone }) => {
@@ -57,7 +82,6 @@ const PAYOUT_PROVIDERS = {
       return { success: true, reference: data.id?.toString(), status: data.status, provider: 'fedapay' };
     }
   },
-
   cinetpay: {
     name: 'CinetPay',
     payout: async (config, { amount, phone, network }) => {
@@ -73,7 +97,6 @@ const PAYOUT_PROVIDERS = {
   }
 };
 
-// Détection réseau
 function detectNetwork(phone) {
   const p = String(phone).replace(/[^0-9]/g, '');
   if (p.startsWith('229')) {
@@ -88,7 +111,6 @@ function detectNetwork(phone) {
   return 'MTN';
 }
 
-// Priorité des providers pour le payout
 const PAYOUT_PRIORITY = ['feexpay', 'kkiapay', 'fedapay', 'cinetpay'];
 
 export default async function handler(req, res) {
@@ -117,7 +139,6 @@ export default async function handler(req, res) {
 
     const network = detectNetwork(w.phone);
 
-    // Si un provider spécifique est demandé, l'utiliser
     if (providerId) {
       const provider = PAYOUT_PROVIDERS[providerId];
       if (!provider) return res.status(400).json({ error: 'Provider non supporté' });
@@ -132,11 +153,17 @@ export default async function handler(req, res) {
         await db.collection('gateway_merchants').doc(w.merchantId).update({
           balance: admin.firestore.FieldValue.increment(-w.amount), updatedAt: new Date().toISOString()
         });
+        // Email
+        await sendBrevoEmail({
+          to: merchant.email,
+          toName: merchant.name || merchant.email,
+          subject: `📤 Retrait envoyé - ${w.amount.toLocaleString()} XOF`,
+          htmlContent: getPayoutSentTemplate(merchant.name || merchant.email, w.amount, result.reference)
+        });
       }
       return res.status(200).json({ success: result.success, reference: result.reference, status: result.status, provider: providerId });
     }
 
-    // Sinon, essayer tous les providers dans l'ordre de priorité
     for (const pid of PAYOUT_PRIORITY) {
       const provider = PAYOUT_PROVIDERS[pid];
       if (!provider) continue;
@@ -153,12 +180,19 @@ export default async function handler(req, res) {
           await db.collection('gateway_merchants').doc(w.merchantId).update({
             balance: admin.firestore.FieldValue.increment(-w.amount), updatedAt: new Date().toISOString()
           });
+          // Email
+          await sendBrevoEmail({
+            to: merchant.email,
+            toName: merchant.name || merchant.email,
+            subject: `📤 Retrait envoyé - ${w.amount.toLocaleString()} XOF`,
+            htmlContent: getPayoutSentTemplate(merchant.name || merchant.email, w.amount, result.reference)
+          });
         }
         return res.status(200).json({ success: true, reference: result.reference, status: result.status, provider: pid });
       }
     }
 
-    return res.status(400).json({ error: 'Aucun provider payout disponible. Configurez FeexPay, KKiaPay, FedaPay ou CinetPay.' });
+    return res.status(400).json({ error: 'Aucun provider payout disponible.' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
