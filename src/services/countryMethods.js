@@ -16,7 +16,11 @@ const METHOD_NAMES = {
   paypal: { name: 'PayPal', icon: '🅿️' },
   apple_pay: { name: 'Apple Pay', icon: '🍎' },
   google_pay: { name: 'Google Pay', icon: '📱' },
-  chipper_wallet: { name: 'Chipper Wallet', icon: '💳' }
+  chipper_wallet: { name: 'Chipper Wallet', icon: '💳' },
+  ideal: { name: 'iDEAL', icon: '🏦' },
+  giropay: { name: 'Giropay', icon: '🏦' },
+  sofort: { name: 'Sofort', icon: '🏦' },
+  bancontact: { name: 'Bancontact', icon: '🏦' }
 };
 
 const COUNTRIES = {
@@ -31,16 +35,22 @@ const COUNTRIES = {
   cm: { name: 'Cameroun', flag: '🇨🇲', currency: 'XAF' },
   ga: { name: 'Gabon', flag: '🇬🇦', currency: 'XAF' },
   cd: { name: 'RDC', flag: '🇨🇩', currency: 'CDF' },
-  cg: { name: 'Congo', flag: '🇨🇬', currency: 'XAF' },
+  cg: { name: 'Congo Brazzaville', flag: '🇨🇬', currency: 'XAF' },
   ng: { name: 'Nigeria', flag: '🇳🇬', currency: 'NGN' },
   gh: { name: 'Ghana', flag: '🇬🇭', currency: 'GHS' },
   ke: { name: 'Kenya', flag: '🇰🇪', currency: 'KES' },
+  ug: { name: 'Ouganda', flag: '🇺🇬', currency: 'UGX' },
+  tz: { name: 'Tanzanie', flag: '🇹🇿', currency: 'TZS' },
+  rw: { name: 'Rwanda', flag: '🇷🇼', currency: 'RWF' },
+  za: { name: 'Afrique du Sud', flag: '🇿🇦', currency: 'ZAR' },
   fr: { name: 'France', flag: '🇫🇷', currency: 'EUR' },
+  be: { name: 'Belgique', flag: '🇧🇪', currency: 'EUR' },
+  de: { name: 'Allemagne', flag: '🇩🇪', currency: 'EUR' },
+  nl: { name: 'Pays-Bas', flag: '🇳🇱', currency: 'EUR' },
   gb: { name: 'Royaume-Uni', flag: '🇬🇧', currency: 'GBP' },
   us: { name: 'États-Unis', flag: '🇺🇸', currency: 'USD' }
 };
 
-// Méthodes disponibles par provider (statique, pas besoin de Firestore)
 const PROVIDER_METHODS = {
   feexpay: {
     countries: {
@@ -48,6 +58,7 @@ const PROVIDER_METHODS = {
       ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money'],
       tg: ['togocom_money', 'moov_money'],
       sn: ['orange_money', 'free_money'],
+      bf: ['orange_money', 'moov_money'],
       cg: ['mtn_money']
     }
   },
@@ -64,8 +75,9 @@ const PROVIDER_METHODS = {
   paystack: {
     countries: {
       ng: ['card', 'bank_transfer', 'ussd'],
-      gh: ['card', 'mtn_money'],
-      ke: ['card', 'mpesa']
+      gh: ['card', 'mobile_money'],
+      ke: ['card', 'mpesa'],
+      za: ['card']
     }
   },
   flutterwave: {
@@ -73,9 +85,13 @@ const PROVIDER_METHODS = {
       ng: ['card', 'bank_transfer'],
       gh: ['card', 'mobile_money'],
       ke: ['card', 'mpesa'],
+      ug: ['card', 'mobile_money'],
+      tz: ['card', 'mobile_money'],
+      rw: ['card', 'mobile_money'],
       ci: ['card', 'mobile_money'],
       sn: ['card', 'mobile_money'],
-      bj: ['card', 'mobile_money']
+      bj: ['card', 'mobile_money'],
+      cm: ['card', 'mobile_money']
     }
   },
   kkiapay: {
@@ -83,7 +99,14 @@ const PROVIDER_METHODS = {
       bj: ['mtn_money', 'moov_money', 'card'],
       tg: ['togocom_money', 'moov_money'],
       ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
-      sn: ['orange_money', 'free_money', 'wave_money', 'card']
+      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
+      bf: ['orange_money', 'moov_money'],
+      ml: ['orange_money', 'moov_money'],
+      ne: ['airtel_money', 'orange_money'],
+      gn: ['orange_money', 'mtn_money'],
+      cm: ['mtn_money', 'orange_money'],
+      ga: ['airtel_money', 'moov_money'],
+      cd: ['airtel_money', 'orange_money', 'mpesa']
     }
   },
   fedapay: {
@@ -91,7 +114,28 @@ const PROVIDER_METHODS = {
       bj: ['mtn_money', 'moov_money', 'card'],
       tg: ['togocom_money', 'moov_money', 'card'],
       ci: ['mtn_money', 'orange_money', 'moov_money', 'card'],
-      sn: ['orange_money', 'free_money', 'card']
+      sn: ['orange_money', 'free_money', 'card'],
+      bf: ['orange_money', 'moov_money'],
+      ml: ['orange_money', 'moov_money'],
+      ne: ['airtel_money', 'orange_money'],
+      gn: ['orange_money', 'mtn_money'],
+      cm: ['mtn_money', 'orange_money'],
+      ga: ['airtel_money', 'moov_money']
+    }
+  },
+  cinetpay: {
+    countries: {
+      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
+      tg: ['togocom_money', 'moov_money', 'card'],
+      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
+      cm: ['mtn_money', 'orange_money', 'card'],
+      bf: ['orange_money', 'moov_money'],
+      ml: ['orange_money', 'moov_money'],
+      gn: ['orange_money', 'mtn_money', 'card'],
+      ne: ['airtel_money', 'orange_money'],
+      cd: ['airtel_money', 'orange_money', 'mpesa'],
+      ga: ['airtel_money', 'moov_money']
     }
   },
   paypal: {
@@ -99,9 +143,27 @@ const PROVIDER_METHODS = {
       fr: ['paypal', 'card'],
       gb: ['paypal', 'card'],
       us: ['paypal', 'card'],
+      de: ['paypal', 'card'],
+      be: ['paypal', 'card'],
+      nl: ['paypal', 'card'],
       ng: ['paypal', 'card'],
+      ke: ['paypal', 'card'],
       ci: ['paypal', 'card'],
-      sn: ['paypal', 'card']
+      sn: ['paypal', 'card'],
+      ma: ['paypal', 'card']
+    }
+  },
+  chipper: {
+    countries: {
+      gh: ['chipper_wallet', 'mobile_money', 'card'],
+      ng: ['chipper_wallet', 'card', 'bank_transfer'],
+      ke: ['chipper_wallet', 'mpesa', 'card'],
+      ug: ['chipper_wallet', 'mobile_money', 'card'],
+      tz: ['chipper_wallet', 'mobile_money', 'card'],
+      rw: ['chipper_wallet', 'mobile_money'],
+      za: ['chipper_wallet', 'card'],
+      us: ['chipper_wallet', 'card'],
+      gb: ['chipper_wallet', 'card']
     }
   }
 };
@@ -110,7 +172,6 @@ export function getMethodsForCountry(countryCode) {
   const country = COUNTRIES[countryCode];
   if (!country) return null;
 
-  // Collecter toutes les méthodes uniques de tous les providers
   const allMethods = new Set();
   
   Object.values(PROVIDER_METHODS).forEach(provider => {
@@ -119,8 +180,6 @@ export function getMethodsForCountry(countryCode) {
       countryMethods.forEach(m => allMethods.add(m));
     }
   });
-
-  if (allMethods.size === 0) return { ...country, code: countryCode, methods: [] };
 
   return {
     ...country,
