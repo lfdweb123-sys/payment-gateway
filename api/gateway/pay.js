@@ -29,17 +29,29 @@ function checkRateLimit(apiKey) {
 }
 
 const PROVIDER_CALLS = {
+  // PAYIN FeexPay - Demande de paiement au client
   feexpay: async (config, { amount, phone, method }) => {
-    const networkMap = { mtn_money: 'MTN', moov_money: 'MOOV', celtiis_money: 'CELTIIS BJ', orange_money: 'ORANGE', wave_money: 'WAVE', togocom_money: 'TOGOCOM TG' };
-    const res = await fetch('https://api.feexpay.me/api/payouts/public/transfer/global', {
+    const endpoints = {
+      mtn_money: 'https://api.feexpay.me/api/transactions/public/requesttopay/mtn',
+      moov_money: 'https://api.feexpay.me/api/transactions/public/requesttopay/moov',
+      celtiis_money: 'https://api.feexpay.me/api/transactions/public/requesttopay/celtiis',
+      orange_money: 'https://api.feexpay.me/api/transactions/public/requesttopay/orange',
+      wave_money: 'https://api.feexpay.me/api/transactions/public/requesttopay/wave',
+      togocom_money: 'https://api.feexpay.me/api/transactions/public/requesttopay/togocom_tg',
+      wallet: 'https://api.feexpay.me/api/transactions/public/requesttopay/coris'
+    };
+    const url = endpoints[method] || endpoints.mtn_money;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${config.FEEXPAY_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shop: config.FEEXPAY_SHOP_ID, amount: Math.round(amount), phoneNumber: phone, network: networkMap[method] || 'MTN', motif: 'Paiement' })
+      body: JSON.stringify({ shop: config.FEEXPAY_SHOP_ID, amount: Math.round(amount), phoneNumber: phone })
     });
     const data = await res.json();
-    if (!res.ok) return { success: false, error: data.message };
+    if (!res.ok) return { success: false, error: data.message || 'Erreur FeexPay' };
     return { success: true, reference: data.reference, status: data.status, provider: 'feexpay' };
   },
+
+  // Stripe - Checkout Session
   stripe: async (config, { amount, currency, description }) => {
     const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
@@ -50,6 +62,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.error?.message };
     return { success: true, reference: data.id, url: data.url, status: 'pending', provider: 'stripe' };
   },
+
+  // Paystack - Initialize Transaction
   paystack: async (config, { amount, email, currency, method }) => {
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -60,6 +74,8 @@ const PROVIDER_CALLS = {
     if (!data.status) return { success: false, error: data.message };
     return { success: true, reference: data.data.reference, url: data.data.authorization_url, status: 'pending', provider: 'paystack' };
   },
+
+  // Flutterwave - Payments
   flutterwave: async (config, { amount, email, phone, currency, country }) => {
     const res = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
@@ -70,6 +86,8 @@ const PROVIDER_CALLS = {
     if (data.status !== 'success') return { success: false, error: data.message };
     return { success: true, reference: data.data.tx_ref, url: data.data.link, status: 'pending', provider: 'flutterwave' };
   },
+
+  // KKiaPay - Transactions (PAYIN)
   kkiapay: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.kkiapay.me/api/v1/transactions', {
       method: 'POST',
@@ -80,6 +98,8 @@ const PROVIDER_CALLS = {
     if (!res.ok || data.status === 'failed') return { success: false, error: data.message };
     return { success: true, reference: data.transaction_id, url: data.payment_url, status: 'pending', provider: 'kkiapay' };
   },
+
+  // FedaPay - Transactions (PAYIN)
   fedapay: async (config, { amount, email, phone, description }) => {
     const res = await fetch('https://api.fedapay.com/v1/transactions', {
       method: 'POST',
@@ -90,6 +110,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.id?.toString(), url: data.payment_url, status: 'pending', provider: 'fedapay' };
   },
+
+  // PayDunya - Checkout Invoice (PAYIN)
   paydunya: async (config, { amount, description }) => {
     const res = await fetch('https://paydunya.com/api/v1/checkout-invoice/create', {
       method: 'POST',
@@ -100,6 +122,8 @@ const PROVIDER_CALLS = {
     if (data.response_code !== '00') return { success: false, error: data.response_text };
     return { success: true, reference: data.invoice.token, url: data.response_text, status: 'pending', provider: 'paydunya' };
   },
+
+  // CinetPay - Payment (PAYIN)
   cinetpay: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api-checkout.cinetpay.com/v2/payment', {
       method: 'POST',
@@ -110,6 +134,8 @@ const PROVIDER_CALLS = {
     if (data.code !== '201') return { success: false, error: data.message };
     return { success: true, reference: data.data.transaction_id, url: data.data.payment_url, status: 'pending', provider: 'cinetpay' };
   },
+
+  // Lygos - Payments (PAYIN)
   lygos: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.lygosapp.com/v1/payments', {
       method: 'POST',
@@ -120,6 +146,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference || data.id, status: 'pending', provider: 'lygos' };
   },
+
+  // PayPal - Orders (PAYIN)
   paypal: async (config, { amount, currency, description }) => {
     const authRes = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
       method: 'POST',
@@ -137,6 +165,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.id, url: data.links?.find(l => l.rel === 'approve')?.href, status: 'pending', provider: 'paypal' };
   },
+
+  // MbiyoPay - Payments (PAYIN)
   mbiyopay: async (config, { amount, phone, description }) => {
     const res = await fetch('https://api.mbiyopay.com/v1/payments', {
       method: 'POST',
@@ -147,6 +177,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference, status: 'pending', provider: 'mbiyopay' };
   },
+
+  // Qosic - Payment Init (PAYIN)
   qosic: async (config, { amount, phone, description }) => {
     const res = await fetch('https://api.qosic.com/v1/payment/init', {
       method: 'POST',
@@ -157,6 +189,8 @@ const PROVIDER_CALLS = {
     if (!res.ok || data.status === 'error') return { success: false, error: data.message };
     return { success: true, reference: data.reference || data.transaction_id, status: 'pending', provider: 'qosic' };
   },
+
+  // Bizao - Payments (PAYIN)
   bizao: async (config, { amount, phone, description }) => {
     const res = await fetch('https://api.bizao.com/v1/payments', {
       method: 'POST',
@@ -167,6 +201,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference, status: 'pending', provider: 'bizao' };
   },
+
+  // Hub2 - Payments (PAYIN)
   hub2: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.hub2.io/v1/payments', {
       method: 'POST',
@@ -177,6 +213,8 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.id, status: 'pending', provider: 'hub2' };
   },
+
+  // Chipper Cash - Charges (PAYIN)
   chipper: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.chipperpayments.com/v1/charges', {
       method: 'POST',
@@ -236,7 +274,7 @@ export default async function handler(req, res) {
 
     const providers = merchant.providers || {};
     const providerId = getBestProvider(method, providers);
-    if (!providerId) return res.status(400).json({ error: 'Aucun provider disponible pour cette méthode' });
+    if (!providerId) return res.status(400).json({ error: 'Aucun provider disponible' });
 
     const providerConfig = providers[providerId];
     const amountNum = parseFloat(amount);
@@ -244,11 +282,10 @@ export default async function handler(req, res) {
     const netAmount = amountNum - commission;
 
     const callFn = PROVIDER_CALLS[providerId];
-    if (!callFn) return res.status(400).json({ error: `Provider ${providerId} non implémenté` });
+    if (!callFn) return res.status(400).json({ error: `Provider ${providerId} non supporté` });
 
     const result = await callFn(providerConfig, { amount: netAmount, phone, email, country, method, description, currency: 'XOF' });
 
-    // UN SEUL add()
     const txRef = await db.collection('gateway_transactions').add({
       merchantId: merchant.id, amount: amountNum, commission, netAmount,
       country, method, provider: providerId, providerRef: result.reference || null,
@@ -270,7 +307,7 @@ export default async function handler(req, res) {
       reference: result.reference,
       status: result.status,
       provider: providerId,
-      message: result.success ? 'Paiement initié' : result.error
+      message: result.success ? 'Paiement initié. Vérifiez votre téléphone.' : result.error
     });
   } catch (error) {
     console.error('Erreur:', error);
