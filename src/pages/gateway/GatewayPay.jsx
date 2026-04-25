@@ -44,7 +44,9 @@ export default function GatewayPay() {
   const [loading, setLoading]               = useState(false);
   const [merchant, setMerchant]             = useState(null);
   const [countries, setCountries]           = useState([]);
-  const [status, setStatus]                 = useState(null);
+  const [status, setStatus]                 = useState(null); // null | 'pending' | 'completed' | 'failed'
+  const [txId, setTxId]                     = useState(null);
+  const [pollMsg, setPollMsg]               = useState('Paiement en cours…');
   const [fetchingMerchant, setFetchingMerchant] = useState(true);
 
   useEffect(() => {
@@ -67,6 +69,52 @@ export default function GatewayPay() {
     setStep(2);
   };
 
+  // Polling du statut de transaction
+  const pollStatus = (id) => {
+    setTxId(id);
+    setStatus('pending');
+    const msgs = [
+      'Paiement en cours…',
+      'En attente de confirmation…',
+      'Vérification en cours…',
+      'Presque terminé…',
+    ];
+    let msgIdx = 0;
+    const msgInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % msgs.length;
+      setPollMsg(msgs[msgIdx]);
+    }, 3500);
+
+    let attempts = 0;
+    const maxAttempts = 24; // 2 min max (5s * 24)
+
+    const interval = setInterval(async () => {
+      attempts++;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        clearInterval(msgInterval);
+        setStatus('failed');
+        return;
+      }
+      try {
+        const r = await fetch(`/api/gateway/verify/${id}`, {
+          headers: { 'x-api-key': token }
+        });
+        const d = await r.json();
+        if (d.status === 'completed') {
+          clearInterval(interval);
+          clearInterval(msgInterval);
+          setStatus('completed');
+        } else if (d.status === 'failed') {
+          clearInterval(interval);
+          clearInterval(msgInterval);
+          setStatus('failed');
+        }
+        // sinon on continue à poller
+      } catch { /* on réessaie */ }
+    }, 5000);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
@@ -78,22 +126,31 @@ export default function GatewayPay() {
         body: JSON.stringify({ amount: parseFloat(amount), country, method: selectedMethod?.id, phone: phoneNumber, description }),
       });
       const data = await res.json();
-      if (data.success) setStatus('success');
-      else toast.error(data.error || 'Une erreur est survenue');
-    } catch { toast.error('Erreur de connexion'); }
-    finally { setLoading(false); }
+      if (data.success) {
+        setLoading(false);
+        pollStatus(data.transactionId);
+      } else {
+        toast.error(data.error || 'Une erreur est survenue');
+        setLoading(false);
+      }
+    } catch {
+      toast.error('Erreur de connexion');
+      setLoading(false);
+    }
   };
 
-  // ── Succès ────────────────────────────────────────────────────────────────
-  if (status === 'success') {
+  // ── Écrans de statut ─────────────────────────────────────────────────────
+  if (status === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 max-w-md w-full p-10 text-center">
-          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 size={40} className="text-emerald-500" />
+          {/* Spinner animé */}
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="w-20 h-20 rounded-full border-4 border-gray-100" />
+            <div className="absolute inset-0 w-20 h-20 rounded-full border-4 border-t-gray-900 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Paiement initié !</h2>
-          <p className="text-gray-400 text-sm mb-6">Suivez les instructions sur votre téléphone pour finaliser.</p>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">{pollMsg}</h2>
+          <p className="text-gray-400 text-sm mb-6">Veuillez confirmer le paiement sur votre téléphone.</p>
           <div className="bg-gray-50 rounded-2xl p-5">
             <p className="text-sm text-gray-400 mb-1">{description}</p>
             <p className="text-3xl font-bold text-gray-900">
@@ -101,6 +158,48 @@ export default function GatewayPay() {
               <span className="text-lg text-gray-400 ml-2">{countryData?.currency || 'XOF'}</span>
             </p>
           </div>
+          <p className="text-xs text-gray-300 mt-4">Ne fermez pas cette page</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'completed') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 max-w-md w-full p-10 text-center">
+          <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 size={40} className="text-emerald-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Paiement réussi !</h2>
+          <p className="text-gray-400 text-sm mb-6">Votre transaction a été confirmée.</p>
+          <div className="bg-emerald-50 rounded-2xl p-5">
+            <p className="text-sm text-emerald-600 mb-1">{description}</p>
+            <p className="text-3xl font-bold text-gray-900">
+              {parseFloat(amount).toLocaleString()}
+              <span className="text-lg text-gray-400 ml-2">{countryData?.currency || 'XOF'}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 max-w-md w-full p-10 text-center">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-5">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Paiement échoué</h2>
+          <p className="text-gray-400 text-sm mb-6">La transaction n'a pas pu être finalisée.</p>
+          <button onClick={() => { setStatus(null); setStep(3); }}
+            className="w-full bg-gray-900 text-white font-semibold py-3 rounded-xl hover:bg-gray-800 transition-all">
+            Réessayer
+          </button>
         </div>
       </div>
     );
