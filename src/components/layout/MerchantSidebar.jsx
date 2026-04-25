@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Layout, CreditCard, Settings, Key, LogOut, HelpCircle, FileText, Code, Shield } from 'lucide-react';
+import { Layout, CreditCard, Settings, Key, LogOut, HelpCircle, FileText, Code, Shield, Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
