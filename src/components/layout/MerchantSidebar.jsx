@@ -25,6 +25,7 @@ export default function MerchantSidebar() {
     { title: 'Dashboard', icon: Layout, path: '/dashboard', requireVerification: false },
     { title: 'Providers', icon: Key, path: '/providers', requireVerification: true },
     { title: 'Transactions', icon: CreditCard, path: '/transactions', requireVerification: true },
+    { title: 'Retraits', icon: Wallet, path: '/payouts', requireVerification: true },
     { title: 'Développeur', icon: Code, path: '/developer', requireVerification: true },
     { title: 'Paramètres', icon: Settings, path: '/settings', requireVerification: false }
   ];

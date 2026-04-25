@@ -16,6 +16,7 @@ import RegisterForm from './components/auth/RegisterForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Developer from './pages/gateway/Developer';
 import Verification from './pages/gateway/Verification';
+import MerchantPayouts from './pages/gateway/MerchantPayouts';
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -31,6 +32,10 @@ import AdminMerchants from './pages/admin/AdminMerchants';
 import AdminVerifications from './pages/admin/AdminVerifications';
 import AdminCommissions from './pages/admin/AdminCommissions';
 import AdminRoute from './components/auth/AdminRoute';
+import AdminPayouts from './pages/admin/AdminPayouts';
+
+
+
 
 function PublicRoute({ children }) {
   const { user } = useAuth();
@@ -79,6 +84,7 @@ function AppContent() {
             <Route path="/dashboard" element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
             <Route path="/providers" element={<ProtectedRoute><MerchantProviders /></ProtectedRoute>} />
             <Route path="/transactions" element={<ProtectedRoute><GatewayTransactions /></ProtectedRoute>} />
+            <Route path="/payouts" element={<ProtectedRoute><MerchantPayouts /></ProtectedRoute>} />
             <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             <Route path="/verification" element={<ProtectedRoute><Verification /></ProtectedRoute>} />
@@ -90,6 +96,7 @@ function AppContent() {
               <Route path="verifications" element={<AdminVerifications />} />
               <Route path="transactions" element={<GatewayTransactions />} />
               <Route path="commissions" element={<AdminCommissions />} />
+              <Route path="payouts" element={<AdminPayouts />} />
             </Route>
             
             {/* Fallback */}
