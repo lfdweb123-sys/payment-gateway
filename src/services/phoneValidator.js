@@ -76,40 +76,28 @@ const COUNTRY_CODES = {
 };
 
 export function validatePhone(phone, country, method) {
-  if (!phone) return { valid: false, error: 'Numéro de téléphone requis' };
+  if (!phone) return { valid: false, error: 'Numéro requis' };
 
   const countryCode = COUNTRY_CODES[country];
-  if (!countryCode) return { valid: true }; // Pays non géré = on laisse passer
-
-  // Extraire le numéro local (enlever l'indicatif pays)
-  const cleaned = phone.replace(/\s/g, '');
-  let local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
-  if (local.startsWith('0')) local = local.slice(1);
+  if (!countryCode) return { valid: true };
 
   const countryData = PHONE_PREFIXES[country];
   if (!countryData) return { valid: true };
 
   const operatorData = countryData[method];
-  if (!operatorData) return { valid: true }; // Méthode inconnue = on laisse passer
+  if (!operatorData?.prefixes) return { valid: true };
 
-  // Si pas de préfixes définis (ex: Wave), on accepte tout
-  if (!operatorData.prefixes) return { valid: true };
+  // Extraire le numéro local : enlever l'indicatif pays
+  const cleaned = phone.replace(/\s/g, '');
+  let local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
 
-  // Pour le Bénin : les 2 chiffres à valider sont APRÈS le "01" obligatoire
-  let prefix2;
-  if (country === 'bj') {
-    if (!local.startsWith('01')) {
-      return { valid: false, error: 'Les numéros béninois doivent commencer par 01' };
-    }
-    prefix2 = local.slice(2, 4);
-  } else {
-    prefix2 = local.slice(0, 2);
-  }
+  // Prendre les 2 premiers chiffres du numéro local
+  const prefix2 = local.slice(0, 2);
 
   if (!operatorData.prefixes.includes(prefix2)) {
     return {
       valid: false,
-      error: `Ce numéro ne correspond pas au réseau ${operatorData.name}. Vérifiez que vous avez sélectionné la bonne méthode.`,
+      error: `Ce numéro ne correspond pas au réseau ${operatorData.name}.`,
     };
   }
 
@@ -120,20 +108,12 @@ export function detectNetwork(phone, country) {
   const countryCode = COUNTRY_CODES[country];
   if (!countryCode) return null;
 
-  const cleaned = phone.replace(/\s/g, '');
-  let local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
-  if (local.startsWith('0')) local = local.slice(1);
-
   const countryData = PHONE_PREFIXES[country];
   if (!countryData) return null;
 
-  let prefix2;
-  if (country === 'bj') {
-    if (!local.startsWith('01')) return null;
-    prefix2 = local.slice(2, 4);
-  } else {
-    prefix2 = local.slice(0, 2);
-  }
+  const cleaned = phone.replace(/\s/g, '');
+  const local = cleaned.startsWith(countryCode) ? cleaned.slice(countryCode.length) : cleaned;
+  const prefix2 = local.slice(0, 2);
 
   for (const [methodId, data] of Object.entries(countryData)) {
     if (data.prefixes && data.prefixes.includes(prefix2)) {
