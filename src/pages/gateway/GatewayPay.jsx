@@ -10,7 +10,7 @@ import { validatePhone } from '../../services/phoneValidator';
 /* ─── Constantes ───────────────────────────────────────── */
 const DEFAULT_SETTINGS = {
   paymentDesign: 'modern', primaryColor: '#f97316', logo: '', companyName: '',
-  redirectUrl: '', defaultCurrency: 'XOF',
+  redirectUrl: '', defaultCurrency: 'XOF', defaultCountry: '',
 };
 
 const COUNTRY_PREFIXES = {
@@ -130,7 +130,12 @@ export default function GatewayPay() {
     if (!token) { setFetchingMerchant(false); return; }
 
     getDoc(doc(db,'gateway_settings','config'))
-      .then(snap => { if (snap.exists()) setGatewaySettings(p => ({...p,...snap.data()})); })
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setGatewaySettings(p => ({ ...p, ...data }));
+        }
+      })
       .catch(()=>{});
 
     fetch(`/api/gateway/merchant/${token}`)
@@ -139,7 +144,6 @@ export default function GatewayPay() {
         if (data.success) {
           setMerchant(data);
           setCountries(getCountriesForProviders(data.activeProviders || []));
-          // Récupérer la public key KKiaPay si configurée
           if (data.kkiapayPublicKey) {
             setKkiapayPublicKey(data.kkiapayPublicKey);
           }
@@ -163,6 +167,24 @@ export default function GatewayPay() {
       }
     } catch {}
   }, [token]);
+
+  /* ─── Appliquer defaultCountry une fois les données chargées ── */
+  useEffect(() => {
+    if (
+      !fetchingMerchant &&
+      step === 1 &&
+      !country &&
+      gatewaySettings.defaultCountry &&
+      countries.length > 0
+    ) {
+      const defaultCode = gatewaySettings.defaultCountry;
+      const exists = countries.find(c => c.code === defaultCode);
+      if (exists) {
+        handleSelectCountry(defaultCode);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchingMerchant, countries, gatewaySettings.defaultCountry]);
 
   const handleSelectCountry = (code) => {
     setCountry(code);
@@ -230,7 +252,6 @@ export default function GatewayPay() {
       if (data.success) {
         setLoading(false);
         savePhoneNumber(fullPhone);
-        // Si le provider retourne une URL de redirection (Stripe, PayPal, etc.)
         if (data.url) {
           window.location.href = data.url;
         } else {
@@ -253,13 +274,11 @@ export default function GatewayPay() {
       return;
     }
 
-    // Nettoyer les anciens listeners pour éviter les doublons
     if (window.removeKkiapayListener) {
       window.removeKkiapayListener('success', () => {});
       window.removeKkiapayListener('failed', () => {});
     }
 
-    // Listener succès
     window.addSuccessListener(async (response) => {
       setStatus('pending');
       setPollMsg('Vérification du paiement…');
@@ -277,12 +296,10 @@ export default function GatewayPay() {
       }
     });
 
-    // Listener échec
     window.addFailedListener(() => {
       setStatus('failed');
     });
 
-    // Ouvrir le widget avec la PUBLIC KEY du marchand
     window.openKkiapayWidget({
       amount:   parseFloat(amount),
       key:      kkiapayPublicKey,
@@ -303,6 +320,79 @@ export default function GatewayPay() {
   /* ─── Computed ───────────────────────────────────── */
   const currency     = countryData?.currency || gatewaySettings.defaultCurrency;
   const primaryColor = gatewaySettings.primaryColor || '#C8931A';
+
+  /* ─── Dériver les variables de thème selon paymentDesign ── */
+  const design = gatewaySettings.paymentDesign || 'modern';
+
+  const themeVars = (() => {
+    switch (design) {
+      case 'classic':
+        return {
+          pageBackground: '#F4F6FA',
+          cardBackground: '#FFFFFF',
+          cardBorder: '1px solid #DDE3EE',
+          cardRadius: '16px',
+          rightBackground: '#F0F3FA',
+          inputBackground: '#F8FAFC',
+          inputBorder: '1.5px solid #DDE3EE',
+          countryBtnBackground: '#F8FAFC',
+          countryBtnBorder: '1.5px solid #DDE3EE',
+          methodBtnBackground: '#F8FAFC',
+          methodBtnBorder: '1.5px solid #DDE3EE',
+          summaryBackground: '#EEF2FA',
+          totalBackground: '#E8EDF8',
+          textPrimary: '#1A2340',
+          textSecondary: '#6B7A9F',
+          textMuted: '#A0AACC',
+          fontFamily: "'DM Sans', sans-serif",
+          shadow: '0 2px 4px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08)',
+        };
+      case 'bold':
+        return {
+          pageBackground: '#0F0F0F',
+          cardBackground: '#1A1A1A',
+          cardBorder: '1px solid #2A2A2A',
+          cardRadius: '20px',
+          rightBackground: '#141414',
+          inputBackground: '#242424',
+          inputBorder: '1.5px solid #333',
+          countryBtnBackground: '#222',
+          countryBtnBorder: '1.5px solid #2A2A2A',
+          methodBtnBackground: '#222',
+          methodBtnBorder: '1.5px solid #2A2A2A',
+          summaryBackground: '#222',
+          totalBackground: '#2A2A2A',
+          textPrimary: '#FFFFFF',
+          textSecondary: '#999',
+          textMuted: '#555',
+          fontFamily: "'DM Sans', sans-serif",
+          shadow: '0 4px 6px rgba(0,0,0,.3), 0 20px 60px rgba(0,0,0,.5)',
+        };
+      case 'modern':
+      default:
+        return {
+          pageBackground: '#F0EBE3',
+          cardBackground: '#FFFFFF',
+          cardBorder: 'none',
+          cardRadius: '24px',
+          rightBackground: '#FAFAF8',
+          inputBackground: '#FAFAF8',
+          inputBorder: '1.5px solid #EDE9E3',
+          countryBtnBackground: '#FAFAF8',
+          countryBtnBorder: '1.5px solid #EDE9E3',
+          methodBtnBackground: '#FAFAF8',
+          methodBtnBorder: '1.5px solid #EDE9E3',
+          summaryBackground: '#FAFAF8',
+          totalBackground: '#F7F5F2',
+          textPrimary: '#111111',
+          textSecondary: '#AAA',
+          textMuted: '#CCC',
+          fontFamily: "'DM Sans', sans-serif",
+          shadow: '0 4px 6px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.10), 0 40px 80px rgba(0,0,0,.08)',
+        };
+    }
+  })();
+
   const hexL = (hex) => {
     if (!hex.startsWith('#') || hex.length < 7) return 0.5;
     const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
@@ -311,10 +401,9 @@ export default function GatewayPay() {
   const btnTextColor = hexL(primaryColor) > 0.45 ? '#1a0f00' : '#fff';
   const filteredSuggestions = savedPhones.filter(p => p.country === country);
 
-  // Détecter si la méthode sélectionnée vient de KKiaPay
   const isKkiapayMethod = selectedMethod?.provider === 'kkiapay' && kkiapayPublicKey;
 
-  /* ─── CSS ────────────────────────────────────────── */
+  /* ─── CSS dynamique selon thème ─────────────────── */
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
     @keyframes gw-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -325,10 +414,10 @@ export default function GatewayPay() {
 
     .gw-page{
       min-height:100vh;
-      background:#F0EBE3;
+      background:${themeVars.pageBackground};
       display:flex;align-items:center;justify-content:center;
       padding:24px 16px;
-      font-family:'DM Sans',sans-serif;
+      font-family:${themeVars.fontFamily};
     }
     .gw-wrapper{
       display:grid;
@@ -336,22 +425,24 @@ export default function GatewayPay() {
       gap:0;
       width:100%;
       max-width:860px;
-      background:#fff;
-      border-radius:24px;
+      background:${themeVars.cardBackground};
+      border-radius:${themeVars.cardRadius};
       overflow:hidden;
-      box-shadow:0 4px 6px rgba(0,0,0,.04),0 12px 40px rgba(0,0,0,.10),0 40px 80px rgba(0,0,0,.08);
+      border:${themeVars.cardBorder};
+      box-shadow:${themeVars.shadow};
       animation:gw-scaleIn .4s cubic-bezier(.34,1.3,.64,1) both;
     }
     .gw-left{
       padding:36px 40px;
-      border-right:1px solid #F3F0EC;
+      border-right:1px solid ${design === 'bold' ? '#2A2A2A' : design === 'classic' ? '#DDE3EE' : '#F3F0EC'};
       min-height:500px;
       display:flex;flex-direction:column;
     }
     .gw-right{
-      background:#FAFAF8;
+      background:${themeVars.rightBackground};
       padding:36px 28px;
       display:flex;flex-direction:column;
+      border-left:${design === 'classic' ? '1px solid #DDE3EE' : 'none'};
     }
     .gw-right-header{
       display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;
@@ -359,63 +450,65 @@ export default function GatewayPay() {
     .gw-logo-row{display:flex;align-items:center;gap:8px;}
     .gw-logo-icon{
       width:32px;height:32px;border-radius:9px;
-      background:linear-gradient(135deg,#1C0F00,#2E1A00);
+      background:${design === 'bold' ? `linear-gradient(135deg,${primaryColor},${primaryColor}cc)` : 'linear-gradient(135deg,#1C0F00,#2E1A00)'};
       display:flex;align-items:center;justify-content:center;
     }
-    .gw-company{font-size:13px;font-weight:700;color:#333;}
+    .gw-company{font-size:13px;font-weight:700;color:${themeVars.textPrimary};}
     .gw-amount-card{
-      background:#fff;border:1px solid #EDE9E3;border-radius:16px;
+      background:${themeVars.cardBackground};
+      border:1px solid ${design === 'bold' ? '#2A2A2A' : design === 'classic' ? '#DDE3EE' : '#EDE9E3'};
+      border-radius:16px;
       padding:20px;text-align:center;margin-bottom:20px;
     }
-    .gw-amount-label{font-size:10px;font-weight:700;color:#CCC;text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
-    .gw-amount-val{font-size:38px;font-weight:900;color:#111;letter-spacing:-.03em;line-height:1;}
-    .gw-amount-curr{font-size:14px;font-weight:500;color:#AAA;margin-left:6px;}
-    .gw-amount-desc{font-size:12px;color:#AAA;margin-top:8px;}
-    .gw-divider{height:1px;background:#F0EDE8;margin:16px 0;}
+    .gw-amount-label{font-size:10px;font-weight:700;color:${themeVars.textMuted};text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
+    .gw-amount-val{font-size:38px;font-weight:900;color:${themeVars.textPrimary};letter-spacing:-.03em;line-height:1;}
+    .gw-amount-curr{font-size:14px;font-weight:500;color:${themeVars.textSecondary};margin-left:6px;}
+    .gw-amount-desc{font-size:12px;color:${themeVars.textSecondary};margin-top:8px;}
+    .gw-divider{height:1px;background:${design === 'bold' ? '#2A2A2A' : design === 'classic' ? '#DDE3EE' : '#F0EDE8'};margin:16px 0;}
     .gw-summary-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-    .gw-summary-key{font-size:12px;color:#AAA;font-weight:500;}
-    .gw-summary-val{font-size:12px;font-weight:700;color:#555;}
+    .gw-summary-key{font-size:12px;color:${themeVars.textSecondary};font-weight:500;}
+    .gw-summary-val{font-size:12px;font-weight:700;color:${design === 'bold' ? '#CCC' : '#555'};}
     .gw-total-row{
       display:flex;justify-content:space-between;align-items:center;
-      padding:14px 16px;background:#F7F5F2;border-radius:12px;margin-top:8px;
+      padding:14px 16px;background:${themeVars.totalBackground};border-radius:12px;margin-top:8px;
     }
-    .gw-total-key{font-size:12px;font-weight:700;color:#555;}
-    .gw-total-val{font-size:18px;font-weight:900;color:#111;letter-spacing:-.02em;}
+    .gw-total-key{font-size:12px;font-weight:700;color:${design === 'bold' ? '#999' : '#555'};}
+    .gw-total-val{font-size:18px;font-weight:900;color:${themeVars.textPrimary};letter-spacing:-.02em;}
     .gw-secure-row{
       display:flex;align-items:center;justify-content:center;gap:6px;
       margin-top:auto;padding-top:20px;
-      font-size:10px;color:#CCC;font-weight:600;
+      font-size:10px;color:${themeVars.textMuted};font-weight:600;
     }
     .gw-section-lbl{
-      font-size:10px;font-weight:800;color:#BBB;
+      font-size:10px;font-weight:800;color:${themeVars.textMuted};
       text-transform:uppercase;letter-spacing:.12em;
       margin-bottom:14px;display:block;
     }
     .gw-country-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
     .gw-country-btn{
       padding:14px 8px;border-radius:14px;
-      background:#FAFAF8;border:1.5px solid #EDE9E3;
+      background:${themeVars.countryBtnBackground};border:${themeVars.countryBtnBorder};
       cursor:pointer;text-align:center;
       transition:all .2s;font-family:inherit;
     }
     .gw-country-btn:hover{
-      background:#FFF8EE;
+      background:${design === 'bold' ? '#2A2A2A' : '#FFF8EE'};
       border-color:${primaryColor};
       transform:translateY(-2px);
       box-shadow:0 6px 20px ${primaryColor}22;
     }
     .gw-flag{font-size:24px;display:block;margin-bottom:6px;line-height:1;}
-    .gw-cname{font-size:11px;font-weight:700;color:#222;}
-    .gw-ccurr{font-size:10px;color:#AAA;margin-top:1px;}
+    .gw-cname{font-size:11px;font-weight:700;color:${themeVars.textPrimary};}
+    .gw-ccurr{font-size:10px;color:${themeVars.textSecondary};margin-top:1px;}
     .gw-method-btn{
       width:100%;padding:14px 16px;border-radius:14px;
-      background:#FAFAF8;border:1.5px solid #EDE9E3;
+      background:${themeVars.methodBtnBackground};border:${themeVars.methodBtnBorder};
       cursor:pointer;display:flex;align-items:center;gap:12px;
       transition:all .2s;font-family:inherit;text-align:left;
       margin-bottom:8px;
     }
     .gw-method-btn:hover{
-      background:#FFF8EE;border-color:${primaryColor};transform:translateX(2px);
+      background:${design === 'bold' ? '#2A2A2A' : '#FFF8EE'};border-color:${primaryColor};transform:translateX(2px);
     }
     .gw-method-icon{
       width:40px;height:40px;border-radius:12px;flex-shrink:0;
@@ -424,7 +517,7 @@ export default function GatewayPay() {
       display:flex;align-items:center;justify-content:center;
       color:${primaryColor};
     }
-    .gw-method-name{flex:1;font-size:13px;font-weight:700;color:#111;}
+    .gw-method-name{flex:1;font-size:13px;font-weight:700;color:${themeVars.textPrimary};}
     .gw-pill{
       display:flex;align-items:center;gap:10px;
       padding:12px 14px;border-radius:14px;
@@ -436,19 +529,19 @@ export default function GatewayPay() {
       background:${primaryColor};
       display:flex;align-items:center;justify-content:center;color:#fff;
     }
-    .gw-pill-name{font-size:13px;font-weight:700;color:#111;}
-    .gw-pill-sub{font-size:11px;color:#AAA;margin-top:1px;}
-    .gw-input-label{font-size:10px;font-weight:700;color:#AAA;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;display:block;}
+    .gw-pill-name{font-size:13px;font-weight:700;color:${themeVars.textPrimary};}
+    .gw-pill-sub{font-size:11px;color:${themeVars.textSecondary};margin-top:1px;}
+    .gw-input-label{font-size:10px;font-weight:700;color:${themeVars.textSecondary};text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;display:block;}
     .gw-input{
       width:100%;padding:14px 16px;
-      background:#FAFAF8;border:1.5px solid #EDE9E3;border-radius:14px;
-      font-size:15px;font-family:'DM Mono',monospace;color:#111;
+      background:${themeVars.inputBackground};border:${themeVars.inputBorder};border-radius:14px;
+      font-size:15px;font-family:'DM Mono',monospace;color:${themeVars.textPrimary};
       outline:none;transition:all .2s;
     }
-    .gw-input:focus{border-color:${primaryColor};background:#fff;box-shadow:0 0 0 3px ${primaryColor}18;}
+    .gw-input:focus{border-color:${primaryColor};background:${design === 'bold' ? '#2A2A2A' : '#fff'};box-shadow:0 0 0 3px ${primaryColor}18;}
     .gw-suggestion{
       width:100%;text-align:left;padding:9px 12px;
-      background:#FAFAF8;border:1px solid #EDE9E3;border-radius:10px;
+      background:${themeVars.inputBackground};border:1px solid ${design === 'bold' ? '#333' : '#EDE9E3'};border-radius:10px;
       margin-bottom:4px;cursor:pointer;display:flex;align-items:center;gap:8px;
       transition:background .15s;font-family:inherit;
     }
@@ -466,7 +559,7 @@ export default function GatewayPay() {
     .gw-submit:disabled{opacity:.5;cursor:not-allowed;}
     .gw-back{
       display:inline-flex;align-items:center;gap:5px;
-      font-size:12px;font-weight:600;color:#AAA;
+      font-size:12px;font-weight:600;color:${themeVars.textSecondary};
       background:none;border:none;cursor:pointer;padding:0;
       margin-bottom:22px;transition:color .2s;font-family:inherit;
     }
@@ -476,13 +569,15 @@ export default function GatewayPay() {
 
     /* ── KKiaPay info box ── */
     .gw-kkiapay-info{
-      background:#F8F5FF;border:1.5px solid #E9E0FF;border-radius:14px;
+      background:${design === 'bold' ? '#1E1E2E' : '#F8F5FF'};
+      border:1.5px solid ${design === 'bold' ? '#312B55' : '#E9E0FF'};
+      border-radius:14px;
       padding:16px 18px;margin-bottom:20px;
-      font-size:13px;color:#555;line-height:1.6;
+      font-size:13px;color:${themeVars.textSecondary};line-height:1.6;
     }
     .gw-kkiapay-logo{
       display:flex;align-items:center;gap:8px;
-      margin-bottom:10px;font-weight:700;font-size:13px;color:#333;
+      margin-bottom:10px;font-weight:700;font-size:13px;color:${themeVars.textPrimary};
     }
     .gw-kkiapay-dot{
       width:10px;height:10px;border-radius:50%;
@@ -492,23 +587,27 @@ export default function GatewayPay() {
 
     /* ── STATUS PAGES ── */
     .gw-status-page{
-      min-height:100vh;background:#F0EBE3;
+      min-height:100vh;background:${themeVars.pageBackground};
       display:flex;align-items:center;justify-content:center;padding:24px;
-      font-family:'DM Sans',sans-serif;
+      font-family:${themeVars.fontFamily};
     }
     .gw-status-card{
-      width:100%;max-width:420px;background:#fff;border-radius:24px;
+      width:100%;max-width:420px;
+      background:${themeVars.cardBackground};
+      border:${themeVars.cardBorder};
+      border-radius:${themeVars.cardRadius};
       padding:48px 36px;text-align:center;
-      box-shadow:0 4px 6px rgba(0,0,0,.04),0 12px 40px rgba(0,0,0,.10);
+      box-shadow:${themeVars.shadow};
       animation:gw-scaleIn .4s cubic-bezier(.34,1.3,.64,1) both;
     }
+    .gw-status-card h2{color:${themeVars.textPrimary};}
     .gw-status-icon{
       width:72px;height:72px;border-radius:50%;
       display:flex;align-items:center;justify-content:center;
       margin:0 auto 20px;
     }
     .gw-status-amount{
-      background:#F7F5F2;border-radius:14px;padding:18px;margin-top:20px;
+      background:${themeVars.totalBackground};border-radius:14px;padding:18px;margin-top:20px;
     }
 
     /* ── MOBILE ── */
@@ -603,17 +702,17 @@ export default function GatewayPay() {
         <div className="gw-status-icon" style={{background:`${primaryColor}18`,border:`2px solid ${primaryColor}33`}}>
           <div style={{width:32,height:32,borderRadius:'50%',border:`3px solid ${primaryColor}33`,borderTopColor:primaryColor}} className="gw-spin"/>
         </div>
-        <h2 style={{fontSize:20,fontWeight:800,color:'#111',marginBottom:8,letterSpacing:'-.02em'}}>{pollMsg}</h2>
-        <p style={{fontSize:13,color:'#AAA',lineHeight:1.6}}>
+        <h2 style={{fontSize:20,fontWeight:800,marginBottom:8,letterSpacing:'-.02em'}}>{pollMsg}</h2>
+        <p style={{fontSize:13,color:themeVars.textSecondary,lineHeight:1.6}}>
           {isKkiapayMethod ? 'Vérification de votre paiement KKiaPay en cours…' : 'Confirmez le paiement sur votre téléphone.'}
         </p>
         <div className="gw-status-amount">
-          <p style={{fontSize:11,color:'#CCC',marginBottom:4}}>{description}</p>
-          <p style={{fontSize:28,fontWeight:900,color:'#111',letterSpacing:'-.02em'}}>
-            {parseFloat(amount).toLocaleString('fr-FR')} <span style={{fontSize:13,color:'#AAA',fontWeight:500}}>{currency}</span>
+          <p style={{fontSize:11,color:themeVars.textMuted,marginBottom:4}}>{description}</p>
+          <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+            {parseFloat(amount).toLocaleString('fr-FR')} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{currency}</span>
           </p>
         </div>
-        <p style={{fontSize:11,color:'#DDD',marginTop:16}}>Ne fermez pas cette page</p>
+        <p style={{fontSize:11,color:themeVars.textMuted,marginTop:16}}>Ne fermez pas cette page</p>
       </div>
     </div>
   );
@@ -627,15 +726,15 @@ export default function GatewayPay() {
           <CheckCircle2 size={32} style={{color:'#10B981'}}/>
         </div>
         {gatewaySettings.logo && <img src={gatewaySettings.logo} alt="" style={{height:26,margin:'0 auto 14px',display:'block',objectFit:'contain'}}/>}
-        <h2 style={{fontSize:22,fontWeight:900,color:'#111',marginBottom:8,letterSpacing:'-.02em'}}>Paiement réussi !</h2>
-        <p style={{fontSize:13,color:'#AAA'}}>Votre transaction a été confirmée.</p>
+        <h2 style={{fontSize:22,fontWeight:900,marginBottom:8,letterSpacing:'-.02em'}}>Paiement réussi !</h2>
+        <p style={{fontSize:13,color:themeVars.textSecondary}}>Votre transaction a été confirmée.</p>
         <div className="gw-status-amount" style={{background:'#ECFDF5',border:'1px solid rgba(16,185,129,.15)'}}>
           <p style={{fontSize:11,color:'#6EE7B7',marginBottom:4}}>{description}</p>
-          <p style={{fontSize:28,fontWeight:900,color:'#111',letterSpacing:'-.02em'}}>
-            {parseFloat(amount).toLocaleString('fr-FR')} <span style={{fontSize:13,color:'#AAA',fontWeight:500}}>{currency}</span>
+          <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+            {parseFloat(amount).toLocaleString('fr-FR')} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{currency}</span>
           </p>
         </div>
-        {gatewaySettings.redirectUrl && <p style={{fontSize:11,color:'#CCC',marginTop:14}}>Redirection en cours…</p>}
+        {gatewaySettings.redirectUrl && <p style={{fontSize:11,color:themeVars.textMuted,marginTop:14}}>Redirection en cours…</p>}
       </div>
     </div>
   );
@@ -650,8 +749,8 @@ export default function GatewayPay() {
             <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
           </svg>
         </div>
-        <h2 style={{fontSize:22,fontWeight:900,color:'#111',marginBottom:8,letterSpacing:'-.02em'}}>Paiement échoué</h2>
-        <p style={{fontSize:13,color:'#AAA',marginBottom:28}}>La transaction n'a pas pu être finalisée.</p>
+        <h2 style={{fontSize:22,fontWeight:900,marginBottom:8,letterSpacing:'-.02em'}}>Paiement échoué</h2>
+        <p style={{fontSize:13,color:themeVars.textSecondary,marginBottom:28}}>La transaction n'a pas pu être finalisée.</p>
         <button onClick={() => { setStatus(null); setStep(3); }} className="gw-submit" style={{marginTop:0}}>
           Réessayer
         </button>
@@ -670,22 +769,22 @@ export default function GatewayPay() {
         {/* ── LEFT — Form ── */}
         <div className="gw-left">
 
-          {/* Header mobile */}
+          {/* Header */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               {gatewaySettings.logo
                 ? <img src={gatewaySettings.logo} alt="" style={{height:24,objectFit:'contain'}}/>
-                : <div style={{width:28,height:28,borderRadius:8,background:'#1C0F00',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={13} style={{color:'#fff'}}/></div>
+                : <div style={{width:28,height:28,borderRadius:8,background: design === 'bold' ? primaryColor : '#1C0F00',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={13} style={{color:'#fff'}}/></div>
               }
               {(gatewaySettings.companyName || merchant?.name) && (
-                <span style={{fontSize:13,fontWeight:700,color:'#333'}}>{gatewaySettings.companyName || merchant?.name}</span>
+                <span style={{fontSize:13,fontWeight:700,color:themeVars.textPrimary}}>{gatewaySettings.companyName || merchant?.name}</span>
               )}
             </div>
             <div style={{textAlign:'right'}}>
-              <div style={{fontSize:18,fontWeight:900,color:'#111',letterSpacing:'-.02em'}}>
-                {parseFloat(amount||0).toLocaleString('fr-FR')} <span style={{fontSize:11,color:'#AAA',fontWeight:500}}>{currency}</span>
+              <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+                {parseFloat(amount||0).toLocaleString('fr-FR')} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{currency}</span>
               </div>
-              {description && <div style={{fontSize:10,color:'#CCC'}}>{description}</div>}
+              {description && <div style={{fontSize:10,color:themeVars.textMuted}}>{description}</div>}
             </div>
           </div>
 
@@ -700,7 +799,7 @@ export default function GatewayPay() {
               <span className="gw-section-lbl">Sélectionnez votre pays</span>
               {fetchingMerchant ? (
                 <div style={{display:'flex',justifyContent:'center',padding:'28px 0'}}>
-                  <div style={{width:28,height:28,borderRadius:'50%',border:'3px solid #EDE9E3',borderTopColor:primaryColor}} className="gw-spin"/>
+                  <div style={{width:28,height:28,borderRadius:'50%',border:`3px solid ${design === 'bold' ? '#333' : '#EDE9E3'}`,borderTopColor:primaryColor}} className="gw-spin"/>
                 </div>
               ) : countries.length > 0 ? (
                 <div className="gw-country-grid">
@@ -713,7 +812,7 @@ export default function GatewayPay() {
                   ))}
                 </div>
               ) : (
-                <div style={{textAlign:'center',padding:'28px 0',color:'#CCC'}}>
+                <div style={{textAlign:'center',padding:'28px 0',color:themeVars.textMuted}}>
                   <Globe size={32} style={{margin:'0 auto 10px',display:'block',opacity:.4}}/>
                   <p style={{fontSize:13,fontWeight:600}}>Aucun moyen de paiement disponible</p>
                 </div>
@@ -739,10 +838,10 @@ export default function GatewayPay() {
                 <button key={method.id} onClick={() => { setSelectedMethod(method); setStep(3); }} className="gw-method-btn">
                   <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
                   <span className="gw-method-name">{method.name}</span>
-                  <ChevronRight size={14} style={{color:'#CCC'}}/>
+                  <ChevronRight size={14} style={{color:themeVars.textMuted}}/>
                 </button>
               )) : (
-                <p style={{fontSize:13,color:'#CCC',textAlign:'center',padding:'20px 0'}}>Aucune méthode disponible</p>
+                <p style={{fontSize:13,color:themeVars.textMuted,textAlign:'center',padding:'20px 0'}}>Aucune méthode disponible</p>
               )}
             </div>
           )}
@@ -770,7 +869,7 @@ export default function GatewayPay() {
                       <div className="gw-kkiapay-dot"/>
                       Paiement via KKiaPay
                     </div>
-                    <p style={{margin:0,fontSize:12,color:'#777'}}>
+                    <p style={{margin:0,fontSize:12,color:themeVars.textSecondary}}>
                       Une fenêtre sécurisée KKiaPay s'ouvrira pour finaliser votre paiement.
                       Vous pourrez choisir votre méthode de paiement (Mobile Money, carte bancaire, etc.).
                     </p>
@@ -811,16 +910,16 @@ export default function GatewayPay() {
 
                   {showSuggestions && filteredSuggestions.length > 0 && phoneSuffix.length === 0 && (
                     <div style={{marginTop:8,marginBottom:4}}>
-                      <p style={{fontSize:9,color:'#CCC',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
+                      <p style={{fontSize:9,color:themeVars.textMuted,fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
                       {filteredSuggestions.map((p, i) => {
                         const prefix = COUNTRY_PREFIXES[country] || '';
                         const suf = prefix ? p.number.replace(prefix,'') : p.number;
                         return (
                           <button key={i} type="button" className="gw-suggestion"
                             onClick={() => { setPhoneSuffix(suf); setShowSuggestions(false); }}>
-                            <Smartphone size={12} style={{color:'#CCC'}}/>
-                            <span style={{fontSize:12,color:'#555',fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
-                            <span style={{fontSize:10,color:'#CCC',marginLeft:'auto'}}>Utiliser</span>
+                            <Smartphone size={12} style={{color:themeVars.textMuted}}/>
+                            <span style={{fontSize:12,color:themeVars.textPrimary,fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
+                            <span style={{fontSize:10,color:themeVars.textMuted,marginLeft:'auto'}}>Utiliser</span>
                           </button>
                         );
                       })}
@@ -843,7 +942,7 @@ export default function GatewayPay() {
                 </form>
               )}
 
-              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:16,fontSize:10,color:'#DDD',fontWeight:600}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:16,fontSize:10,color:themeVars.textMuted,fontWeight:600}}>
                 <Lock size={9}/> SSL · PCI DSS · Paiement sécurisé
               </div>
             </div>
