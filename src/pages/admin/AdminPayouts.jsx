@@ -5,7 +5,6 @@ import { CheckCircle, XCircle, RefreshCw, Settings, Search, Clock } from 'lucide
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
-import { doc, setDoc } from 'firebase/firestore';
 
 export default function AdminPayouts() {
   const [withdrawals, setWithdrawals] = useState([]);

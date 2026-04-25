@@ -11,33 +11,85 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Payout réel via FeexPay
-async function processFeexPayPayout({ token, shopId, amount, phone, network }) {
-  const url = 'https://api.feexpay.me/api/payouts/public/transfer/global';
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shop: shopId, amount: Math.round(amount), phoneNumber: phone, network: network || 'MTN', motif: 'Retrait' })
-    });
-    const data = await res.json();
-    if (!res.ok) return { success: false, error: data.message || 'Erreur FeexPay' };
-    return { success: true, reference: data.reference, status: data.status };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+// ═══════════════════════════════════════════
+// PROVIDERS AVEC API PAYOUT
+// ═══════════════════════════════════════════
 
+const PAYOUT_PROVIDERS = {
+  feexpay: {
+    name: 'FeexPay',
+    payout: async (config, { amount, phone, network }) => {
+      const res = await fetch('https://api.feexpay.me/api/payouts/public/transfer/global', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${config.FEEXPAY_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shop: config.FEEXPAY_SHOP_ID, amount: Math.round(amount), phoneNumber: phone, network: network || 'MTN', motif: 'Retrait' })
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.message };
+      return { success: true, reference: data.reference, status: data.status, provider: 'feexpay' };
+    }
+  },
+
+  kkiapay: {
+    name: 'KKiaPay',
+    payout: async (config, { amount, phone }) => {
+      const res = await fetch('https://api.kkiapay.me/api/v1/payouts', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Api-Key': config.KKIAPAY_PUBLIC_KEY, 'X-Private-Key': config.KKIAPAY_PRIVATE_KEY, 'X-Secret-Key': config.KKIAPAY_SECRET_KEY },
+        body: JSON.stringify({ amount: Math.round(amount), phone: phone, description: 'Retrait' })
+      });
+      const data = await res.json();
+      if (!res.ok || data.status === 'failed') return { success: false, error: data.message };
+      return { success: true, reference: data.transaction_id, status: data.status, provider: 'kkiapay' };
+    }
+  },
+
+  fedapay: {
+    name: 'FedaPay',
+    payout: async (config, { amount, phone }) => {
+      const res = await fetch('https://api.fedapay.com/v1/payouts', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${config.FEDAPAY_SECRET_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: Math.round(amount), currency: { iso: 'XOF' }, recipient: { phone_number: { number: phone } }, description: 'Retrait' })
+      });
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.message };
+      return { success: true, reference: data.id?.toString(), status: data.status, provider: 'fedapay' };
+    }
+  },
+
+  cinetpay: {
+    name: 'CinetPay',
+    payout: async (config, { amount, phone, network }) => {
+      const res = await fetch('https://api-checkout.cinetpay.com/v2/payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apikey: config.CINETPAY_API_KEY, site_id: config.CINETPAY_SITE_ID, transaction_id: `PW-${Date.now()}`, amount: Math.round(amount), currency: 'XOF', phone_number: phone, network: network || 'MTN', description: 'Retrait', notify_url: `${process.env.VITE_APP_URL}/api/webhook/cinetpay` })
+      });
+      const data = await res.json();
+      if (data.code !== '201') return { success: false, error: data.message };
+      return { success: true, reference: data.data.transaction_id, status: 'pending', provider: 'cinetpay' };
+    }
+  }
+};
+
+// Détection réseau
 function detectNetwork(phone) {
   const p = String(phone).replace(/[^0-9]/g, '');
   if (p.startsWith('229')) {
-    const prefix = p.substring(3,5);
+    const prefix = p.substring(3, 5);
     if (['01','61','62','63','64','65','66','67','68','69'].includes(prefix)) return 'MTN';
     if (['51','52','53','54','55','56','57','58','59'].includes(prefix)) return 'MOOV';
     if (['41','42','43','44','45','46','47','48','49'].includes(prefix)) return 'CELTIIS BJ';
   }
+  if (p.startsWith('228')) return 'TOGOCOM TG';
+  if (p.startsWith('225')) return 'MTN';
+  if (p.startsWith('221')) return 'ORANGE';
   return 'MTN';
 }
+
+// Priorité des providers pour le payout
+const PAYOUT_PRIORITY = ['feexpay', 'kkiapay', 'fedapay', 'cinetpay'];
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -47,50 +99,66 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
 
-  const { withdrawalId } = req.body;
+  const { withdrawalId, providerId } = req.body;
   if (!withdrawalId) return res.status(400).json({ error: 'withdrawalId requis' });
 
   try {
     const wSnap = await db.collection('withdrawals').doc(withdrawalId).get();
     if (!wSnap.exists) return res.status(404).json({ error: 'Retrait introuvable' });
     const w = { id: wSnap.id, ...wSnap.data() };
-    if (w.status !== 'pending') return res.status(400).json({ error: 'Ce retrait a déjà été traité' });
+    if (w.status !== 'pending') return res.status(400).json({ error: 'Déjà traité' });
 
-    // Récupérer les clés FeexPay du marchand
     const merchantSnap = await db.collection('gateway_merchants').doc(w.merchantId).get();
     if (!merchantSnap.exists) return res.status(404).json({ error: 'Marchand introuvable' });
     const merchant = merchantSnap.data();
-    const feexpay = merchant.providers?.feexpay;
-    if (!feexpay?.active) return res.status(400).json({ error: 'FeexPay non configuré' });
+    const providers = merchant.providers || {};
 
-    // Vérifier le solde
     if ((merchant.balance || 0) < w.amount) return res.status(400).json({ error: 'Solde insuffisant' });
 
     const network = detectNetwork(w.phone);
-    const result = await processFeexPayPayout({
-      token: feexpay.FEEXPAY_TOKEN,
-      shopId: feexpay.FEEXPAY_SHOP_ID,
-      amount: w.amount,
-      phone: w.phone,
-      network
-    });
 
-    if (result.success) {
-      await db.collection('withdrawals').doc(withdrawalId).update({
-        status: result.status === 'SUCCESSFUL' ? 'completed' : 'pending',
-        payoutRef: result.reference,
-        processedAt: new Date().toISOString()
-      });
+    // Si un provider spécifique est demandé, l'utiliser
+    if (providerId) {
+      const provider = PAYOUT_PROVIDERS[providerId];
+      if (!provider) return res.status(400).json({ error: 'Provider non supporté' });
+      const config = providers[providerId];
+      if (!config?.active) return res.status(400).json({ error: `${provider.name} non configuré` });
 
-      if (result.status === 'SUCCESSFUL') {
-        await db.collection('gateway_merchants').doc(w.merchantId).update({
-          balance: admin.firestore.FieldValue.increment(-w.amount),
-          updatedAt: new Date().toISOString()
+      const result = await provider.payout(config, { amount: w.amount, phone: w.phone, network });
+      if (result.success && result.status === 'SUCCESSFUL') {
+        await db.collection('withdrawals').doc(withdrawalId).update({
+          status: 'completed', payoutRef: result.reference, provider: providerId, processedAt: new Date().toISOString()
         });
+        await db.collection('gateway_merchants').doc(w.merchantId).update({
+          balance: admin.firestore.FieldValue.increment(-w.amount), updatedAt: new Date().toISOString()
+        });
+      }
+      return res.status(200).json({ success: result.success, reference: result.reference, status: result.status, provider: providerId });
+    }
+
+    // Sinon, essayer tous les providers dans l'ordre de priorité
+    for (const pid of PAYOUT_PRIORITY) {
+      const provider = PAYOUT_PROVIDERS[pid];
+      if (!provider) continue;
+      const config = providers[pid];
+      if (!config?.active) continue;
+
+      const result = await provider.payout(config, { amount: w.amount, phone: w.phone, network });
+      if (result.success) {
+        await db.collection('withdrawals').doc(withdrawalId).update({
+          status: result.status === 'SUCCESSFUL' ? 'completed' : 'pending',
+          payoutRef: result.reference, provider: pid, processedAt: new Date().toISOString()
+        });
+        if (result.status === 'SUCCESSFUL') {
+          await db.collection('gateway_merchants').doc(w.merchantId).update({
+            balance: admin.firestore.FieldValue.increment(-w.amount), updatedAt: new Date().toISOString()
+          });
+        }
+        return res.status(200).json({ success: true, reference: result.reference, status: result.status, provider: pid });
       }
     }
 
-    return res.status(200).json({ success: result.success, reference: result.reference, status: result.status });
+    return res.status(400).json({ error: 'Aucun provider payout disponible. Configurez FeexPay, KKiaPay, FedaPay ou CinetPay.' });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
