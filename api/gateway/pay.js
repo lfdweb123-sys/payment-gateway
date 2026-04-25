@@ -1,4 +1,4 @@
-import { validatePhone } from '../services/phoneValidator.js';
+import { validatePhone } from '../../src/services/phoneValidator.js';
 
 import admin from 'firebase-admin';
 
