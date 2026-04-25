@@ -1,8 +1,6 @@
-import { getAllMethodsForCountry } from './providers/registry';
+import { getMethodsForCountry } from './providers/index';
 
-// ─── Noms et icônes des méthodes ─────────────────────────────────────────────
-// IMPORTANT : toutes les valeurs sont des strings simples (pas d'objets)
-// pour éviter l'erreur React #31 "Objects are not valid as a React child"
+// ─── Noms des méthodes ────────────────────────────────────────────────────────
 
 const METHOD_NAMES = {
   mtn_money:      'MTN Mobile Money',
@@ -14,6 +12,9 @@ const METHOD_NAMES = {
   togocom_money:  'TOGOCOM Money',
   airtel_money:   'Airtel Money',
   mpesa:          'M-Pesa',
+  afrimoney:      'Afrimoney',
+  coris:          'Coris Money',
+  qmoney:         'QMoney',
   card:           'Carte Bancaire',
   bank_transfer:  'Virement Bancaire',
   ussd:           'USSD',
@@ -22,44 +23,45 @@ const METHOD_NAMES = {
   google_pay:     'Google Pay',
   chipper_wallet: 'Chipper Wallet',
   mobile_money:   'Mobile Money',
-  wallet:         'Wallet (Coris)',   // ← était un objet {name,icon}, corrigé en string
+  wallet:         'Wallet (Coris)',
   ideal:          'iDEAL',
   giropay:        'Giropay',
   sofort:         'Sofort',
   bancontact:     'Bancontact',
 };
 
-// ─── Pays ────────────────────────────────────────────────────────────────────
+// ─── Pays ─────────────────────────────────────────────────────────────────────
 
 const COUNTRIES = {
-  bj: { name: 'Bénin',           flag: '🇧🇯', currency: 'XOF', phonePrefix: '229' },
-  ci: { name: "Côte d'Ivoire",   flag: '🇨🇮', currency: 'XOF', phonePrefix: '225' },
-  tg: { name: 'Togo',            flag: '🇹🇬', currency: 'XOF', phonePrefix: '228' },
-  sn: { name: 'Sénégal',         flag: '🇸🇳', currency: 'XOF', phonePrefix: '221' },
-  bf: { name: 'Burkina Faso',    flag: '🇧🇫', currency: 'XOF', phonePrefix: '226' },
-  ml: { name: 'Mali',            flag: '🇲🇱', currency: 'XOF', phonePrefix: '223' },
-  ne: { name: 'Niger',           flag: '🇳🇪', currency: 'XOF', phonePrefix: '227' },
-  gn: { name: 'Guinée',          flag: '🇬🇳', currency: 'GNF', phonePrefix: '224' },
-  cm: { name: 'Cameroun',        flag: '🇨🇲', currency: 'XAF', phonePrefix: '237' },
-  ga: { name: 'Gabon',           flag: '🇬🇦', currency: 'XAF', phonePrefix: '241' },
-  cd: { name: 'RDC',             flag: '🇨🇩', currency: 'CDF', phonePrefix: '243' },
+  bj: { name: 'Bénin',             flag: '🇧🇯', currency: 'XOF', phonePrefix: '229' },
+  ci: { name: "Côte d'Ivoire",     flag: '🇨🇮', currency: 'XOF', phonePrefix: '225' },
+  tg: { name: 'Togo',              flag: '🇹🇬', currency: 'XOF', phonePrefix: '228' },
+  sn: { name: 'Sénégal',           flag: '🇸🇳', currency: 'XOF', phonePrefix: '221' },
+  bf: { name: 'Burkina Faso',      flag: '🇧🇫', currency: 'XOF', phonePrefix: '226' },
+  ml: { name: 'Mali',              flag: '🇲🇱', currency: 'XOF', phonePrefix: '223' },
+  ne: { name: 'Niger',             flag: '🇳🇪', currency: 'XOF', phonePrefix: '227' },
+  gn: { name: 'Guinée',            flag: '🇬🇳', currency: 'GNF', phonePrefix: '224' },
+  cm: { name: 'Cameroun',          flag: '🇨🇲', currency: 'XAF', phonePrefix: '237' },
+  ga: { name: 'Gabon',             flag: '🇬🇦', currency: 'XAF', phonePrefix: '241' },
+  cd: { name: 'RDC',               flag: '🇨🇩', currency: 'CDF', phonePrefix: '243' },
   cg: { name: 'Congo Brazzaville', flag: '🇨🇬', currency: 'XAF', phonePrefix: '242' },
-  ng: { name: 'Nigeria',         flag: '🇳🇬', currency: 'NGN', phonePrefix: '234' },
-  gh: { name: 'Ghana',           flag: '🇬🇭', currency: 'GHS', phonePrefix: '233' },
-  ke: { name: 'Kenya',           flag: '🇰🇪', currency: 'KES', phonePrefix: '254' },
-  ug: { name: 'Ouganda',         flag: '🇺🇬', currency: 'UGX', phonePrefix: '256' },
-  tz: { name: 'Tanzanie',        flag: '🇹🇿', currency: 'TZS', phonePrefix: '255' },
-  rw: { name: 'Rwanda',          flag: '🇷🇼', currency: 'RWF', phonePrefix: '250' },
-  za: { name: 'Afrique du Sud',  flag: '🇿🇦', currency: 'ZAR', phonePrefix: '27' },
-  fr: { name: 'France',          flag: '🇫🇷', currency: 'EUR', phonePrefix: '33' },
-  be: { name: 'Belgique',        flag: '🇧🇪', currency: 'EUR', phonePrefix: '32' },
-  de: { name: 'Allemagne',       flag: '🇩🇪', currency: 'EUR', phonePrefix: '49' },
-  nl: { name: 'Pays-Bas',        flag: '🇳🇱', currency: 'EUR', phonePrefix: '31' },
-  gb: { name: 'Royaume-Uni',     flag: '🇬🇧', currency: 'GBP', phonePrefix: '44' },
-  us: { name: 'États-Unis',      flag: '🇺🇸', currency: 'USD', phonePrefix: '1' },
+  gm: { name: 'Gambie',            flag: '🇬🇲', currency: 'GMD', phonePrefix: '220' },
+  ng: { name: 'Nigeria',           flag: '🇳🇬', currency: 'NGN', phonePrefix: '234' },
+  gh: { name: 'Ghana',             flag: '🇬🇭', currency: 'GHS', phonePrefix: '233' },
+  ke: { name: 'Kenya',             flag: '🇰🇪', currency: 'KES', phonePrefix: '254' },
+  ug: { name: 'Ouganda',           flag: '🇺🇬', currency: 'UGX', phonePrefix: '256' },
+  tz: { name: 'Tanzanie',          flag: '🇹🇿', currency: 'TZS', phonePrefix: '255' },
+  rw: { name: 'Rwanda',            flag: '🇷🇼', currency: 'RWF', phonePrefix: '250' },
+  za: { name: 'Afrique du Sud',    flag: '🇿🇦', currency: 'ZAR', phonePrefix: '27'  },
+  fr: { name: 'France',            flag: '🇫🇷', currency: 'EUR', phonePrefix: '33'  },
+  be: { name: 'Belgique',          flag: '🇧🇪', currency: 'EUR', phonePrefix: '32'  },
+  de: { name: 'Allemagne',         flag: '🇩🇪', currency: 'EUR', phonePrefix: '49'  },
+  nl: { name: 'Pays-Bas',          flag: '🇳🇱', currency: 'EUR', phonePrefix: '31'  },
+  gb: { name: 'Royaume-Uni',       flag: '🇬🇧', currency: 'GBP', phonePrefix: '44'  },
+  us: { name: 'États-Unis',        flag: '🇺🇸', currency: 'USD', phonePrefix: '1'   },
 };
 
-// ─── Méthodes par provider et pays ───────────────────────────────────────────
+// ─── Méthodes par provider et pays ────────────────────────────────────────────
 
 const PROVIDER_METHODS = {
   feexpay: {
@@ -72,6 +74,7 @@ const PROVIDER_METHODS = {
       cg: ['mtn_money'],
     },
   },
+
   stripe: {
     countries: {
       fr: ['card', 'apple_pay', 'google_pay'],
@@ -82,6 +85,7 @@ const PROVIDER_METHODS = {
       be: ['card', 'bancontact'],
     },
   },
+
   paystack: {
     countries: {
       ng: ['card', 'bank_transfer', 'ussd'],
@@ -90,6 +94,7 @@ const PROVIDER_METHODS = {
       za: ['card'],
     },
   },
+
   flutterwave: {
     countries: {
       ng: ['card', 'bank_transfer'],
@@ -104,6 +109,7 @@ const PROVIDER_METHODS = {
       cm: ['card', 'mobile_money'],
     },
   },
+
   kkiapay: {
     countries: {
       bj: ['mtn_money', 'moov_money', 'card'],
@@ -119,6 +125,7 @@ const PROVIDER_METHODS = {
       cd: ['airtel_money', 'orange_money', 'mpesa'],
     },
   },
+
   fedapay: {
     countries: {
       bj: ['mtn_money', 'moov_money', 'card'],
@@ -133,6 +140,7 @@ const PROVIDER_METHODS = {
       ga: ['airtel_money', 'moov_money'],
     },
   },
+
   cinetpay: {
     countries: {
       bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card'],
@@ -148,6 +156,25 @@ const PROVIDER_METHODS = {
       ga: ['airtel_money', 'moov_money'],
     },
   },
+
+  // ── MbiyoPay — 11 pays selon doc officielle ──────────────────────────────
+  // https://dashboard.mbiyo.africa/docs/reference/merchant/payin
+  mbiyopay: {
+    countries: {
+      bj: ['mtn_money', 'moov_money', 'celtiis_money'],
+      bf: ['orange_money', 'moov_money', 'coris'],
+      ci: ['orange_money', 'mtn_money', 'wave_money', 'moov_money'],
+      sn: ['orange_money', 'free_money'],
+      tg: ['moov_money', 'togocom_money'],
+      cg: ['mtn_money'],
+      cd: ['mpesa', 'airtel_money', 'orange_money', 'afrimoney'],
+      cm: ['orange_money', 'moov_money'],
+      gn: ['orange_money', 'mtn_money'],
+      ml: ['orange_money', 'moov_money'],
+      gm: ['afrimoney', 'qmoney', 'wave_money'],
+    },
+  },
+
   paypal: {
     countries: {
       fr: ['paypal', 'card'],
@@ -158,6 +185,7 @@ const PROVIDER_METHODS = {
       nl: ['paypal', 'card'],
     },
   },
+
   chipper: {
     countries: {
       gh: ['chipper_wallet', 'mobile_money', 'card'],
@@ -173,41 +201,8 @@ const PROVIDER_METHODS = {
   },
 };
 
-// ─── Exports ─────────────────────────────────────────────────────────────────
+// ─── Fonctions ────────────────────────────────────────────────────────────────
 
-/**
- * Retourne les méthodes disponibles pour un pays donné
- * (union de tous les providers qui couvrent ce pays)
- */
-export function getMethodsForCountry(countryCode) {
-  const country = COUNTRIES[countryCode];
-  if (!country) return null;
-
-  const seen = new Set();
-  const methods = [];
-
-  Object.values(PROVIDER_METHODS).forEach(provider => {
-    const countryMethods = provider.countries?.[countryCode];
-    if (countryMethods) {
-      countryMethods.forEach(m => {
-        if (!seen.has(m)) {
-          seen.add(m);
-          methods.push({
-            id: m,
-            name: METHOD_NAMES[m] || m, // toujours une string
-          });
-        }
-      });
-    }
-  });
-
-  return { ...country, code: countryCode, methods };
-}
-
-/**
- * Retourne les méthodes disponibles pour un pays,
- * filtrées selon une liste de providers actifs
- */
 export function getMethodsForCountryWithProviders(countryCode, activeProviders = []) {
   const country = COUNTRIES[countryCode];
   if (!country) return null;
@@ -222,10 +217,7 @@ export function getMethodsForCountryWithProviders(countryCode, activeProviders =
       countryMethods.forEach(m => {
         if (!seen.has(m)) {
           seen.add(m);
-          methods.push({
-            id: m,
-            name: METHOD_NAMES[m] || m, // toujours une string
-          });
+          methods.push({ id: m, name: METHOD_NAMES[m] || m });
         }
       });
     }
@@ -234,16 +226,10 @@ export function getMethodsForCountryWithProviders(countryCode, activeProviders =
   return { ...country, code: countryCode, methods };
 }
 
-/**
- * Retourne tous les pays disponibles (avec au moins 1 méthode)
- */
 export function getAllCountries() {
   return Object.entries(COUNTRIES).map(([code, data]) => ({ code, ...data }));
 }
 
-/**
- * Retourne les pays disponibles selon une liste de providers actifs
- */
 export function getCountriesForProviders(activeProviders = []) {
   const countrySet = new Set();
   activeProviders.forEach(pid => {
@@ -257,5 +243,5 @@ export function getCountriesForProviders(activeProviders = []) {
     .map(code => ({ code, ...COUNTRIES[code] }));
 }
 
-export { METHOD_NAMES, COUNTRIES, PROVIDER_METHODS };
+export { getMethodsForCountry, METHOD_NAMES, COUNTRIES, PROVIDER_METHODS };
 export default COUNTRIES;
