@@ -28,10 +28,6 @@ function checkRateLimit(apiKey) {
   return { allowed: true };
 }
 
-// ═══════════════════════════════════════════
-// 15 PROVIDERS - APPELS RÉELS
-// ═══════════════════════════════════════════
-
 const PROVIDER_CALLS = {
   feexpay: async (config, { amount, phone, method }) => {
     const networkMap = { mtn_money: 'MTN', moov_money: 'MOOV', celtiis_money: 'CELTIIS BJ', orange_money: 'ORANGE', wave_money: 'WAVE', togocom_money: 'TOGOCOM TG' };
@@ -44,7 +40,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference, status: data.status, provider: 'feexpay' };
   },
-
   stripe: async (config, { amount, currency, description }) => {
     const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
@@ -55,7 +50,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.error?.message };
     return { success: true, reference: data.id, url: data.url, status: 'pending', provider: 'stripe' };
   },
-
   paystack: async (config, { amount, email, currency, method }) => {
     const res = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -66,7 +60,6 @@ const PROVIDER_CALLS = {
     if (!data.status) return { success: false, error: data.message };
     return { success: true, reference: data.data.reference, url: data.data.authorization_url, status: 'pending', provider: 'paystack' };
   },
-
   flutterwave: async (config, { amount, email, phone, currency, country }) => {
     const res = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
@@ -77,7 +70,6 @@ const PROVIDER_CALLS = {
     if (data.status !== 'success') return { success: false, error: data.message };
     return { success: true, reference: data.data.tx_ref, url: data.data.link, status: 'pending', provider: 'flutterwave' };
   },
-
   kkiapay: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.kkiapay.me/api/v1/transactions', {
       method: 'POST',
@@ -88,7 +80,6 @@ const PROVIDER_CALLS = {
     if (!res.ok || data.status === 'failed') return { success: false, error: data.message };
     return { success: true, reference: data.transaction_id, url: data.payment_url, status: 'pending', provider: 'kkiapay' };
   },
-
   fedapay: async (config, { amount, email, phone, description }) => {
     const res = await fetch('https://api.fedapay.com/v1/transactions', {
       method: 'POST',
@@ -99,7 +90,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.id?.toString(), url: data.payment_url, status: 'pending', provider: 'fedapay' };
   },
-
   paydunya: async (config, { amount, description }) => {
     const res = await fetch('https://paydunya.com/api/v1/checkout-invoice/create', {
       method: 'POST',
@@ -110,7 +100,6 @@ const PROVIDER_CALLS = {
     if (data.response_code !== '00') return { success: false, error: data.response_text };
     return { success: true, reference: data.invoice.token, url: data.response_text, status: 'pending', provider: 'paydunya' };
   },
-
   cinetpay: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api-checkout.cinetpay.com/v2/payment', {
       method: 'POST',
@@ -121,7 +110,6 @@ const PROVIDER_CALLS = {
     if (data.code !== '201') return { success: false, error: data.message };
     return { success: true, reference: data.data.transaction_id, url: data.data.payment_url, status: 'pending', provider: 'cinetpay' };
   },
-
   lygos: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.lygosapp.com/v1/payments', {
       method: 'POST',
@@ -132,7 +120,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference || data.id, status: 'pending', provider: 'lygos' };
   },
-
   paypal: async (config, { amount, currency, description }) => {
     const authRes = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
       method: 'POST',
@@ -150,7 +137,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.id, url: data.links?.find(l => l.rel === 'approve')?.href, status: 'pending', provider: 'paypal' };
   },
-
   mbiyopay: async (config, { amount, phone, description }) => {
     const res = await fetch('https://api.mbiyopay.com/v1/payments', {
       method: 'POST',
@@ -161,7 +147,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference, status: 'pending', provider: 'mbiyopay' };
   },
-
   qosic: async (config, { amount, phone, description }) => {
     const res = await fetch('https://api.qosic.com/v1/payment/init', {
       method: 'POST',
@@ -172,7 +157,6 @@ const PROVIDER_CALLS = {
     if (!res.ok || data.status === 'error') return { success: false, error: data.message };
     return { success: true, reference: data.reference || data.transaction_id, status: 'pending', provider: 'qosic' };
   },
-
   bizao: async (config, { amount, phone, description }) => {
     const res = await fetch('https://api.bizao.com/v1/payments', {
       method: 'POST',
@@ -183,7 +167,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.reference, status: 'pending', provider: 'bizao' };
   },
-
   hub2: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.hub2.io/v1/payments', {
       method: 'POST',
@@ -194,7 +177,6 @@ const PROVIDER_CALLS = {
     if (!res.ok) return { success: false, error: data.message };
     return { success: true, reference: data.id, status: 'pending', provider: 'hub2' };
   },
-
   chipper: async (config, { amount, phone, email, description }) => {
     const res = await fetch('https://api.chipperpayments.com/v1/charges', {
       method: 'POST',
@@ -207,7 +189,6 @@ const PROVIDER_CALLS = {
   }
 };
 
-// Priorité des providers par méthode
 function getBestProvider(method, providers) {
   const priority = {
     mtn_money: ['feexpay', 'kkiapay', 'fedapay', 'cinetpay', 'paydunya', 'lygos', 'mbiyopay', 'qosic', 'bizao', 'hub2'],
@@ -223,9 +204,9 @@ function getBestProvider(method, providers) {
     ussd: ['paystack', 'flutterwave'],
     mpesa: ['paystack', 'flutterwave'],
     chipper_wallet: ['chipper'],
-    airtel_money: ['kkiapay', 'fedapay', 'cinetpay', 'lygos', 'mbiyopay', 'qosic', 'bizao']
+    airtel_money: ['kkiapay', 'fedapay', 'cinetpay', 'lygos', 'mbiyopay', 'qosic', 'bizao'],
+    wallet: ['feexpay']
   };
-
   for (const pid of (priority[method] || ['feexpay'])) {
     if (providers[pid]?.active) return pid;
   }
@@ -267,7 +248,8 @@ export default async function handler(req, res) {
 
     const result = await callFn(providerConfig, { amount: netAmount, phone, email, country, method, description, currency: 'XOF' });
 
-    await db.collection('gateway_transactions').add({
+    // UN SEUL add()
+    const txRef = await db.collection('gateway_transactions').add({
       merchantId: merchant.id, amount: amountNum, commission, netAmount,
       country, method, provider: providerId, providerRef: result.reference || null,
       status: result.success ? (result.status === 'SUCCESSFUL' ? 'completed' : 'pending') : 'failed',
@@ -282,7 +264,14 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({ success: result.success, transactionId: merchant.id, reference: result.reference, status: result.status, provider: providerId, message: result.success ? 'Paiement initié' : result.error });
+    return res.status(200).json({
+      success: result.success,
+      transactionId: txRef.id,
+      reference: result.reference,
+      status: result.status,
+      provider: providerId,
+      message: result.success ? 'Paiement initié' : result.error
+    });
   } catch (error) {
     console.error('Erreur:', error);
     return res.status(500).json({ error: error.message });
