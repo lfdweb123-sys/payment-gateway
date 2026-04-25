@@ -161,7 +161,7 @@ export default function Home() {
           </a>
 
           <div className="pp-desktop-nav" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API'],['#pricing','Tarifs']].map(([href, label]) => (
+            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API']].map(([href, label]) => (
               <a key={href} href={href} className="pp-nav-link" style={{ fontSize: 14, color: '#555', textDecoration: 'none', fontWeight: 500, transition: 'color .2s' }}>{label}</a>
             ))}
           </div>
@@ -188,7 +188,7 @@ export default function Home() {
 
         {mobileMenuOpen && (
           <div style={{ background: '#fff', borderTop: '1px solid #EEE', padding: '16px 28px 24px' }}>
-            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API'],['#pricing','Tarifs']].map(([href, label], i, arr) => (
+            {[['#features','Fonctionnalités'],['#providers','Providers'],['#api','API']].map(([href, label], i, arr) => (
               <a key={href} href={href} style={{ display: 'block', padding: '12px 0', fontSize: 15, color: '#444', borderBottom: i < arr.length-1 ? '1px solid #F3F3F3' : 'none', textDecoration: 'none' }} onClick={() => setMobileMenuOpen(false)}>{label}</a>
             ))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
@@ -401,76 +401,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── PRICING ── */}
-      {/*
-      <section id="pricing" style={{ background: '#fff', borderTop: '1px solid #EBEBEB', padding: '90px 32px' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#FF6B00', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12, justifyContent: 'center' }}>
-              <TrendingUp size={11} /> Tarification
-            </div>
-            <h2 style={{ fontSize: 'clamp(26px,3.5vw,42px)', fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.025em', lineHeight: 1.1, marginBottom: 14 }}>
-              Simple. Transparent.<br />Pas d'abonnement.
-            </h2>
-            <p style={{ fontSize: 16, color: '#777', maxWidth: 440, margin: '0 auto' }}>
-              Aucun frais fixe, aucun abonnement. Vous ne payez que lorsque vous encaissez.
-            </p>
-          </div>
-
-          {/* Big commission card 
-          <div style={{ maxWidth: 680, margin: '0 auto 40px', background: 'linear-gradient(135deg,#FFF8F2,#FFF3EA)', border: '2px solid #FFDAB8', borderRadius: 28, padding: '52px 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            {/* decorative circle 
-            <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,107,0,.06)', pointerEvents: 'none' }} />
-            <div style={{ position: 'absolute', bottom: -40, left: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,170,0,.08)', pointerEvents: 'none' }} />
-
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid #FFDAB8', color: '#FF6B00', fontSize: 12, fontWeight: 700, padding: '6px 16px', borderRadius: 100, marginBottom: 28 }}>
-              <Zap size={12} /> Modèle unique
-            </div>
-
-            <div style={{ fontSize: 'clamp(72px,12vw,110px)', fontWeight: 900, color: '#FF6B00', lineHeight: 1, letterSpacing: '-.04em', marginBottom: 8 }}>
-              1<span style={{ fontSize: '0.55em', verticalAlign: 'super' }}>%</span>
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#333', marginBottom: 10 }}>par transaction</div>
-            <div style={{ fontSize: 15, color: '#888', lineHeight: 1.65, maxWidth: 360, margin: '0 auto 36px' }}>
-              C'est tout. Pas d'abonnement, pas de frais cachés, pas de frais d'installation. Payez uniquement quand vos clients paient.
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 36 }}>
-              {[
-                { label: 'Inscription', value: 'Gratuite' },
-                { label: 'Frais mensuels', value: '0 XOF' },
-                { label: 'Commission', value: '1% / tx' },
-                { label: 'Retrait', value: 'Inclus' },
-              ].map((item, i) => (
-                <div key={i} style={{ background: '#fff', border: '1px solid #EBEBEB', borderRadius: 14, padding: '14px 22px', textAlign: 'center', minWidth: 110 }}>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: '#111', letterSpacing: '-.02em' }}>{item.value}</div>
-                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 3, fontWeight: 500 }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-
-            <Link to="/register" className="pp-btn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none', fontSize: 15, fontWeight: 700, padding: '15px 36px', borderRadius: 14, background: 'linear-gradient(135deg,#FF6B00,#FFAA00)', color: '#fff', boxShadow: '0 6px 24px rgba(255,107,0,.35)', transition: 'all .25s' }}>
-              Commencer gratuitement <ArrowRight size={17} />
-            </Link>
-          </div>
-
-          {/* Reassurance row 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
-            {[
-              { icon: CheckCircle, color: '#00A550', text: 'Sans engagement' },
-              { icon: Shield, color: '#0057FF', text: 'Transactions sécurisées PCI DSS' },
-              { icon: Zap, color: '#FF6B00', text: 'Activation instantanée' },
-              { icon: Globe, color: '#9B00E8', text: '40+ pays supportés' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#666', background: '#FAFAFA', border: '1px solid #EBEBEB', padding: '9px 16px', borderRadius: 100 }}>
-                <item.icon size={13} style={{ color: item.color }} /> {item.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      */}
-
       {/* ── CTA BAND ── */}
       <div style={{ background: 'linear-gradient(135deg,#FF6B00 0%,#FFAA00 100%)', padding: '72px 32px', textAlign: 'center' }}>
         <h2 style={{ fontSize: 'clamp(26px,4vw,44px)', fontWeight: 900, color: '#fff', letterSpacing: '-.025em', marginBottom: 14 }}>
@@ -507,7 +437,7 @@ export default function Home() {
             </div>
 
             {[
-              { title: 'Produit', links: [['/#features','Fonctionnalités'],['/#pricing','Tarifs'],['/#api','API'],['/#providers','Providers']] },
+              { title: 'Produit', links: [['/#features','Fonctionnalités'],['/#api','API'],['/#providers','Providers']] },
               { title: 'Ressources', links: [['/api-documentation','Documentation API'],['a/help','Aide & Support'],['a/contact','Contact']] },
               { title: 'Légal', links: [['/privacy','Confidentialité'],['/terms','CGU'],['/cookies','Cookies'],['/legal','Mentions légales']] },
             ].map((col, ci) => (
