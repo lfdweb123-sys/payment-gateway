@@ -203,9 +203,9 @@ function ScreenCard({ src, label, onClick }) {
 
 /* ── SCREENSHOTS SECTION ── */
 const SCREENS = [
-  { src: screen1, label: 'Tableau de bord principal' },
-  { src: screen2, label: 'Gestion des transactions' },
-  { src: screen3, label: 'Rapports & analytics' },
+  { src: screen1, label: 'Passerelle de paiement' },
+  { src: screen2, label: 'Passerelle de paiement' },
+  { src: screen3, label: 'Passerelle de paiement' },
 ];
 
 function ScreenshotsSection() {
