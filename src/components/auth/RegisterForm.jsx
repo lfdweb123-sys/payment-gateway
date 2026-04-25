@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import toast from 'react-hot-toast';
-import { Mail, Lock, User, Globe, Building2, Phone } from 'lucide-react';
+import { Mail, Lock, User, Globe, Building2, Phone, CheckCircle } from 'lucide-react';
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -17,6 +17,7 @@ export default function RegisterForm() {
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1);
   const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
@@ -42,7 +43,6 @@ export default function RegisterForm() {
         company: formData.company
       });
 
-      // Créer le compte marchand dans la passerelle
       const apiKey = generateApiKey();
       await setDoc(doc(db, 'gateway_merchants', result.user.uid), {
         name: formData.company || formData.name,
@@ -52,13 +52,15 @@ export default function RegisterForm() {
         apiKey,
         balance: 0,
         totalTransactions: 0,
-        active: true,
+        active: true, // Activé par défaut
+        verificationStatus: 'pending', // En attente de vérification
         commission: 1,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
 
       toast.success('Compte créé avec succès !');
-      navigate('/dashboard');
+      setStep(2);
     } catch (error) {
       if (error.code === 'auth/email-already-in-use') {
         toast.error('Cet email est déjà utilisé');
@@ -73,8 +75,7 @@ export default function RegisterForm() {
   const handleGoogleSignup = async () => {
     try {
       const result = await loginWithGoogle();
-      
-      // Créer le compte marchand
+
       const apiKey = generateApiKey();
       await setDoc(doc(db, 'gateway_merchants', result.user.uid), {
         name: result.user.displayName || '',
@@ -83,8 +84,10 @@ export default function RegisterForm() {
         balance: 0,
         totalTransactions: 0,
         active: true,
+        verificationStatus: 'pending',
         commission: 1,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       });
 
       toast.success('Compte créé avec succès !');
@@ -93,6 +96,48 @@ export default function RegisterForm() {
       toast.error('Erreur lors de l\'inscription avec Google');
     }
   };
+
+  // Étape 2 : Confirmation
+  if (step === 2) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <Link to="/" className="inline-flex items-center gap-2 mb-6">
+              <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center">
+                <Globe size={22} className="text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">Paiement Pro</span>
+            </Link>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+            <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <CheckCircle size={28} className="text-emerald-600"/>
+            </div>
+            <h1 className="text-xl font-bold text-gray-900 mb-2">Compte créé !</h1>
+            <p className="text-sm text-gray-500 mb-6">
+              Votre compte a été créé avec succès. Vous devez maintenant faire vérifier votre identité pour activer toutes les fonctionnalités.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+              <p className="text-sm font-medium text-amber-900 mb-2">⚠️ Vérification requise</p>
+              <p className="text-xs text-amber-700">
+                Vous pouvez accéder à votre dashboard, mais les fonctionnalités de paiement seront limitées tant que votre compte n'est pas vérifié.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Link to="/verification" className="bg-orange-500 text-white px-6 py-3 rounded-xl text-sm font-medium hover:bg-orange-600 text-center">
+                Vérifier mon compte maintenant
+              </Link>
+              <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-900">
+                Accéder au dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -112,11 +157,8 @@ export default function RegisterForm() {
             <p className="text-gray-500 text-sm mt-1">Créez votre compte marchand</p>
           </div>
 
-          {/* Google */}
-          <button
-            onClick={handleGoogleSignup}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 text-gray-700 font-medium py-3 px-4 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all mb-4"
-          >
+          <button onClick={handleGoogleSignup}
+            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 text-gray-700 font-medium py-3 px-4 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all mb-4">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77" fill="#34A853"/>

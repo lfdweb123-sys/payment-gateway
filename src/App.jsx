@@ -15,6 +15,7 @@ import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Developer from './pages/gateway/Developer';
+import Verification from './pages/gateway/Verification';
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -22,9 +23,14 @@ import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Cookies from './pages/Cookies';
 import Legal from './pages/Legal';
-import Verification from './pages/gateway/Verification';
 
-
+// Admin
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminMerchants from './pages/admin/AdminMerchants';
+import AdminVerifications from './pages/admin/AdminVerifications';
+import AdminCommissions from './pages/admin/AdminCommissions';
+import AdminRoute from './components/auth/AdminRoute';
 
 function PublicRoute({ children }) {
   const { user } = useAuth();
@@ -36,20 +42,23 @@ function AppContent() {
   const { user } = useAuth();
   const location = useLocation();
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  const isAdminRoute = location.pathname.startsWith('/admin');
   const isPublicPage = location.pathname === '/' || location.pathname === '/pay' || 
-    location.pathname.startsWith('/api-documentation') || location.pathname === '/status' ||
-    location.pathname === '/security' || location.pathname === '/updates' ||
+    location.pathname.startsWith('/api-documentation') ||
     location.pathname === '/help' || location.pathname === '/privacy' ||
-    location.pathname === '/terms' || location.pathname === '/cookies' || location.pathname === '/legal';
+    location.pathname === '/contact' || location.pathname === '/terms' || 
+    location.pathname === '/cookies' || location.pathname === '/legal';
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {user && !isAuthPage && !isPublicPage && <MerchantHeader />}
+      {/* Header marchand (pas sur admin, pas sur auth, pas sur public) */}
+      {user && !isAuthPage && !isPublicPage && !isAdminRoute && <MerchantHeader />}
       
       <div className="flex flex-1">
-        {user && !isAuthPage && !isPublicPage && <MerchantSidebar />}
+        {/* Sidebar marchand (pas sur admin, pas sur auth, pas sur public) */}
+        {user && !isAuthPage && !isPublicPage && !isAdminRoute && <MerchantSidebar />}
         
-        <main className={`flex-1 ${user && !isAuthPage && !isPublicPage ? 'lg:ml-64' : ''} ${user && !isAuthPage && !isPublicPage ? 'pt-16 pb-16 lg:pb-0' : ''}`}>
+        <main className={`flex-1 ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'lg:ml-64' : ''} ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'pt-16 pb-16 lg:pb-0' : ''}`}>
           <Routes>
             {/* Pages publiques */}
             <Route path="/" element={<GatewayHome />} />
@@ -59,6 +68,12 @@ function AppContent() {
             
             {/* Pages info publiques */}
             <Route path="/api-documentation" element={<GatewayApiDocs />} />
+            <Route path="/help" element={<Help />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/cookies" element={<Cookies />} />
+            <Route path="/legal" element={<Legal />} />
             
             {/* Pages protégées - Marchand */}
             <Route path="/dashboard" element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
@@ -68,16 +83,15 @@ function AppContent() {
             <Route path="/settings" element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             <Route path="/verification" element={<ProtectedRoute><Verification /></ProtectedRoute>} />
 
+            {/* Pages Admin */}
+            <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="merchants" element={<AdminMerchants />} />
+              <Route path="verifications" element={<AdminVerifications />} />
+              <Route path="transactions" element={<GatewayTransactions />} />
+              <Route path="commissions" element={<AdminCommissions />} />
+            </Route>
             
-
-            <Route path="/help" element={<Help />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/cookies" element={<Cookies />} />
-            <Route path="/legal" element={<Legal />} />
-
-
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
