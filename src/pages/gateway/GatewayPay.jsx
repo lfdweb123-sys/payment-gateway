@@ -88,7 +88,13 @@ function Stepper({ current, primaryColor }) {
 /* ─── Main ────────────────────────────────────────────── */
 export default function GatewayPay() {
   const [searchParams] = useSearchParams();
-  const token        = searchParams.get('token');
+  const rawToken = searchParams.get('token') || searchParams.get('t');
+  const token = (() => {
+    if (!rawToken) return null;
+    // Si commence par 'gw_' c'est déjà en clair, sinon décoder base64
+    if (rawToken.startsWith('gw_')) return rawToken;
+    try { return atob(rawToken); } catch { return rawToken; }
+  })();
   const amountParam  = searchParams.get('amount');
   const description  = searchParams.get('desc') || 'Paiement en ligne';
 

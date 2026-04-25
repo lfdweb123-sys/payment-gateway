@@ -17,8 +17,17 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { token } = req.query;
-  if (!token) return res.status(400).json({ error: 'Token requis' });
+  const { token: rawToken } = req.query;
+  if (!rawToken) return res.status(400).json({ error: 'Token requis' });
+
+  // Décoder le token si encodé en base64
+  let token = rawToken;
+  if (!rawToken.startsWith('gw_')) {
+    try {
+      const decoded = Buffer.from(rawToken, 'base64').toString('utf8');
+      if (decoded.startsWith('gw_')) token = decoded;
+    } catch {}
+  }
 
   try {
     const merchantSnap = await db.collection('gateway_merchants')
@@ -31,7 +40,6 @@ export default async function handler(req, res) {
     const merchantDoc = merchantSnap.docs[0];
     const merchant = { id: merchantDoc.id, ...merchantDoc.data() };
 
-    // Extraire les providers actifs
     const providers = merchant.providers || {};
     const activeProviders = Object.entries(providers)
       .filter(([, config]) => config.active)
