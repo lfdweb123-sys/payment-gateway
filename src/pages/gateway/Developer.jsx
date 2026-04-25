@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin;
+
 export default function Developer() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -52,9 +54,9 @@ export default function Developer() {
     finally { setSaving(false); }
   };
 
-  const copyKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    toast.success('Clé API copiée !');
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copié !');
   };
 
   const handleAddWebhook = async () => {
@@ -102,7 +104,16 @@ export default function Developer() {
     setWebhooks(updated);
   };
 
-  const paymentLink = `${window.location.origin}/pay?token=${apiKey}`;
+  const paymentLink = `${APP_URL}/pay?token=${apiKey}`;
+
+  // URLs de webhook par provider
+  const activeProviders = merchant?.providers ? Object.keys(merchant.providers).filter(k => merchant.providers[k]?.active) : [];
+  
+  const providerWebhookUrls = activeProviders.map(providerId => ({
+    id: providerId,
+    name: providerId.charAt(0).toUpperCase() + providerId.slice(1),
+    url: `${APP_URL}/api/webhook/${providerId}`
+  }));
 
   const availableEvents = [
     { value: 'payment.completed', label: 'Paiement réussi' },
@@ -111,7 +122,7 @@ export default function Developer() {
     { value: 'payment.refunded', label: 'Paiement remboursé' }
   ];
 
-  const curlExample = `curl -X POST ${window.location.origin}/api/gateway/pay \\
+  const curlExample = `curl -X POST ${APP_URL}/api/gateway/pay \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: ${apiKey || 'VOTRE_CLE_API'}" \\
   -d '{"amount":5000,"description":"Test"}'`;
@@ -149,7 +160,7 @@ export default function Developer() {
                 <button onClick={() => setShowKey(!showKey)} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-                <button onClick={copyKey} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
+                <button onClick={() => copyToClipboard(apiKey)} className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
                   <Copy size={16} />
                 </button>
               </div>
@@ -185,7 +196,7 @@ export default function Developer() {
             <div className="bg-gray-900 text-gray-100 rounded-xl p-4 font-mono text-xs sm:text-sm overflow-x-auto">
               <pre>{curlExample}</pre>
             </div>
-            <button onClick={() => { navigator.clipboard.writeText(curlExample); toast.success('Commande copiée !'); }}
+            <button onClick={() => copyToClipboard(curlExample)}
               className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
               <Copy size={14} /> Copier la commande cURL
             </button>
@@ -208,7 +219,7 @@ export default function Developer() {
               <code className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-xs text-gray-600 truncate">
                 {paymentLink}
               </code>
-              <button onClick={() => { navigator.clipboard.writeText(paymentLink); toast.success('Lien copié !'); }}
+              <button onClick={() => copyToClipboard(paymentLink)}
                 className="p-2.5 border border-gray-200 rounded-xl hover:bg-gray-50">
                 <Copy size={16} />
               </button>
@@ -217,13 +228,45 @@ export default function Developer() {
         </div>
       )}
 
-      {/* Section Webhooks */}
+      {/* URLs Webhook pour les providers */}
+      {providerWebhookUrls.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="p-5 sm:p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Webhook size={20} className="text-orange-500" />
+              <h2 className="text-lg font-bold text-gray-900">URLs Webhook pour vos providers</h2>
+            </div>
+            <p className="text-sm text-gray-500">
+              Copiez l'URL correspondante dans les paramètres de chaque provider pour recevoir les notifications de paiement.
+            </p>
+            <div className="space-y-2">
+              {providerWebhookUrls.map(p => (
+                <div key={p.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-xs font-bold text-orange-600">
+                    {p.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                    <code className="text-xs text-gray-500 truncate block">{p.url}</code>
+                  </div>
+                  <button onClick={() => copyToClipboard(p.url)}
+                    className="p-2 text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg hover:bg-white">
+                    <Copy size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Section Webhooks personnalisés */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <div className="p-5 sm:p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Webhook size={20} className="text-orange-500" />
-              <h2 className="text-lg font-bold text-gray-900">Webhooks</h2>
+              <h2 className="text-lg font-bold text-gray-900">Vos webhooks personnalisés</h2>
             </div>
             <button onClick={() => setShowWebhookForm(!showWebhookForm)}
               className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-orange-600 flex items-center gap-1.5">
@@ -231,10 +274,9 @@ export default function Developer() {
             </button>
           </div>
           <p className="text-sm text-gray-500">
-            Recevez des notifications en temps réel sur votre serveur quand un paiement est effectué.
+            Recevez des notifications en temps réel sur votre serveur.
           </p>
 
-          {/* Formulaire ajout */}
           {showWebhookForm && (
             <div className="bg-gray-50 rounded-xl p-4 space-y-3">
               <div>
@@ -263,18 +305,14 @@ export default function Developer() {
                   className="bg-gray-900 text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-gray-800 disabled:opacity-50">
                   {saving ? 'Ajout...' : 'Ajouter le webhook'}
                 </button>
-                <button onClick={() => setShowWebhookForm(false)} className="px-4 py-2 text-xs text-gray-600 hover:text-gray-900">
-                  Annuler
-                </button>
+                <button onClick={() => setShowWebhookForm(false)} className="px-4 py-2 text-xs text-gray-600 hover:text-gray-900">Annuler</button>
               </div>
             </div>
           )}
 
-          {/* Liste des webhooks */}
           {webhooks.length === 0 ? (
             <div className="text-center py-6 text-sm text-gray-400">
-              <Webhook size={24} className="mx-auto mb-2 text-gray-300" />
-              Aucun webhook configuré
+              <Webhook size={24} className="mx-auto mb-2 text-gray-300" />Aucun webhook configuré
             </div>
           ) : (
             <div className="space-y-2">
@@ -284,21 +322,16 @@ export default function Developer() {
                     <p className="text-sm font-medium text-gray-900 truncate">{w.url}</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {w.events.map(e => (
-                        <span key={e} className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
-                          {availableEvents.find(ev => ev.value === e)?.label || e}
-                        </span>
+                        <span key={e} className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">{availableEvents.find(ev => ev.value === e)?.label || e}</span>
                       ))}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Créé le {new Date(w.createdAt).toLocaleDateString('fr-FR')}</p>
                   </div>
                   <div className="flex items-center gap-1 ml-3">
-                    <button onClick={() => handleToggleWebhook(w.id)}
-                      className={`p-1.5 rounded-lg ${w.active ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-200'}`}>
+                    <button onClick={() => handleToggleWebhook(w.id)} className={`p-1.5 rounded-lg ${w.active ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-200'}`}>
                       {w.active ? <CheckCircle size={14} /> : <XCircle size={14} />}
                     </button>
-                    <button onClick={() => handleDeleteWebhook(w.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg">
-                      <Trash2 size={14} />
-                    </button>
+                    <button onClick={() => handleDeleteWebhook(w.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg"><Trash2 size={14} /></button>
                   </div>
                 </div>
               ))}
