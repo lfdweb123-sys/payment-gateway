@@ -157,7 +157,7 @@ export default function Home() {
             <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg,#FF6B00,#FFAA00)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(255,107,0,.3)' }}>
               <Globe size={18} style={{ color: '#fff' }} />
             </div>
-            <span style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>Paiement Pro</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>Payment Gateway</span>
           </a>
 
           <div className="pp-desktop-nav" style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
@@ -424,7 +424,7 @@ export default function Home() {
                 <div style={{ width: 34, height: 34, background: 'linear-gradient(135deg,#FF6B00,#FFAA00)', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Globe size={16} style={{ color: '#fff' }} />
                 </div>
-                <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>Paiement Pro</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>Payment Gateway</span>
               </div>
               <p style={{ fontSize: 13, color: '#fff', lineHeight: 1.75, marginBottom: 18 }}>
                 Passerelle de paiement unifiée. Mobile Money, cartes bancaires, PayPal et plus encore — en Afrique, en Europe, en Amérique et dans le monde entier.
