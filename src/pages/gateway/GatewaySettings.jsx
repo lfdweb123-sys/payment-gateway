@@ -4,8 +4,8 @@ import { db } from '../../services/firebase';
 import { Save, Loader, Palette, Globe, Link, Building2, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const SETTINGS_DOC = 'settings';
-const SETTINGS_COLLECTION = 'gateway_merchants';
+const SETTINGS_DOC = 'config';
+const SETTINGS_COLLECTION = 'gateway_settings';
 
 const DESIGNS = [
   { id: 'modern',   label: 'Moderne',    desc: 'Dark & épuré',    preview: 'bg-gray-900' },

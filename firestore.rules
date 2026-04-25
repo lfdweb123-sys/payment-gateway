@@ -8,34 +8,66 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
+    // Utilisateurs
     match /users/{userId} {
       allow read, update: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow delete: if request.auth != null && isAdmin();
       allow create: if request.auth != null;
     }
     
+    // Marchands de la passerelle
     match /gateway_merchants/{merchantId} {
       allow read: if request.auth != null && (request.auth.uid == merchantId || isAdmin());
       allow create: if request.auth != null;
       allow update: if request.auth != null && (request.auth.uid == merchantId || isAdmin());
+      allow delete: if request.auth != null && isAdmin();
     }
     
-    match /gateway_providers/{providerId} {
-      allow read: if true;
-      allow write: if request.auth != null && isAdmin();
-    }
-    
+    // Transactions
     match /gateway_transactions/{txId} {
       allow read: if request.auth != null;
       allow create: if true;
       allow update: if request.auth != null && isAdmin();
+      allow delete: if request.auth != null && isAdmin();
     }
     
+    // Paramètres de la passerelle
     match /gateway_settings/{settingId} {
-      allow read: if true;
-      allow write: if request.auth != null;  // ← remplacer isAdmin() par ça
+      allow read, write: if request.auth != null;
     }
     
+    // Providers config
+    match /gateway_providers/{providerId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+    
+    // Retraits
+    match /withdrawals/{withdrawalId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && isAdmin();
+    }
+    
+    // Conversations IA
+    match /conversations/{conversationId} {
+      allow read, create, update, delete: if request.auth != null;
+    }
+    
+    // Paiements
+    match /payments/{paymentId} {
+      allow read, create: if request.auth != null;
+      allow update: if request.auth != null && isAdmin();
+    }
+    
+    // Webhooks logs
+    match /webhooks/{webhookId} {
+      allow read: if request.auth != null && isAdmin();
+      allow create: if true;
+      allow update: if request.auth != null && isAdmin();
+    }
+    
+    // Refuser tout le reste
     match /{document=**} {
       allow read, write: if false;
     }
