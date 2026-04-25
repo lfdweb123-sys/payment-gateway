@@ -45,13 +45,19 @@ export default async function handler(req, res) {
       .filter(([, config]) => config.active)
       .map(([key]) => key);
 
+    // Exposer uniquement la PUBLIC KEY de KKiaPay (jamais private/secret)
+    const kkiapayPublicKey = providers.kkiapay?.active
+      ? providers.kkiapay?.KKIAPAY_PUBLIC_KEY || null
+      : null;
+
     return res.status(200).json({
       success: true,
       id: merchant.id,
       name: merchant.name,
       active: merchant.active,
       verificationStatus: merchant.verificationStatus,
-      activeProviders
+      activeProviders,
+      kkiapayPublicKey,
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });

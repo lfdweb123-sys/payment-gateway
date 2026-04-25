@@ -6,7 +6,7 @@ import { Shield, Lock, Smartphone, CreditCard, ChevronRight, CheckCircle2, Globe
 import { getMethodsForCountryWithProviders, getCountriesForProviders } from '../../services/countryMethods';
 import toast from 'react-hot-toast';
 
-/* ─── Constantes inchangées ───────────────────────────── */
+/* ─── Constantes ───────────────────────────────────────── */
 const DEFAULT_SETTINGS = {
   paymentDesign: 'modern', primaryColor: '#f97316', logo: '', companyName: '',
   redirectUrl: '', defaultCurrency: 'XOF',
@@ -18,7 +18,7 @@ const COUNTRY_PREFIXES = {
   tz:'255',rw:'250',za:'27',fr:'33',be:'32',de:'49',nl:'31',gb:'44',us:'1'
 };
 
-/* ─── Loading bar ─────────────────────────────────────── */
+/* ─── Loading bar ──────────────────────────────────────── */
 function TopLoadingBar({ visible, color = '#C8931A' }) {
   if (!visible) return null;
   return (
@@ -43,7 +43,7 @@ function maskPhone(phone) {
   return phone.substring(0,3) + '••••' + phone.substring(phone.length-3);
 }
 
-/* ─── Stepper ─────────────────────────────────────────── */
+/* ─── Stepper ──────────────────────────────────────────── */
 function Stepper({ current, primaryColor }) {
   const steps = ['Pays','Méthode','Paiement'];
   return (
@@ -85,13 +85,12 @@ function Stepper({ current, primaryColor }) {
   );
 }
 
-/* ─── Main ────────────────────────────────────────────── */
+/* ─── Main ─────────────────────────────────────────────── */
 export default function GatewayPay() {
   const [searchParams] = useSearchParams();
   const rawToken = searchParams.get('token') || searchParams.get('t');
   const token = (() => {
     if (!rawToken) return null;
-    // Si commence par 'gw_' c'est déjà en clair, sinon décoder base64
     if (rawToken.startsWith('gw_')) return rawToken;
     try { return atob(rawToken); } catch { return rawToken; }
   })();
@@ -113,25 +112,45 @@ export default function GatewayPay() {
   const [gatewaySettings, setGatewaySettings]   = useState(DEFAULT_SETTINGS);
   const [savedPhones, setSavedPhones]           = useState([]);
   const [showSuggestions, setShowSuggestions]   = useState(false);
+  const [kkiapayPublicKey, setKkiapayPublicKey] = useState(null);
 
-  /* ─── Init inchangé ──────────────────────────────── */
+  /* ─── Charger le script KKiaPay une seule fois ───── */
+  useEffect(() => {
+    if (!document.querySelector('script[src="https://cdn.kkiapay.me/k.js"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.kkiapay.me/k.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  /* ─── Init ───────────────────────────────────────── */
   useEffect(() => {
     if (!token) { setFetchingMerchant(false); return; }
+
     getDoc(doc(db,'gateway_settings','config'))
       .then(snap => { if (snap.exists()) setGatewaySettings(p => ({...p,...snap.data()})); })
       .catch(()=>{});
+
     fetch(`/api/gateway/merchant/${token}`)
-      .then(r=>r.json())
+      .then(r => r.json())
       .then(data => {
-        if (data.success) { setMerchant(data); setCountries(getCountriesForProviders(data.activeProviders||[])); }
+        if (data.success) {
+          setMerchant(data);
+          setCountries(getCountriesForProviders(data.activeProviders || []));
+          // Récupérer la public key KKiaPay si configurée
+          if (data.kkiapayPublicKey) {
+            setKkiapayPublicKey(data.kkiapayPublicKey);
+          }
+        }
       })
-      .catch(()=>toast.error('Impossible de charger le marchand'))
-      .finally(()=>setFetchingMerchant(false));
+      .catch(() => toast.error('Impossible de charger le marchand'))
+      .finally(() => setFetchingMerchant(false));
+
     try {
       const s = localStorage.getItem('gw_saved_phones');
       if (s) {
         const parsed = JSON.parse(s);
-        // Dédupliquer par numéro au chargement
         const seen = new Set();
         const deduped = parsed.filter(p => {
           if (seen.has(p.number)) return false;
@@ -139,7 +158,6 @@ export default function GatewayPay() {
           return true;
         });
         setSavedPhones(deduped);
-        // Réécrire le localStorage propre
         localStorage.setItem('gw_saved_phones', JSON.stringify(deduped));
       }
     } catch {}
@@ -147,13 +165,13 @@ export default function GatewayPay() {
 
   const handleSelectCountry = (code) => {
     setCountry(code);
-    setCountryData(getMethodsForCountryWithProviders(code, merchant?.activeProviders||[]));
+    setCountryData(getMethodsForCountryWithProviders(code, merchant?.activeProviders || []));
     setPhoneSuffix('');
     setStep(2);
   };
 
   const getFullPhoneNumber = () => {
-    const prefix = COUNTRY_PREFIXES[country]||'';
+    const prefix = COUNTRY_PREFIXES[country] || '';
     return prefix ? `${prefix}${phoneSuffix.replace(/\s/g,'')}` : phoneSuffix.replace(/\s/g,'');
   };
 
@@ -162,50 +180,118 @@ export default function GatewayPay() {
     const filtered = savedPhones.filter(p => p.number !== phone);
     const updated = [{number:phone,country},...filtered].slice(0,5);
     setSavedPhones(updated);
-    localStorage.setItem('gw_saved_phones',JSON.stringify(updated));
+    localStorage.setItem('gw_saved_phones', JSON.stringify(updated));
   };
 
   const pollStatus = (id) => {
     setStatus('pending');
     const msgs = ['Paiement en cours…','En attente de confirmation…','Vérification en cours…','Presque terminé…'];
-    let mi=0;
-    const mi_ = setInterval(()=>{ mi=(mi+1)%msgs.length; setPollMsg(msgs[mi]); },3500);
-    let attempts=0;
-    const iv = setInterval(async()=>{
+    let mi = 0;
+    const mi_ = setInterval(() => { mi=(mi+1)%msgs.length; setPollMsg(msgs[mi]); }, 3500);
+    let attempts = 0;
+    const iv = setInterval(async () => {
       attempts++;
-      if(attempts>24){ clearInterval(iv); clearInterval(mi_); setStatus('failed'); return; }
-      try{
-        const r=await fetch(`/api/gateway/verify/${id}`,{headers:{'x-api-key':token}});
-        const d=await r.json();
-        if(d.status==='completed'){clearInterval(iv);clearInterval(mi_);setStatus('completed');}
-        else if(d.status==='failed'){clearInterval(iv);clearInterval(mi_);setStatus('failed');}
-      }catch{}
-    },5000);
+      if (attempts > 24) { clearInterval(iv); clearInterval(mi_); setStatus('failed'); return; }
+      try {
+        const r = await fetch(`/api/gateway/verify/${id}`, { headers:{'x-api-key':token} });
+        const d = await r.json();
+        if (d.status === 'completed') { clearInterval(iv); clearInterval(mi_); setStatus('completed'); }
+        else if (d.status === 'failed') { clearInterval(iv); clearInterval(mi_); setStatus('failed'); }
+      } catch {}
+    }, 5000);
   };
 
+  /* ─── Submit standard (non-KKiaPay) ─────────────── */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!amount||parseFloat(amount)<=0){toast.error('Montant invalide');return;}
+    if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
     setLoading(true);
-    try{
-      const fullPhone=getFullPhoneNumber();
-      const res=await fetch('/api/gateway/pay',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':token},
-        body:JSON.stringify({amount:parseFloat(amount),country,method:selectedMethod?.id,phone:fullPhone,description}),
+    try {
+      const fullPhone = getFullPhoneNumber();
+      const res = await fetch('/api/gateway/pay', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'x-api-key':token },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          country,
+          method: selectedMethod?.id,
+          phone: fullPhone,
+          description,
+        }),
       });
-      const data=await res.json();
-      if(data.success){setLoading(false);savePhoneNumber(fullPhone);pollStatus(data.transactionId);}
-      else{toast.error(data.error||'Une erreur est survenue');setLoading(false);}
-    }catch{toast.error('Erreur de connexion');setLoading(false);}
+      const data = await res.json();
+      if (data.success) {
+        setLoading(false);
+        savePhoneNumber(fullPhone);
+        // Si le provider retourne une URL de redirection (Stripe, PayPal, etc.)
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          pollStatus(data.transactionId);
+        }
+      } else {
+        toast.error(data.error || 'Une erreur est survenue');
+        setLoading(false);
+      }
+    } catch {
+      toast.error('Erreur de connexion');
+      setLoading(false);
+    }
   };
 
-  useEffect(()=>{
-    if(status==='completed'&&gatewaySettings.redirectUrl){
-      const t=setTimeout(()=>{window.location.href=gatewaySettings.redirectUrl;},3000);
-      return()=>clearTimeout(t);
+  /* ─── Ouvrir le widget KKiaPay ───────────────────── */
+  const handleKkiapayPayment = () => {
+    if (!window.openKkiapayWidget) {
+      toast.error('Widget KKiaPay non chargé, réessayez dans quelques secondes');
+      return;
     }
-  },[status,gatewaySettings.redirectUrl]);
+
+    // Nettoyer les anciens listeners pour éviter les doublons
+    if (window.removeKkiapayListener) {
+      window.removeKkiapayListener('success', () => {});
+      window.removeKkiapayListener('failed', () => {});
+    }
+
+    // Listener succès
+    window.addSuccessListener(async (response) => {
+      setStatus('pending');
+      setPollMsg('Vérification du paiement…');
+      try {
+        const res = await fetch('/api/gateway/kkiapay-verify', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'x-api-key':token },
+          body: JSON.stringify({ transactionId: response.transactionId }),
+        });
+        const data = await res.json();
+        if (data.success) setStatus('completed');
+        else setStatus('failed');
+      } catch {
+        setStatus('failed');
+      }
+    });
+
+    // Listener échec
+    window.addFailedListener(() => {
+      setStatus('failed');
+    });
+
+    // Ouvrir le widget avec la PUBLIC KEY du marchand
+    window.openKkiapayWidget({
+      amount:   parseFloat(amount),
+      key:      kkiapayPublicKey,
+      sandbox:  false,
+      email:    '',
+      phone:    '',
+      callback: `${window.location.origin}/payment/success`,
+    });
+  };
+
+  useEffect(() => {
+    if (status === 'completed' && gatewaySettings.redirectUrl) {
+      const t = setTimeout(() => { window.location.href = gatewaySettings.redirectUrl; }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [status, gatewaySettings.redirectUrl]);
 
   /* ─── Computed ───────────────────────────────────── */
   const currency     = countryData?.currency || gatewaySettings.defaultCurrency;
@@ -213,10 +299,13 @@ export default function GatewayPay() {
   const hexL = (hex) => {
     if (!hex.startsWith('#') || hex.length < 7) return 0.5;
     const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
-    return 0.2126*r+0.7152*g+0.0722*b;
+    return 0.2126*r + 0.7152*g + 0.0722*b;
   };
   const btnTextColor = hexL(primaryColor) > 0.45 ? '#1a0f00' : '#fff';
-  const filteredSuggestions = savedPhones.filter(p=>p.country===country);
+  const filteredSuggestions = savedPhones.filter(p => p.country === country);
+
+  // Détecter si la méthode sélectionnée vient de KKiaPay
+  const isKkiapayMethod = selectedMethod?.provider === 'kkiapay' && kkiapayPublicKey;
 
   /* ─── CSS ────────────────────────────────────────── */
   const css = `
@@ -227,7 +316,6 @@ export default function GatewayPay() {
     @keyframes gw-scaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
     *{box-sizing:border-box;}
 
-    /* ── PAGE ── */
     .gw-page{
       min-height:100vh;
       background:#F0EBE3;
@@ -235,8 +323,6 @@ export default function GatewayPay() {
       padding:24px 16px;
       font-family:'DM Sans',sans-serif;
     }
-
-    /* ── DESKTOP 2-COL WRAPPER ── */
     .gw-wrapper{
       display:grid;
       grid-template-columns:1fr 340px;
@@ -249,20 +335,12 @@ export default function GatewayPay() {
       box-shadow:0 4px 6px rgba(0,0,0,.04),0 12px 40px rgba(0,0,0,.10),0 40px 80px rgba(0,0,0,.08);
       animation:gw-scaleIn .4s cubic-bezier(.34,1.3,.64,1) both;
     }
-
-    /* ── LEFT PANEL (form) ── */
     .gw-left{
       padding:36px 40px;
       border-right:1px solid #F3F0EC;
       min-height:500px;
       display:flex;flex-direction:column;
     }
-    .gw-left-title{
-      font-size:20px;font-weight:800;color:#111;letter-spacing:-.02em;margin-bottom:6px;
-    }
-    .gw-left-sub{font-size:13px;color:#AAA;margin-bottom:28px;}
-
-    /* ── RIGHT PANEL (summary) ── */
     .gw-right{
       background:#FAFAF8;
       padding:36px 28px;
@@ -301,8 +379,6 @@ export default function GatewayPay() {
       margin-top:auto;padding-top:20px;
       font-size:10px;color:#CCC;font-weight:600;
     }
-
-    /* ── FORM ELEMENTS ── */
     .gw-section-lbl{
       font-size:10px;font-weight:800;color:#BBB;
       text-transform:uppercase;letter-spacing:.12em;
@@ -391,6 +467,22 @@ export default function GatewayPay() {
     .gw-fade{animation:gw-fadeUp .3s ease both;}
     .gw-spin{animation:gw-spin .8s linear infinite;}
 
+    /* ── KKiaPay info box ── */
+    .gw-kkiapay-info{
+      background:#F8F5FF;border:1.5px solid #E9E0FF;border-radius:14px;
+      padding:16px 18px;margin-bottom:20px;
+      font-size:13px;color:#555;line-height:1.6;
+    }
+    .gw-kkiapay-logo{
+      display:flex;align-items:center;gap:8px;
+      margin-bottom:10px;font-weight:700;font-size:13px;color:#333;
+    }
+    .gw-kkiapay-dot{
+      width:10px;height:10px;border-radius:50%;
+      background:linear-gradient(135deg,#e03131,#c92a2a);
+      flex-shrink:0;
+    }
+
     /* ── STATUS PAGES ── */
     .gw-status-page{
       min-height:100vh;background:#F0EBE3;
@@ -431,7 +523,7 @@ export default function GatewayPay() {
     }
   `;
 
-  /* ── Summary panel content ── */
+  /* ── Summary panel ── */
   const SummaryPanel = () => (
     <div className="gw-right">
       <div className="gw-right-header">
@@ -444,8 +536,8 @@ export default function GatewayPay() {
               </div>
             )
           }
-          {(gatewaySettings.companyName||merchant?.name) && (
-            <span className="gw-company">{gatewaySettings.companyName||merchant?.name}</span>
+          {(gatewaySettings.companyName || merchant?.name) && (
+            <span className="gw-company">{gatewaySettings.companyName || merchant?.name}</span>
           )}
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,fontSize:10,fontWeight:700,color:primaryColor,background:`${primaryColor}18`,padding:'4px 10px',borderRadius:50}}>
@@ -497,7 +589,7 @@ export default function GatewayPay() {
   );
 
   /* ── STATUS: PENDING ── */
-  if (status==='pending') return (
+  if (status === 'pending') return (
     <div className="gw-status-page">
       <style>{css}</style>
       <div className="gw-status-card">
@@ -505,7 +597,9 @@ export default function GatewayPay() {
           <div style={{width:32,height:32,borderRadius:'50%',border:`3px solid ${primaryColor}33`,borderTopColor:primaryColor}} className="gw-spin"/>
         </div>
         <h2 style={{fontSize:20,fontWeight:800,color:'#111',marginBottom:8,letterSpacing:'-.02em'}}>{pollMsg}</h2>
-        <p style={{fontSize:13,color:'#AAA',lineHeight:1.6}}>Confirmez le paiement sur votre téléphone.</p>
+        <p style={{fontSize:13,color:'#AAA',lineHeight:1.6}}>
+          {isKkiapayMethod ? 'Vérification de votre paiement KKiaPay en cours…' : 'Confirmez le paiement sur votre téléphone.'}
+        </p>
         <div className="gw-status-amount">
           <p style={{fontSize:11,color:'#CCC',marginBottom:4}}>{description}</p>
           <p style={{fontSize:28,fontWeight:900,color:'#111',letterSpacing:'-.02em'}}>
@@ -518,7 +612,7 @@ export default function GatewayPay() {
   );
 
   /* ── STATUS: COMPLETED ── */
-  if (status==='completed') return (
+  if (status === 'completed') return (
     <div className="gw-status-page">
       <style>{css}</style>
       <div className="gw-status-card">
@@ -540,16 +634,18 @@ export default function GatewayPay() {
   );
 
   /* ── STATUS: FAILED ── */
-  if (status==='failed') return (
+  if (status === 'failed') return (
     <div className="gw-status-page">
       <style>{css}</style>
       <div className="gw-status-card">
         <div className="gw-status-icon" style={{background:'#FEF2F2',border:'2px solid rgba(239,68,68,.2)'}}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
         </div>
         <h2 style={{fontSize:22,fontWeight:900,color:'#111',marginBottom:8,letterSpacing:'-.02em'}}>Paiement échoué</h2>
         <p style={{fontSize:13,color:'#AAA',marginBottom:28}}>La transaction n'a pas pu être finalisée.</p>
-        <button onClick={()=>{setStatus(null);setStep(3);}} className="gw-submit" style={{marginTop:0}}>
+        <button onClick={() => { setStatus(null); setStep(3); }} className="gw-submit" style={{marginTop:0}}>
           Réessayer
         </button>
       </div>
@@ -567,40 +663,42 @@ export default function GatewayPay() {
         {/* ── LEFT — Form ── */}
         <div className="gw-left">
 
-          {/* Header mobile (caché sur desktop car right panel a le logo) */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}} className="gw-mobile-header">
+          {/* Header mobile */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               {gatewaySettings.logo
                 ? <img src={gatewaySettings.logo} alt="" style={{height:24,objectFit:'contain'}}/>
                 : <div style={{width:28,height:28,borderRadius:8,background:'#1C0F00',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={13} style={{color:'#fff'}}/></div>
               }
-              {(gatewaySettings.companyName||merchant?.name) && (
-                <span style={{fontSize:13,fontWeight:700,color:'#333'}}>{gatewaySettings.companyName||merchant?.name}</span>
+              {(gatewaySettings.companyName || merchant?.name) && (
+                <span style={{fontSize:13,fontWeight:700,color:'#333'}}>{gatewaySettings.companyName || merchant?.name}</span>
               )}
             </div>
             <div style={{textAlign:'right'}}>
-              <div style={{fontSize:18,fontWeight:900,color:'#111',letterSpacing:'-.02em'}}>{parseFloat(amount||0).toLocaleString('fr-FR')} <span style={{fontSize:11,color:'#AAA',fontWeight:500}}>{currency}</span></div>
+              <div style={{fontSize:18,fontWeight:900,color:'#111',letterSpacing:'-.02em'}}>
+                {parseFloat(amount||0).toLocaleString('fr-FR')} <span style={{fontSize:11,color:'#AAA',fontWeight:500}}>{currency}</span>
+              </div>
               {description && <div style={{fontSize:10,color:'#CCC'}}>{description}</div>}
             </div>
           </div>
 
-          {/* Stepper — sur mobile en haut du form */}
+          {/* Stepper */}
           <div style={{marginBottom:28}}>
             <Stepper current={step} primaryColor={primaryColor}/>
           </div>
 
-          {/* STEP 1 — Pays */}
-          {step===1 && (
+          {/* ── STEP 1 — Pays ── */}
+          {step === 1 && (
             <div className="gw-fade" style={{flex:1}}>
               <span className="gw-section-lbl">Sélectionnez votre pays</span>
               {fetchingMerchant ? (
                 <div style={{display:'flex',justifyContent:'center',padding:'28px 0'}}>
                   <div style={{width:28,height:28,borderRadius:'50%',border:'3px solid #EDE9E3',borderTopColor:primaryColor}} className="gw-spin"/>
                 </div>
-              ) : countries.length>0 ? (
+              ) : countries.length > 0 ? (
                 <div className="gw-country-grid">
-                  {countries.map(c=>(
-                    <button key={c.code} onClick={()=>handleSelectCountry(c.code)} className="gw-country-btn">
+                  {countries.map(c => (
+                    <button key={c.code} onClick={() => handleSelectCountry(c.code)} className="gw-country-btn">
                       <span className="gw-flag">{c.flag}</span>
                       <div className="gw-cname">{c.name}</div>
                       <div className="gw-ccurr">{c.currency}</div>
@@ -616,10 +714,10 @@ export default function GatewayPay() {
             </div>
           )}
 
-          {/* STEP 2 — Méthode */}
-          {step===2 && countryData && (
+          {/* ── STEP 2 — Méthode ── */}
+          {step === 2 && countryData && (
             <div className="gw-fade" style={{flex:1}}>
-              <button className="gw-back" onClick={()=>{setStep(1);setCountryData(null);setCountry(null);}}>
+              <button className="gw-back" onClick={() => { setStep(1); setCountryData(null); setCountry(null); }}>
                 <ArrowLeft size={13}/> Changer de pays
               </button>
               <div className="gw-pill">
@@ -630,85 +728,114 @@ export default function GatewayPay() {
                 </div>
               </div>
               <span className="gw-section-lbl">Mode de paiement</span>
-              {countryData.methods?.length>0 ? countryData.methods.map(method=>(
-                <button key={method.id} onClick={()=>{setSelectedMethod(method);setStep(3);}} className="gw-method-btn">
+              {countryData.methods?.length > 0 ? countryData.methods.map(method => (
+                <button key={method.id} onClick={() => { setSelectedMethod(method); setStep(3); }} className="gw-method-btn">
                   <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
                   <span className="gw-method-name">{method.name}</span>
                   <ChevronRight size={14} style={{color:'#CCC'}}/>
                 </button>
-              )) : <p style={{fontSize:13,color:'#CCC',textAlign:'center',padding:'20px 0'}}>Aucune méthode disponible</p>}
+              )) : (
+                <p style={{fontSize:13,color:'#CCC',textAlign:'center',padding:'20px 0'}}>Aucune méthode disponible</p>
+              )}
             </div>
           )}
 
-          {/* STEP 3 — Paiement */}
-          {step===3 && selectedMethod && (
+          {/* ── STEP 3 — Paiement ── */}
+          {step === 3 && selectedMethod && (
             <div className="gw-fade" style={{flex:1}}>
-              <button className="gw-back" onClick={()=>{setStep(2);setSelectedMethod(null);setPhoneSuffix('');}}>
+              <button className="gw-back" onClick={() => { setStep(2); setSelectedMethod(null); setPhoneSuffix(''); }}>
                 <ArrowLeft size={13}/> Changer de méthode
               </button>
+
               <div className="gw-pill">
-                <div className="gw-pill-icon">{getMethodIcon(selectedMethod.id,18)}</div>
+                <div className="gw-pill-icon">{getMethodIcon(selectedMethod.id, 18)}</div>
                 <div>
                   <div className="gw-pill-name">{selectedMethod.name}</div>
                   <div className="gw-pill-sub">{countryData?.flag} {countryData?.name}</div>
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit}>
-                <div style={{marginBottom:6}}>
-                  <label className="gw-input-label">Numéro de téléphone</label>
-                  <input
-                    type="tel"
-                    className="gw-input"
-                    value={phoneSuffix ? `${COUNTRY_PREFIXES[country]||''} ${phoneSuffix}` : COUNTRY_PREFIXES[country]||''}
-                    onChange={e=>{
-                      const prefix=COUNTRY_PREFIXES[country]||'';
-                      const val=e.target.value;
-                      if(prefix&&!val.startsWith(prefix)) return;
-                      const suffix=prefix?val.slice(prefix.length).trim():val;
-                      setPhoneSuffix(suffix);
-                      setShowSuggestions(suffix.length===0);
-                    }}
-                    onFocus={()=>setShowSuggestions(phoneSuffix.length===0)}
-                    placeholder={COUNTRY_PREFIXES[country]?`${COUNTRY_PREFIXES[country]} 97000000`:'97000000'}
-                    required
-                  />
+              {/* ── KKiaPay : widget direct ── */}
+              {isKkiapayMethod ? (
+                <div>
+                  <div className="gw-kkiapay-info">
+                    <div className="gw-kkiapay-logo">
+                      <div className="gw-kkiapay-dot"/>
+                      Paiement via KKiaPay
+                    </div>
+                    <p style={{margin:0,fontSize:12,color:'#777'}}>
+                      Une fenêtre sécurisée KKiaPay s'ouvrira pour finaliser votre paiement.
+                      Vous pourrez choisir votre méthode de paiement (Mobile Money, carte bancaire, etc.).
+                    </p>
+                  </div>
+
+                  <button
+                    className="gw-submit"
+                    style={{marginTop:0}}
+                    onClick={handleKkiapayPayment}
+                  >
+                    <Zap size={16}/>
+                    Payer {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}
+                  </button>
                 </div>
 
-                {showSuggestions && filteredSuggestions.length>0 && phoneSuffix.length===0 && (
-                  <div style={{marginTop:8,marginBottom:4}}>
-                    <p style={{fontSize:9,color:'#CCC',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
-                    {filteredSuggestions.map((p,i)=>{
-                      const prefix=COUNTRY_PREFIXES[country]||'';
-                      const suf=prefix?p.number.replace(prefix,''):p.number;
-                      return (
-                        <button key={i} type="button" className="gw-suggestion"
-                          onClick={()=>{setPhoneSuffix(suf);setShowSuggestions(false);}}>
-                          <Smartphone size={12} style={{color:'#CCC'}}/>
-                          <span style={{fontSize:12,color:'#555',fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
-                          <span style={{fontSize:10,color:'#CCC',marginLeft:'auto'}}>Utiliser</span>
-                        </button>
-                      );
-                    })}
+              ) : (
+                /* ── Autres providers : formulaire téléphone ── */
+                <form onSubmit={handleSubmit}>
+                  <div style={{marginBottom:6}}>
+                    <label className="gw-input-label">Numéro de téléphone</label>
+                    <input
+                      type="tel"
+                      className="gw-input"
+                      value={phoneSuffix ? `${COUNTRY_PREFIXES[country]||''} ${phoneSuffix}` : COUNTRY_PREFIXES[country]||''}
+                      onChange={e => {
+                        const prefix = COUNTRY_PREFIXES[country] || '';
+                        const val = e.target.value;
+                        if (prefix && !val.startsWith(prefix)) return;
+                        const suffix = prefix ? val.slice(prefix.length).trim() : val;
+                        setPhoneSuffix(suffix);
+                        setShowSuggestions(suffix.length === 0);
+                      }}
+                      onFocus={() => setShowSuggestions(phoneSuffix.length === 0)}
+                      placeholder={COUNTRY_PREFIXES[country] ? `${COUNTRY_PREFIXES[country]} 97000000` : '97000000'}
+                      required
+                    />
                   </div>
-                )}
 
-                <button type="submit" disabled={loading} className="gw-submit">
-                  {loading ? (
-                    <>
-                      <div style={{width:16,height:16,borderRadius:'50%',border:`2px solid ${btnTextColor}44`,borderTopColor:btnTextColor}} className="gw-spin"/>
-                      Traitement en cours…
-                    </>
-                  ) : (
-                    <>
-                      <Zap size={16}/>
-                      Payer {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}
-                    </>
+                  {showSuggestions && filteredSuggestions.length > 0 && phoneSuffix.length === 0 && (
+                    <div style={{marginTop:8,marginBottom:4}}>
+                      <p style={{fontSize:9,color:'#CCC',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
+                      {filteredSuggestions.map((p, i) => {
+                        const prefix = COUNTRY_PREFIXES[country] || '';
+                        const suf = prefix ? p.number.replace(prefix,'') : p.number;
+                        return (
+                          <button key={i} type="button" className="gw-suggestion"
+                            onClick={() => { setPhoneSuffix(suf); setShowSuggestions(false); }}>
+                            <Smartphone size={12} style={{color:'#CCC'}}/>
+                            <span style={{fontSize:12,color:'#555',fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
+                            <span style={{fontSize:10,color:'#CCC',marginLeft:'auto'}}>Utiliser</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
-                </button>
-              </form>
 
-              {/* Sécurité — visible sur mobile uniquement (desktop = right panel) */}
+                  <button type="submit" disabled={loading} className="gw-submit">
+                    {loading ? (
+                      <>
+                        <div style={{width:16,height:16,borderRadius:'50%',border:`2px solid ${btnTextColor}44`,borderTopColor:btnTextColor}} className="gw-spin"/>
+                        Traitement en cours…
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={16}/>
+                        Payer {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:16,fontSize:10,color:'#DDD',fontWeight:600}}>
                 <Lock size={9}/> SSL · PCI DSS · Paiement sécurisé
               </div>

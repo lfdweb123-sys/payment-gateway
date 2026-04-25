@@ -162,13 +162,44 @@ const PROVIDER_CALLS = {
 
   /* ── KKiaPay — SDK JS uniquement, pas d'API REST directe publique
        On utilise le SDK JS côté client — cet appel serveur est un fallback non officiel ── */
-  kkiapay: async (config, { amount, phone, email, description }) => {
-    // KKiaPay ne documente pas d'API REST directe pour payin serveur-à-serveur.
-    // L'intégration officielle passe par leur SDK JS (widget) côté client.
-    // Si vous avez un accès API privé, utilisez l'endpoint fourni par leur équipe.
-    console.warn('KKiaPay: pas d\'API REST directe documentée pour payin serveur');
-    return { success: false, error: 'KKiaPay nécessite le SDK JS côté client' };
-  },
+        kkiapay: async (config, { amount, phone, email, description }) => {
+          try {
+            // Import dynamique du JS SDK KKiaPay (npm i -s kkiapay)
+            const kkiapayModule = await import('kkiapay');
+            const kkiapay = kkiapayModule.kkiapay || kkiapayModule.default;
+
+            // Initialisation avec la PUBLIC KEY uniquement pour le débit
+            const k = kkiapay(config.KKIAPAY_PUBLIC_KEY);
+
+            // Envoi direct USSD push sur le téléphone du client
+            const result = await k.debit(
+              phone,              // numéro mobile money ex: 22961000000
+              Math.round(amount), // montant en XOF
+              {
+                firstname: '',
+                lastname:  '',
+                email:     email || '',
+                callback:  `${process.env.VITE_APP_URL}/api/webhook?provider=kkiapay`,
+              }
+            );
+
+            if (!result || !result.transactionId) {
+              return { success: false, error: result?.failureMessage || 'Erreur KKiaPay' };
+            }
+
+            return {
+              success:   true,
+              reference: result.transactionId,
+              status:    'PENDING',
+              provider:  'kkiapay',
+              url:       null,
+            };
+
+          } catch (err) {
+            console.error('KKiaPay error:', err);
+            return { success: false, error: err.message || 'Erreur KKiaPay' };
+          }
+        },
 
   /* ── FedaPay — 2 étapes : créer transaction + générer token + payer ── */
   fedapay: async (config, { amount, email, phone, description }) => {
