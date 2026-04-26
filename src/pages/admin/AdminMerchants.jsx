@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Search, CheckCircle, Ban, ChevronLeft, ChevronRight, ChevronDown, X, Users, Shield, Clock, AlertTriangle } from 'lucide-react';
+import { Search, CheckCircle, Ban, ChevronLeft, ChevronRight, X, Users, Shield, Clock, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -48,15 +48,30 @@ export default function AdminMerchants() {
 
   const loadMerchants = async () => {
     try {
-      const snap = await getDocs(collection(db, 'gateway_merchants'));
-      const merchantsData = snap.docs.map(d => ({ 
-        id: d.id, 
-        ...d.data(),
-        // S'assurer que le nom est bien récupéré
-        name: d.data().name || d.data().displayName || d.data().companyName || 'Sans nom',
-        email: d.data().email || d.data().contactEmail || '—'
-      }));
-      setMerchants(merchantsData);
+      // Récupérer tous les merchants de gateway_merchants
+      const merchantsSnap = await getDocs(collection(db, 'gateway_merchants'));
+      
+      // Pour chaque merchant, récupérer les infos utilisateur depuis users
+      const merchantsWithUsers = await Promise.all(
+        merchantsSnap.docs.map(async (merchantDoc) => {
+          const merchantData = { id: merchantDoc.id, ...merchantDoc.data() };
+          
+          // Récupérer le document utilisateur correspondant (même ID)
+          const userDoc = await getDoc(doc(db, 'users', merchantDoc.id));
+          const userData = userDoc.exists() ? userDoc.data() : {};
+          
+          // Fusionner les données
+          return {
+            ...merchantData,
+            name: userData.displayName || userData.name || merchantData.name || 'Sans nom',
+            email: userData.email || merchantData.email || '—',
+            userPhoto: userData.photoURL || null,
+            userCreatedAt: userData.createdAt,
+          };
+        })
+      );
+      
+      setMerchants(merchantsWithUsers);
     } catch (e) { 
       console.error(e);
       toast.error('Erreur lors du chargement des marchands');
@@ -225,7 +240,7 @@ export default function AdminMerchants() {
               className="adm-row"
               style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 100px 80px', padding: '13px 22px', gap: 12, borderBottom: i < paginated.length - 1 ? '1px solid #f8fafc' : 'none', alignItems: 'center', transition: 'background .1s' }}
             >
-              {/* Nom - Affichage du nom du marchand depuis Firebase */}
+              {/* Nom - Maintenant affiché depuis users */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -237,7 +252,7 @@ export default function AdminMerchants() {
                   {m.name?.charAt(0)?.toUpperCase() || '?'}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  {/* Le nom du marchand est affiché ici */}
+                  {/* Nom complet depuis users */}
                   <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {m.name || 'Sans nom'}
                   </p>
@@ -247,7 +262,7 @@ export default function AdminMerchants() {
                 </div>
               </div>
 
-              {/* Email */}
+              {/* Email - Maintenant depuis users */}
               <p style={{ fontSize: 12, color: '#475569', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {m.email || '—'}
               </p>
@@ -261,9 +276,10 @@ export default function AdminMerchants() {
                 <span style={{ fontSize: 10, color: '#94a3b8', marginLeft: 3 }}>XOF</span>
               </div>
 
-              {/* Date */}
+              {/* Date d'inscription - Priorité à userCreatedAt */}
               <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                {m.createdAt ? format(new Date(m.createdAt), 'dd/MM/yy') : '—'}
+                {m.userCreatedAt ? format(new Date(m.userCreatedAt), 'dd/MM/yy') : 
+                 m.createdAt ? format(new Date(m.createdAt), 'dd/MM/yy') : '—'}
               </span>
 
               {/* Toggle actif */}
