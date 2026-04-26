@@ -74,7 +74,7 @@ function pay() {
   },
   html: {
     title: 'Intégration HTML',
-    sub: 'Boutons et formulaires prêts à coller dans n\'importe quelle page.',
+    sub: "Boutons et formulaires prêts à coller dans n'importe quelle page.",
     items: [
       {
         name: 'Bouton stylisé complet',
@@ -129,7 +129,7 @@ function pay(amount, desc) {
     body: JSON.stringify({ amount, description })
   });
   const data = await res.json();
-  window.location.href = data.paymentUrl;
+  window.location.href = data.url;
 }
 
 payer(5000, 'Facture #123');`,
@@ -144,14 +144,16 @@ payer(5000, 'Facture #123');`,
     body: JSON.stringify({ amount, description })
   });
   const data = await res.json();
-  const popup = window.open(data.paymentUrl, 'payment', 'width=480,height=700');
+  const popup = window.open(data.url, 'payment', 'width=480,height=700');
 
   const interval = setInterval(async () => {
-    const s = await fetch('https://payment-gateway.vercel.app/api/verify/' + data.reference);
+    const s = await fetch('https://payment-gateway.vercel.app/api/verify/' + data.reference, {
+      headers: { 'x-api-key': 'VOTRE_CLE_API' }
+    });
     const status = await s.json();
     if (status.status === 'SUCCESSFUL') {
       clearInterval(interval);
-      popup.close();
+      popup?.close();
       alert('✅ Paiement réussi !');
     }
   }, 5000);
@@ -171,11 +173,14 @@ app.post('/creer-paiement', async (req, res) => {
     },
     body: JSON.stringify({
       amount: req.body.amount,
-      description: req.body.description
+      description: req.body.description,
+      country: req.body.country,   // ex: 'bj', 'sn', 'fr'
+      method: req.body.method,     // ex: 'mtn_money', 'card', 'wave_money'
+      phone: req.body.phone        // requis pour mobile money
     })
   });
   const data = await response.json();
-  res.redirect(data.paymentUrl);
+  res.redirect(data.url);
 });`,
       },
       {
@@ -183,7 +188,7 @@ app.post('/creer-paiement', async (req, res) => {
         lang: 'jsx',
         code: `import { useState } from 'react';
 
-export default function PayButton({ amount, description }) {
+export default function PayButton({ amount, description, country, method, phone }) {
   const [loading, setLoading] = useState(false);
 
   const pay = async () => {
@@ -191,16 +196,16 @@ export default function PayButton({ amount, description }) {
     const res = await fetch('https://payment-gateway.vercel.app/api/pay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 'VOTRE_CLE_API' },
-      body: JSON.stringify({ amount, description })
+      body: JSON.stringify({ amount, description, country, method, phone })
     });
     const data = await res.json();
-    window.open(data.paymentUrl, 'payment', 'width=480,height=700');
+    if (data.url) window.open(data.url, 'payment', 'width=480,height=700');
     setLoading(false);
   };
 
   return (
     <button onClick={pay} disabled={loading}>
-      {loading ? 'Chargement...' : \`Payer \${amount} XOF\`}
+      {loading ? 'Chargement...' : \`Payer \${amount.toLocaleString()} XOF\`}
     </button>
   );
 }`,
@@ -215,7 +220,7 @@ export default function PayButton({ amount, description }) {
         name: 'cURL simple',
         lang: 'php',
         code: `<?php
-function initierPaiement($amount, $description) {
+function initierPaiement($amount, $description, $country = 'bj', $method = 'mtn_money', $phone = '') {
   $ch = curl_init('https://payment-gateway.vercel.app/api/pay');
   curl_setopt_array($ch, [
     CURLOPT_POST => true,
@@ -224,8 +229,11 @@ function initierPaiement($amount, $description) {
       'x-api-key: VOTRE_CLE_API'
     ],
     CURLOPT_POSTFIELDS => json_encode([
-      'amount' => $amount,
-      'description' => $description
+      'amount'      => $amount,
+      'description' => $description,
+      'country'     => $country,
+      'method'      => $method,
+      'phone'       => $phone,
     ]),
     CURLOPT_RETURNTRANSFER => true
   ]);
@@ -234,15 +242,15 @@ function initierPaiement($amount, $description) {
   return json_decode($response, true);
 }
 
-$paiement = initierPaiement(5000, 'Facture #123');
-header('Location: ' . $paiement['paymentUrl']);
+$paiement = initierPaiement(5000, 'Facture #123', 'bj', 'mtn_money', '22961000000');
+header('Location: ' . $paiement['url']);
 exit;`,
       },
       {
         name: 'Webhook callback',
         lang: 'php',
         code: `<?php
-// callback.php — À configurer dans votre dashboard
+// webhook.php — À configurer dans votre dashboard Vercel
 $payload = file_get_contents('php://input');
 $data = json_decode($payload, true);
 
@@ -251,7 +259,8 @@ if ($data['event'] === 'payment.completed') {
   $amount    = $data['transaction']['amount'];
 
   // Mettre à jour la commande en base
-  $db->query("UPDATE commandes SET statut='paye' WHERE reference='$reference'");
+  $pdo->prepare("UPDATE commandes SET statut='paye' WHERE reference=?")
+      ->execute([$reference]);
 
   // Envoyer un email de confirmation
   mail($data['transaction']['email'], 'Paiement confirmé', "Paiement de $amount XOF reçu.");
@@ -271,21 +280,27 @@ echo json_encode(['received' => true]);`,
         lang: 'python',
         code: `import requests
 
-def initier_paiement(amount, description):
+def initier_paiement(amount, description, country='bj', method='mtn_money', phone=''):
     response = requests.post(
         'https://payment-gateway.vercel.app/api/pay',
         headers={
             'Content-Type': 'application/json',
             'x-api-key': 'VOTRE_CLE_API'
         },
-        json={'amount': amount, 'description': description}
+        json={
+            'amount': amount,
+            'description': description,
+            'country': country,
+            'method': method,
+            'phone': phone,
+        }
     )
     return response.json()
 
 # Vue Django
 def payer(request):
-    paiement = initier_paiement(5000, 'Facture #123')
-    return redirect(paiement['paymentUrl'])`,
+    paiement = initier_paiement(5000, 'Facture #123', 'bj', 'mtn_money', '22961000000')
+    return redirect(paiement['url'])`,
       },
       {
         name: 'Webhook receiver (Flask)',
@@ -297,9 +312,12 @@ app = Flask(__name__)
 @app.route('/webhook', methods=['POST'])
 def webhook():
     data = request.json
-    if data['event'] == 'payment.completed':
+    if data.get('event') == 'payment.completed':
         reference = data['transaction']['reference']
         update_order(reference, 'paid')
+    elif data.get('event') == 'payment.failed':
+        reference = data['transaction']['reference']
+        update_order(reference, 'failed')
     return jsonify({'received': True})`,
       },
     ],
@@ -349,28 +367,39 @@ function ajouter_gateway_personnalisee($gateways) {
         code: `curl -X POST https://payment-gateway.vercel.app/api/pay \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: VOTRE_CLE_API" \\
-  -d '{"amount":5000,"description":"Facture #123"}'
+  -d '{
+    "amount": 5000,
+    "description": "Facture #123",
+    "country": "bj",
+    "method": "mtn_money",
+    "phone": "22961000000",
+    "email": "client@email.com"
+  }'
 
 # Réponse
 {
   "success": true,
-  "reference": "GW-abc123",
-  "paymentUrl": "https://payment-gateway.vercel.app/pay?token=...",
-  "status": "pending"
+  "transactionId": "abc123",
+  "reference": "GW-1714000000000",
+  "url": "https://...",
+  "status": "pending",
+  "provider": "feexpay",
+  "message": "Paiement initié. Vérifiez votre téléphone."
 }`,
       },
       {
         name: 'GET /api/verify/:reference — Vérifier un paiement',
         lang: 'bash',
-        code: `curl https://payment-gateway.vercel.app/api/verify/GW-abc123 \\
+        code: `curl https://payment-gateway.vercel.app/api/verify/GW-1714000000000 \\
   -H "x-api-key: VOTRE_CLE_API"
 
 # Réponse
 {
   "success": true,
   "status": "SUCCESSFUL",
-  "reference": "GW-abc123",
-  "amount": 5000
+  "reference": "GW-1714000000000",
+  "amount": 5000,
+  "provider": "feexpay"
 }`,
       },
       {
@@ -384,8 +413,10 @@ function ajouter_gateway_personnalisee($gateways) {
   "name": "Bénin",
   "currency": "XOF",
   "methods": [
-    {"id":"mtn_money","name":"MTN Mobile Money","icon":"📱"},
-    {"id":"moov_money","name":"Moov Money","icon":"📱"}
+    {"id": "mtn_money",    "name": "MTN Mobile Money"},
+    {"id": "moov_money",   "name": "Moov Money"},
+    {"id": "celtiis_money","name": "CELTIIS Money"},
+    {"id": "card",         "name": "Carte Bancaire"}
   ]
 }`,
       },
@@ -411,29 +442,67 @@ function ajouter_gateway_personnalisee($gateways) {
       {
         name: 'Événements disponibles',
         lang: 'text',
-        code: `payment.completed   → Paiement réussi
-payment.failed      → Paiement échoué
-payment.pending     → Paiement en attente
+        code: `payment.completed   → Paiement réussi (solde crédité)
+payment.failed      → Paiement échoué ou refusé
+payment.pending     → Paiement en attente de confirmation
 payment.refunded    → Paiement remboursé`,
       },
       {
-        name: 'Récepteur Node.js',
+        name: 'Format du payload',
+        lang: 'javascript',
+        code: `// Exemple de payload reçu sur votre endpoint webhook
+{
+  "event": "payment.completed",
+  "transaction": {
+    "id": "abc123",
+    "reference": "GW-1714000000000",
+    "amount": 5000,
+    "netAmount": 4950,
+    "commission": 50,
+    "country": "bj",
+    "method": "mtn_money",
+    "provider": "feexpay",
+    "status": "completed",
+    "createdAt": "2026-01-01T12:00:00.000Z",
+    "completedAt": "2026-01-01T12:01:30.000Z"
+  }
+}`,
+      },
+      {
+        name: 'Récepteur Node.js (Express)',
         lang: 'javascript',
         code: `app.post('/webhook', express.json(), (req, res) => {
   const { event, transaction } = req.body;
 
   switch (event) {
     case 'payment.completed':
-      updateOrder(transaction.metadata.orderId, 'paid');
+      updateOrder(transaction.reference, 'paid');
       sendConfirmationEmail(transaction.email);
       break;
     case 'payment.failed':
-      updateOrder(transaction.metadata.orderId, 'failed');
+      updateOrder(transaction.reference, 'failed');
+      notifyCustomer(transaction.reference);
       break;
   }
 
   res.json({ received: true });
 });`,
+      },
+      {
+        name: 'Récepteur PHP',
+        lang: 'php',
+        code: `<?php
+$payload = json_decode(file_get_contents('php://input'), true);
+$event   = $payload['event'] ?? '';
+$tx      = $payload['transaction'] ?? [];
+
+if ($event === 'payment.completed') {
+  // Créditer la commande
+  $db->query("UPDATE orders SET status='paid' WHERE ref='{$tx['reference']}'");
+}
+
+http_response_code(200);
+echo json_encode(['received' => true]);`,
       },
     ],
   },
@@ -448,17 +517,25 @@ payment.refunded    → Paiement remboursé`,
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 
-Future<void> payer(double amount, String description) async {
+Future<void> payer(double amount, String description, String country, String method, String phone) async {
   final res = await http.post(
     Uri.parse('https://payment-gateway.vercel.app/api/pay'),
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': 'VOTRE_CLE_API'
     },
-    body: jsonEncode({'amount': amount, 'description': description})
+    body: jsonEncode({
+      'amount': amount,
+      'description': description,
+      'country': country,
+      'method': method,
+      'phone': phone,
+    })
   );
   final data = jsonDecode(res.body);
-  await launchUrl(Uri.parse(data['paymentUrl']));
+  if (data['url'] != null) {
+    await launchUrl(Uri.parse(data['url']));
+  }
 }`,
       },
       {
@@ -466,17 +543,17 @@ Future<void> payer(double amount, String description) async {
         lang: 'jsx',
         code: `import { Linking } from 'react-native';
 
-async function payer(amount, description) {
+async function payer(amount, description, country, method, phone) {
   const res = await fetch('https://payment-gateway.vercel.app/api/pay', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': 'VOTRE_CLE_API'
     },
-    body: JSON.stringify({ amount, description })
+    body: JSON.stringify({ amount, description, country, method, phone })
   });
   const data = await res.json();
-  Linking.openURL(data.paymentUrl);
+  if (data.url) Linking.openURL(data.url);
 }`,
       },
     ],
@@ -516,36 +593,82 @@ function generateQR() {
 };
 
 const LANG_COLORS = {
-  html: { bg: '#FFF3EA', color: '#FF6B00', label: 'HTML' },
+  html:       { bg: '#FFF3EA', color: '#FF6B00', label: 'HTML' },
   javascript: { bg: '#FFFBEB', color: '#D97706', label: 'JS' },
-  jsx: { bg: '#EBF0FF', color: '#0057FF', label: 'JSX' },
-  php: { bg: '#F4EBFF', color: '#9B00E8', label: 'PHP' },
-  python: { bg: '#EDFAF3', color: '#00A550', label: 'PY' },
-  bash: { bg: '#F7F8FC', color: '#555', label: 'cURL' },
-  dart: { bg: '#E0F7FA', color: '#0097A7', label: 'Dart' },
-  text: { bg: '#F7F8FC', color: '#888', label: 'TEXT' },
+  jsx:        { bg: '#EBF0FF', color: '#0057FF', label: 'JSX' },
+  php:        { bg: '#F4EBFF', color: '#9B00E8', label: 'PHP' },
+  python:     { bg: '#EDFAF3', color: '#00A550', label: 'PY' },
+  bash:       { bg: '#F7F8FC', color: '#555',    label: 'cURL' },
+  dart:       { bg: '#E0F7FA', color: '#0097A7', label: 'Dart' },
+  text:       { bg: '#F7F8FC', color: '#888',    label: 'TEXT' },
 };
 
+// ─── Liste complète des providers ─────────────────────────────────────────────
 const PROVIDERS = [
-  { name: 'FeexPay',      zone: 'BJ · CI · TG · SN', color: '#FF6B00' },
-  { name: 'Stripe',       zone: 'Europe · US · CA',   color: '#0057FF' },
-  { name: 'Paystack',     zone: 'NG · GH · KE · ZA',  color: '#00A550' },
-  { name: 'Flutterwave',  zone: '15 pays Afrique',    color: '#F59E0B' },
-  { name: 'KKiaPay',      zone: 'UEMOA + CEMAC',      color: '#6366F1' },
-  { name: 'FedaPay',      zone: '10 pays Afrique',    color: '#EF4444' },
-  { name: 'PayDunya',     zone: 'UEMOA',              color: '#0EA5E9' },
-  { name: 'CinetPay',     zone: '11 pays Afrique',    color: '#14B8A6' },
-  { name: 'Lygos',        zone: '13 pays Afrique',    color: '#EC4899' },
-  { name: 'PayPal',       zone: '200+ pays',          color: '#0057FF' },
-  { name: 'MbiyoPay',     zone: '11 pays Afrique',    color: '#FF6B00' },
-  { name: 'Qosic',        zone: '13 pays Afrique',    color: '#9B00E8' },
-  { name: 'Bizao',        zone: '11 pays Afrique',    color: '#00A550' },
-  { name: 'Hub2',         zone: '10 pays Afrique',    color: '#F59E0B' },
-  { name: 'Chipper Cash', zone: 'Afrique · US · UK',  color: '#6366F1' },
+  // Agrégateurs Afrique de l'Ouest
+  { name: 'FeexPay',       zone: 'BJ · CI · TG · SN · BF',   color: '#FF6B00', section: 'Agrégateurs' },
+  { name: 'KKiaPay',       zone: 'UEMOA + CEMAC · 11 pays',   color: '#6366F1', section: 'Agrégateurs' },
+  { name: 'CinetPay',      zone: '11 pays Afrique',            color: '#14B8A6', section: 'Agrégateurs' },
+  { name: 'Hub2',          zone: '10 pays Afrique',            color: '#F59E0B', section: 'Agrégateurs' },
+  { name: 'FedaPay',       zone: '10 pays Afrique',            color: '#EF4444', section: 'Agrégateurs' },
+  { name: 'Qosic',         zone: '12 pays Afrique',            color: '#9B00E8', section: 'Agrégateurs' },
+  { name: 'Lygos',         zone: '12 pays Afrique',            color: '#EC4899', section: 'Agrégateurs' },
+  { name: 'Bizao',         zone: '11 pays Afrique',            color: '#00A550', section: 'Agrégateurs' },
+  { name: 'PayDunya',      zone: 'UEMOA · 8 pays',             color: '#0EA5E9', section: 'Agrégateurs' },
+  { name: 'MbiyoPay',      zone: '11 pays Afrique',            color: '#FF6B00', section: 'Agrégateurs' },
+  // Mobile Money direct
+  { name: 'Wave',          zone: 'SN · CI · ML · UG · CM',    color: '#00A550', section: 'Mobile Money' },
+  { name: 'MTN MoMo',      zone: '12 pays africains',          color: '#F59E0B', section: 'Mobile Money' },
+  { name: 'M-Pesa Daraja', zone: 'KE · TZ · MZ',              color: '#00A550', section: 'Mobile Money' },
+  { name: 'Orange Money',  zone: 'CI · SN · ML · CM · GN',    color: '#FF6B00', section: 'Mobile Money' },
+  { name: 'Airtel Money',  zone: '14 pays Afrique',            color: '#EF4444', section: 'Mobile Money' },
+  // Afrique anglophone
+  { name: 'Paystack',      zone: 'NG · GH · KE · ZA',         color: '#00A550', section: 'Anglophone' },
+  { name: 'Flutterwave',   zone: '11 pays africains',          color: '#F59E0B', section: 'Anglophone' },
+  // Tunisie
+  { name: 'Flouci',        zone: 'Tunisie',                    color: '#0EA5E9', section: 'Tunisie' },
+  { name: 'Paymee',        zone: 'Tunisie',                    color: '#6366F1', section: 'Tunisie' },
+  // Afrique du Sud
+  { name: 'Yoco',          zone: 'Afrique du Sud · ZAR',       color: '#0057FF', section: 'Afrique du Sud' },
+  // International
+  { name: 'PayPal',        zone: '200+ pays',                  color: '#0057FF', section: 'International' },
+  { name: 'Stripe',        zone: 'Europe · USA · Canada',      color: '#6366F1', section: 'International' },
+  { name: 'Mollie',        zone: 'Europe · 15 pays',           color: '#0057FF', section: 'International' },
+  { name: 'Adyen',         zone: 'Mondial · 50+ pays',         color: '#14B8A6', section: 'International' },
+  { name: 'Checkout.com',  zone: 'Mondial · 60+ pays',         color: '#0A0A0A', section: 'International' },
+  { name: 'Braintree',     zone: 'USA · Europe · AU',          color: '#0057FF', section: 'International' },
+  // Inde
+  { name: 'Razorpay',      zone: 'Inde',                       color: '#0057FF', section: 'Inde' },
+  // USA / Canada
+  { name: 'Square',        zone: 'USA · CA · UK · AU',         color: '#0A0A0A', section: 'USA / Canada' },
+  { name: 'Authorize.net', zone: 'USA · Canada',               color: '#0057FF', section: 'USA / Canada' },
 ];
 
+// Sections pour regrouper les providers
+const PROVIDER_SECTIONS = [
+  'Agrégateurs',
+  'Mobile Money',
+  'Anglophone',
+  'Tunisie',
+  'Afrique du Sud',
+  'International',
+  'Inde',
+  'USA / Canada',
+];
+
+const SECTION_LABELS = {
+  'Agrégateurs':   'Agrégateurs Afrique de l\'Ouest',
+  'Mobile Money':  'Mobile Money direct (opérateurs)',
+  'Anglophone':    'Afrique anglophone',
+  'Tunisie':       'Tunisie',
+  'Afrique du Sud':'Afrique du Sud',
+  'International': 'International',
+  'Inde':          'Inde',
+  'USA / Canada':  'USA / Canada',
+};
+
 /* ── Code Block ── */
-function CodeBlock({ code, lang, id }) {
+function CodeBlock({ code, lang }) {
   const [copied, setCopied] = useState(false);
   const lc = LANG_COLORS[lang] || LANG_COLORS.text;
 
@@ -558,7 +681,6 @@ function CodeBlock({ code, lang, id }) {
 
   return (
     <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #1E2433' }}>
-      {/* toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#161B27', padding: '10px 16px',
@@ -588,10 +710,9 @@ function CodeBlock({ code, lang, id }) {
           {copied ? 'Copié !' : 'Copier'}
         </button>
       </div>
-      {/* code */}
       <div style={{
         background: '#0D1117', padding: '16px 20px',
-        overflowX: 'auto', maxHeight: 320, overflowY: 'auto',
+        overflowX: 'auto', maxHeight: 340, overflowY: 'auto',
       }}>
         <pre style={{
           fontFamily: "'Fira Code','Cascadia Code','Courier New',monospace",
@@ -606,15 +727,11 @@ function CodeBlock({ code, lang, id }) {
 /* ── Item card ── */
 function ItemCard({ item, tabId, idx }) {
   return (
-    <div style={{
-      border: '1px solid #EBEBEB', borderRadius: 18, overflow: 'hidden',
-      background: '#fff',
-    }}>
+    <div style={{ border: '1px solid #EBEBEB', borderRadius: 18, overflow: 'hidden', background: '#fff' }}>
       <div style={{
         display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
         gap: 10, padding: '16px 20px',
-        background: '#FAFAFA', borderBottom: '1px solid #F0F0F0',
-        flexWrap: 'wrap',
+        background: '#FAFAFA', borderBottom: '1px solid #F0F0F0', flexWrap: 'wrap',
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>{item.name}</div>
@@ -622,7 +739,7 @@ function ItemCard({ item, tabId, idx }) {
         </div>
       </div>
       <div style={{ padding: '14px' }}>
-        <CodeBlock code={item.code} lang={item.lang} id={`${tabId}-${idx}`} />
+        <CodeBlock code={item.code} lang={item.lang} />
       </div>
     </div>
   );
@@ -631,7 +748,7 @@ function ItemCard({ item, tabId, idx }) {
 /* ── MAIN ── */
 export default function GatewayApiDocs() {
   const [activeTab, setActiveTab] = useState('quickstart');
-  const active = METHODS[activeTab];
+  const active        = METHODS[activeTab];
   const activeTabMeta = TABS.find(t => t.id === activeTab);
 
   return (
@@ -645,6 +762,12 @@ export default function GatewayApiDocs() {
         .doc-tab::-webkit-scrollbar { display: none; }
         .doc-tab { scrollbar-width: none; }
         .provider-card:hover { border-color: var(--hc) !important; background: var(--hb) !important; }
+        .provider-section-title {
+          font-size: 10px; font-weight: 700; color: #94a3b8;
+          text-transform: uppercase; letter-spacing: .08em;
+          margin: 18px 0 8px;
+        }
+        .provider-section-title:first-child { margin-top: 0; }
       `}</style>
 
       {/* ── Hero header ── */}
@@ -653,10 +776,8 @@ export default function GatewayApiDocs() {
         borderRadius: 22, padding: '32px 28px', marginBottom: 24,
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* déco cercles */}
         <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,107,0,.07)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: -60, right: 80, width: 140, height: 140, borderRadius: '50%', background: 'rgba(0,87,255,.07)', pointerEvents: 'none' }} />
-
         <div style={{ position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <div style={{
@@ -668,12 +789,8 @@ export default function GatewayApiDocs() {
               <BookOpen size={18} color="#fff" />
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.1em' }}>
-                Référence
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-.02em', lineHeight: 1 }}>
-                Documentation API
-              </div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Référence</div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-.02em', lineHeight: 1 }}>Documentation API</div>
             </div>
           </div>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', maxWidth: 480, lineHeight: 1.6, marginBottom: 20 }}>
@@ -681,9 +798,9 @@ export default function GatewayApiDocs() {
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {[
-              { label: '10 langages', icon: Layers },
-              { label: '15+ providers', icon: Globe },
-              { label: 'REST + Webhooks', icon: Shield },
+              { label: '10 langages',    icon: Layers },
+              { label: '29 providers',   icon: Globe  },
+              { label: 'REST + Webhooks',icon: Shield },
             ].map((b, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -700,39 +817,11 @@ export default function GatewayApiDocs() {
         </div>
       </div>
 
-      {/* ── Layout : sidebar + contenu ── */}
+      {/* ── Layout : tabs + contenu ── */}
       <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
-
-        {/* Sidebar tabs — desktop */}
-        <div style={{
-          width: 176, flexShrink: 0,
-          display: 'none', /* hidden by default, shown via media query workaround below */
-        }} className="doc-sidebar">
-          {TABS.map(t => {
-            const on = activeTab === t.id;
-            return (
-              <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-                padding: '10px 12px', borderRadius: 11, border: 'none',
-                background: on ? '#FFF3EA' : 'transparent',
-                color: on ? '#FF6B00' : '#666',
-                fontWeight: on ? 700 : 500, fontSize: 13,
-                cursor: 'pointer', transition: 'all .18s',
-                fontFamily: 'inherit', marginBottom: 2,
-                textAlign: 'left',
-              }}>
-                <t.icon size={14} color={on ? '#FF6B00' : '#BBB'} />
-                {t.label}
-                {on && <ChevronRight size={12} color="#FF6B00" style={{ marginLeft: 'auto' }} />}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Main content */}
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* Tabs scroll horizontal (mobile + desktop sans sidebar) */}
+          {/* Tabs scroll horizontal */}
           <div className="doc-tab" style={{
             display: 'flex', gap: 4, overflowX: 'auto',
             WebkitOverflowScrolling: 'touch',
@@ -773,9 +862,7 @@ export default function GatewayApiDocs() {
               {activeTabMeta && <activeTabMeta.icon size={18} color={activeTabMeta.color} />}
             </div>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.015em' }}>
-                {active.title}
-              </div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.015em' }}>{active.title}</div>
               <div style={{ fontSize: 12, color: '#AAA', marginTop: 2 }}>{active.sub}</div>
             </div>
           </div>
@@ -795,33 +882,44 @@ export default function GatewayApiDocs() {
         background: '#fff', border: '1px solid #EBEBEB',
         borderRadius: 20, padding: '24px',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
           <div style={{ width: 38, height: 38, borderRadius: 11, background: '#FFF3EA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Globe size={16} color="#FF6B00" />
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 800, color: '#111' }}>Providers supportés</div>
-            <div style={{ fontSize: 12, color: '#AAA', marginTop: 1 }}>15 intégrations disponibles</div>
+            <div style={{ fontSize: 12, color: '#AAA', marginTop: 1 }}>{PROVIDERS.length} intégrations disponibles</div>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8 }}>
-          {PROVIDERS.map(p => (
-            <div
-              key={p.name}
-              className="provider-card"
-              style={{
-                '--hc': p.color,
-                '--hb': `${p.color}0D`,
-                border: '1.5px solid #EBEBEB',
-                borderRadius: 12, padding: '10px 12px',
-                transition: 'all .2s', cursor: 'default',
-              }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#222', marginBottom: 2 }}>{p.name}</div>
-              <div style={{ fontSize: 10, color: '#AAA', fontWeight: 500 }}>{p.zone}</div>
+
+        {/* Rendu par section */}
+        {PROVIDER_SECTIONS.map(section => {
+          const list = PROVIDERS.filter(p => p.section === section);
+          if (!list.length) return null;
+          return (
+            <div key={section}>
+              <div className="provider-section-title">{SECTION_LABELS[section]}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8, marginBottom: 4 }}>
+                {list.map(p => (
+                  <div
+                    key={p.name}
+                    className="provider-card"
+                    style={{
+                      '--hc': p.color,
+                      '--hb': `${p.color}0D`,
+                      border: '1.5px solid #EBEBEB',
+                      borderRadius: 12, padding: '10px 12px',
+                      transition: 'all .2s', cursor: 'default',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#222', marginBottom: 2 }}>{p.name}</div>
+                    <div style={{ fontSize: 10, color: '#AAA', fontWeight: 500 }}>{p.zone}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
 
       {/* ── Support ── */}
@@ -833,22 +931,17 @@ export default function GatewayApiDocs() {
         flexWrap: 'wrap', gap: 16,
       }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
-            Besoin d'aide pour intégrer ?
-          </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)' }}>
-            Notre équipe technique est disponible 24/7.
-          </div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 4 }}>Besoin d'aide pour intégrer ?</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)' }}>Notre équipe technique est disponible 24/7.</div>
         </div>
         <a
-          href="mailto:support@payment-gateway.vercel.app"
+          href="mailto:support@paymentgateway.com"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
             background: '#fff', color: '#FF6B00',
             padding: '11px 22px', borderRadius: 12,
             fontSize: 13, fontWeight: 800, textDecoration: 'none',
-            boxShadow: '0 4px 16px rgba(0,0,0,.12)',
-            flexShrink: 0,
+            boxShadow: '0 4px 16px rgba(0,0,0,.12)', flexShrink: 0,
           }}
         >
           <Mail size={15} /> Contacter le support

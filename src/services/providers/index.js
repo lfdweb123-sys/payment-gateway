@@ -28,34 +28,249 @@ export function clearProvidersCache() {
 // ─── Capacités de chaque provider ────────────────────────────────────────────
 
 const CAPABILITIES = {
+
+  // ════════════════════════════════════════════════════════════════════════
+  // AFRIQUE DE L'OUEST — agrégateurs
+  // ════════════════════════════════════════════════════════════════════════
+
   feexpay: {
     name: 'FeexPay',
     priority: 1,
     countries: ['bj', 'ci', 'tg', 'sn', 'bf', 'cg'],
     methods: {
-      bj: ['mtn_money', 'moov_money', 'celtiis_money'],
+      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'wallet', 'coris'],
       ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money'],
       tg: ['togocom_money', 'moov_money'],
-      sn: ['orange_money', 'free_money'],
+      sn: ['orange_money', 'free_money', 'wave_money'],
       bf: ['orange_money', 'moov_money'],
       cg: ['mtn_money'],
     },
     currency: 'XOF',
   },
 
-  stripe: {
-    name: 'Stripe',
-    priority: 10,
-    countries: ['fr', 'be', 'ch', 'lu', 'de', 'es', 'it', 'nl', 'pt', 'gb', 'ie', 'us', 'ca'],
+  kkiapay: {
+    name: 'KKiaPay',
+    priority: 2,
+    countries: ['bj', 'tg', 'ci', 'sn', 'bf', 'ml', 'ne', 'gn', 'cm', 'ga', 'cd'],
     methods: {
-      fr: ['card', 'apple_pay', 'google_pay'],
-      gb: ['card', 'apple_pay', 'google_pay', 'bacs'],
-      nl: ['card', 'ideal'],
-      de: ['card', 'giropay', 'sofort'],
-      es: ['card', 'bizum'],
+      bj: ['mtn_money', 'moov_money', 'card'],
+      tg: ['togocom_money', 'moov_money'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money'],
+      sn: ['orange_money', 'free_money', 'wave_money'],
+      cm: ['mtn_money', 'orange_money'],
     },
-    currency: 'EUR',
+    currency: 'XOF',
   },
+
+  cinetpay: {
+    name: 'CinetPay',
+    priority: 2,
+    countries: ['bj', 'ci', 'tg', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'ga'],
+    methods: {
+      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
+      tg: ['togocom_money', 'moov_money', 'card'],
+      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
+      cm: ['mtn_money', 'orange_money', 'card'],
+    },
+    currency: 'XOF',
+  },
+
+  hub2: {
+    name: 'Hub2',
+    priority: 2,
+    countries: ['bj', 'ci', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'cg'],
+    methods: {
+      bj: ['mtn_money', 'moov_money', 'card'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
+      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
+      cm: ['mtn_money', 'orange_money', 'card'],
+    },
+    currency: 'XOF',
+  },
+
+  fedapay: {
+    name: 'FedaPay',
+    priority: 3,
+    countries: ['bj', 'tg', 'ci', 'sn', 'bf', 'ml', 'ne', 'gn', 'cm', 'ga'],
+    methods: {
+      bj: ['mtn_money', 'moov_money', 'card'],
+      tg: ['togocom_money', 'moov_money', 'card'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'card'],
+      sn: ['orange_money', 'free_money', 'card'],
+    },
+    currency: 'XOF',
+  },
+
+  qosic: {
+    name: 'Qosic',
+    priority: 3,
+    countries: ['bj', 'tg', 'ci', 'sn', 'bf', 'ml', 'ne', 'gn', 'cm', 'ga', 'cd', 'cg'],
+    methods: {
+      bj: ['mtn_money', 'moov_money', 'celtiis_money'],
+      tg: ['togocom_money', 'moov_money'],
+      ci: ['mtn_money', 'orange_money', 'moov_money'],
+      sn: ['orange_money', 'free_money'],
+      cm: ['mtn_money', 'orange_money'],
+    },
+    currency: 'XOF',
+  },
+
+  lygos: {
+    name: 'Lygos',
+    priority: 3,
+    countries: ['bj', 'ci', 'tg', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'ga', 'cg'],
+    methods: {
+      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
+      tg: ['togocom_money', 'moov_money', 'card'],
+      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
+      cm: ['mtn_money', 'orange_money', 'card'],
+      cg: ['mtn_money', 'airtel_money'],
+    },
+    currency: 'XOF',
+  },
+
+  bizao: {
+    name: 'Bizao',
+    priority: 3,
+    countries: ['bj', 'ci', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'cg', 'ga'],
+    methods: {
+      bj: ['mtn_money', 'moov_money'],
+      ci: ['mtn_money', 'orange_money', 'moov_money'],
+      sn: ['orange_money', 'free_money'],
+      cm: ['mtn_money', 'orange_money'],
+    },
+    currency: 'XOF',
+  },
+
+  paydunya: {
+    name: 'PayDunya',
+    priority: 4,
+    countries: ['sn', 'ci', 'bj', 'tg', 'bf', 'ml', 'ne', 'gn'],
+    methods: {
+      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
+      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
+      bj: ['mtn_money', 'moov_money', 'card'],
+      tg: ['togocom_money', 'moov_money'],
+    },
+    currency: 'XOF',
+  },
+
+  mbiyopay: {
+    name: 'MbiyoPay',
+    priority: 4,
+    countries: ['bj', 'bf', 'ci', 'sn', 'tg', 'cg', 'cd', 'cm', 'gn', 'ml', 'gm'],
+    methods: {
+      bj: ['mtn_money', 'moov_money', 'celtiis_money'],
+      bf: ['orange_money', 'moov_money', 'coris'],
+      ci: ['orange_money', 'mtn_money', 'wave_money', 'moov_money'],
+      sn: ['orange_money', 'free_money'],
+      tg: ['moov_money', 'togocom_money'],
+      cg: ['mtn_money'],
+      cd: ['mpesa', 'airtel_money', 'orange_money', 'afrimoney'],
+      cm: ['orange_money', 'moov_money'],
+      gn: ['orange_money', 'mtn_money'],
+      ml: ['orange_money', 'moov_money'],
+      gm: ['afrimoney', 'qmoney', 'wave_money'],
+    },
+    currency: 'XOF',
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // AFRIQUE — Mobile Money direct (opérateurs)
+  // ════════════════════════════════════════════════════════════════════════
+
+  wave: {
+    name: 'Wave',
+    priority: 2,
+    countries: ['sn', 'ci', 'ml', 'ug', 'cm', 'gm'],
+    methods: {
+      sn: ['wave_money'],
+      ci: ['wave_money'],
+      ml: ['wave_money'],
+      ug: ['wave_money'],
+      cm: ['wave_money'],
+      gm: ['wave_money'],
+    },
+    currency: 'XOF',
+  },
+
+  mtn: {
+    name: 'MTN MoMo',
+    priority: 3,
+    countries: ['gh', 'cm', 'ci', 'bj', 'sn', 'gn', 'cd', 'rw', 'ug', 'zm', 'za', 'ng'],
+    methods: {
+      gh: ['mtn_money'],
+      cm: ['mtn_money'],
+      ci: ['mtn_money'],
+      bj: ['mtn_money'],
+      sn: ['mtn_money'],
+      gn: ['mtn_money'],
+      cd: ['mtn_money'],
+      rw: ['mtn_money'],
+      ug: ['mtn_money'],
+      zm: ['mtn_money'],
+      za: ['mtn_money'],
+      ng: ['mtn_money'],
+    },
+    currency: 'XOF',
+  },
+
+  mpesa: {
+    name: 'M-Pesa Daraja',
+    priority: 2,
+    countries: ['ke', 'tz', 'mz'],
+    methods: {
+      ke: ['mpesa'],
+      tz: ['mpesa'],
+      mz: ['mpesa'],
+    },
+    currency: 'KES',
+  },
+
+  orange: {
+    name: 'Orange Money',
+    priority: 3,
+    countries: ['ci', 'sn', 'ml', 'cm', 'gn', 'cd', 'cf'],
+    methods: {
+      ci: ['orange_money'],
+      sn: ['orange_money'],
+      ml: ['orange_money'],
+      cm: ['orange_money'],
+      gn: ['orange_money'],
+      cd: ['orange_money'],
+      cf: ['orange_money'],
+    },
+    currency: 'XOF',
+  },
+
+  airtel: {
+    name: 'Airtel Money',
+    priority: 3,
+    countries: ['ke', 'ug', 'tz', 'zm', 'mw', 'gh', 'cd', 'mg', 'cm', 'ci', 'rw', 'ne', 'td', 'bf', 'bi', 'gw', 'sl'],
+    methods: {
+      ke: ['airtel_money'],
+      ug: ['airtel_money'],
+      tz: ['airtel_money'],
+      zm: ['airtel_money'],
+      mw: ['airtel_money'],
+      gh: ['airtel_money'],
+      cd: ['airtel_money'],
+      mg: ['airtel_money'],
+      cm: ['airtel_money'],
+      ci: ['airtel_money'],
+      rw: ['airtel_money'],
+      ne: ['airtel_money'],
+      td: ['airtel_money'],
+      bf: ['airtel_money'],
+    },
+    currency: 'USD',
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // AFRIQUE — Anglophones
+  // ════════════════════════════════════════════════════════════════════════
 
   paystack: {
     name: 'Paystack',
@@ -81,87 +296,71 @@ const CAPABILITIES = {
       ci: ['card', 'mobile_money'],
       sn: ['card', 'mobile_money'],
       bj: ['card', 'mobile_money'],
+      ug: ['card', 'mobile_money'],
+      tz: ['card', 'mobile_money'],
+      rw: ['card', 'mobile_money'],
+      zm: ['card', 'mobile_money'],
+      cm: ['card', 'mobile_money'],
     },
     currency: 'USD',
   },
 
-  kkiapay: {
-    name: 'KKiaPay',
+  // ════════════════════════════════════════════════════════════════════════
+  // AFRIQUE — Tunisie
+  // ════════════════════════════════════════════════════════════════════════
+
+  flouci: {
+    name: 'Flouci',
     priority: 2,
-    countries: ['bj', 'tg', 'ci', 'sn', 'bf', 'ml', 'ne', 'gn', 'cm', 'ga', 'cd'],
+    countries: ['tn'],
     methods: {
-      bj: ['mtn_money', 'moov_money', 'card'],
-      tg: ['togocom_money', 'moov_money'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money'],
-      sn: ['orange_money', 'free_money', 'wave_money'],
-      cm: ['mtn_money', 'orange_money'],
+      tn: ['card', 'flouci_wallet'],
     },
-    currency: 'XOF',
+    currency: 'TND',
   },
 
-  fedapay: {
-    name: 'FedaPay',
+  paymee: {
+    name: 'Paymee',
     priority: 3,
-    countries: ['bj', 'tg', 'ci', 'sn', 'bf', 'ml', 'ne', 'gn', 'cm', 'ga'],
+    countries: ['tn'],
     methods: {
-      bj: ['mtn_money', 'moov_money', 'card'],
-      tg: ['togocom_money', 'moov_money', 'card'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'card'],
-      sn: ['orange_money', 'free_money', 'card'],
+      tn: ['card', 'bank_transfer'],
     },
-    currency: 'XOF',
+    currency: 'TND',
   },
 
-  paydunya: {
-    name: 'PayDunya',
-    priority: 4,
-    countries: ['sn', 'ci', 'bj', 'tg', 'bf', 'ml', 'ne', 'gn'],
-    methods: {
-      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
-      bj: ['mtn_money', 'moov_money', 'card'],
-      tg: ['togocom_money', 'moov_money'],
-    },
-    currency: 'XOF',
-  },
+  // ════════════════════════════════════════════════════════════════════════
+  // AFRIQUE DU SUD
+  // ════════════════════════════════════════════════════════════════════════
 
-  cinetpay: {
-    name: 'CinetPay',
+  yoco: {
+    name: 'Yoco',
     priority: 2,
-    countries: ['bj', 'ci', 'tg', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'ga'],
+    countries: ['za'],
     methods: {
-      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
-      tg: ['togocom_money', 'moov_money', 'card'],
-      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
-      cm: ['mtn_money', 'orange_money', 'card'],
+      za: ['card'],
     },
-    currency: 'XOF',
+    currency: 'ZAR',
   },
 
-  lygos: {
-    name: 'Lygos',
-    priority: 3,
-    countries: ['bj', 'ci', 'tg', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'ga', 'cg'],
-    methods: {
-      bj: ['mtn_money', 'moov_money', 'celtiis_money', 'card'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
-      tg: ['togocom_money', 'moov_money', 'card'],
-      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
-      cm: ['mtn_money', 'orange_money', 'card'],
-      cg: ['mtn_money', 'airtel_money'],
-    },
-    currency: 'XOF',
-  },
+  // ════════════════════════════════════════════════════════════════════════
+  // INTERNATIONAL
+  // ════════════════════════════════════════════════════════════════════════
 
   paypal: {
     name: 'PayPal',
-    priority: 100,
+    priority: 8,
     countries: ['fr', 'be', 'ch', 'lu', 'de', 'es', 'it', 'nl', 'pt', 'gb', 'ie', 'us', 'ca', 'au', 'jp', 'sg', 'hk', 'br', 'mx', 'ma', 'dz', 'tn', 'za', 'ng', 'ke', 'ci', 'sn'],
     methods: {
       fr: ['paypal', 'card'],
       gb: ['paypal', 'card'],
       us: ['paypal', 'card', 'venmo'],
+      ca: ['paypal', 'card'],
+      au: ['paypal', 'card'],
+      de: ['paypal', 'card'],
+      es: ['paypal', 'card'],
+      it: ['paypal', 'card'],
+      nl: ['paypal', 'card'],
       ng: ['paypal', 'card'],
       ke: ['paypal', 'card'],
       ci: ['paypal', 'card'],
@@ -171,80 +370,142 @@ const CAPABILITIES = {
     currency: 'EUR',
   },
 
-  // ── MbiyoPay — corrigé selon doc officielle ──────────────────────────────
-  // Doc : https://dashboard.mbiyo.africa/docs/reference/merchant/payin
-  // Endpoint réel : https://dashboard.mbiyo.africa/api/v1/merchant/payin
-  // 11 pays supportés (mobile money uniquement)
-  mbiyopay: {
-    name: 'MbiyoPay',
-    priority: 4,
-    countries: ['bj', 'bf', 'ci', 'sn', 'tg', 'cg', 'cd', 'cm', 'gn', 'ml', 'gm'],
-    methods: {
-      bj: ['mtn_money', 'moov_money', 'celtiis_money'],
-      bf: ['orange_money', 'moov_money', 'coris'],
-      ci: ['orange_money', 'mtn_money', 'wave_money', 'moov_money'],
-      sn: ['orange_money', 'free_money'],
-      tg: ['moov_money', 'togocom_money'],
-      cg: ['mtn_money'],
-      cd: ['mpesa', 'airtel_money', 'orange_money', 'afrimoney'],
-      cm: ['orange_money', 'moov_money'],
-      gn: ['orange_money', 'mtn_money'],
-      ml: ['orange_money', 'moov_money'],
-      gm: ['afrimoney', 'qmoney', 'wave_money'],
-    },
-    currency: 'XOF',
-  },
-
-  qosic: {
-    name: 'Qosic',
-    priority: 3,
-    countries: ['bj', 'tg', 'ci', 'sn', 'bf', 'ml', 'ne', 'gn', 'cm', 'ga', 'cd', 'cg'],
-    methods: {
-      bj: ['mtn_money', 'moov_money'],
-      tg: ['togocom_money', 'moov_money'],
-      ci: ['mtn_money', 'orange_money', 'moov_money'],
-      sn: ['orange_money', 'free_money'],
-      cm: ['mtn_money', 'orange_money'],
-    },
-    currency: 'XOF',
-  },
-
-  bizao: {
-    name: 'Bizao',
-    priority: 3,
-    countries: ['bj', 'ci', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'cg', 'ga'],
-    methods: {
-      bj: ['mtn_money', 'moov_money'],
-      ci: ['mtn_money', 'orange_money', 'moov_money'],
-      sn: ['orange_money', 'free_money'],
-      cm: ['mtn_money', 'orange_money'],
-    },
-    currency: 'XOF',
-  },
-
-  hub2: {
-    name: 'Hub2',
-    priority: 2,
-    countries: ['bj', 'ci', 'sn', 'cm', 'bf', 'ml', 'gn', 'ne', 'cd', 'cg'],
-    methods: {
-      bj: ['mtn_money', 'moov_money', 'card'],
-      ci: ['mtn_money', 'orange_money', 'moov_money', 'wave_money', 'card'],
-      sn: ['orange_money', 'free_money', 'wave_money', 'card'],
-      cm: ['mtn_money', 'orange_money', 'card'],
-    },
-    currency: 'XOF',
-  },
-
-  chipper: {
-    name: 'Chipper Cash',
+  stripe: {
+    name: 'Stripe',
     priority: 10,
-    countries: ['gh', 'ng', 'ke', 'ug', 'tz', 'rw', 'za', 'us', 'gb'],
+    countries: ['fr', 'be', 'ch', 'lu', 'de', 'es', 'it', 'nl', 'pt', 'gb', 'ie', 'us', 'ca'],
     methods: {
-      gh: ['chipper_wallet', 'mobile_money', 'card'],
-      ng: ['chipper_wallet', 'card', 'bank_transfer'],
-      ke: ['chipper_wallet', 'mpesa', 'card'],
-      us: ['chipper_wallet', 'card', 'ach'],
-      gb: ['chipper_wallet', 'card'],
+      fr: ['card', 'apple_pay', 'google_pay'],
+      gb: ['card', 'apple_pay', 'google_pay', 'bacs'],
+      nl: ['card', 'ideal'],
+      de: ['card', 'giropay', 'sofort'],
+      es: ['card', 'bizum'],
+      us: ['card', 'apple_pay', 'google_pay'],
+      ca: ['card'],
+      be: ['card', 'bancontact'],
+      it: ['card'],
+      pt: ['card'],
+    },
+    currency: 'EUR',
+  },
+
+  mollie: {
+    name: 'Mollie',
+    priority: 7,
+    countries: ['nl', 'be', 'de', 'fr', 'es', 'it', 'pt', 'at', 'ch', 'gb', 'ie', 'pl', 'se', 'dk', 'no', 'fi'],
+    methods: {
+      nl: ['card', 'ideal', 'bancontact'],
+      be: ['card', 'bancontact'],
+      de: ['card', 'giropay', 'sofort'],
+      fr: ['card', 'sofort'],
+      gb: ['card'],
+      es: ['card'],
+      it: ['card'],
+      at: ['card', 'sofort'],
+      ch: ['card', 'sofort'],
+    },
+    currency: 'EUR',
+  },
+
+  adyen: {
+    name: 'Adyen',
+    priority: 9,
+    countries: ['fr', 'gb', 'de', 'nl', 'be', 'es', 'it', 'us', 'ca', 'au', 'sg', 'hk', 'jp', 'br', 'mx', 'ng', 'ke', 'za', 'gh'],
+    methods: {
+      fr: ['card', 'apple_pay', 'google_pay'],
+      gb: ['card', 'apple_pay', 'google_pay'],
+      de: ['card', 'giropay', 'sofort'],
+      nl: ['card', 'ideal'],
+      us: ['card', 'apple_pay', 'google_pay'],
+      ca: ['card'],
+      au: ['card'],
+      ng: ['card'],
+      ke: ['card'],
+      za: ['card'],
+      gh: ['card'],
+    },
+    currency: 'EUR',
+  },
+
+  checkout: {
+    name: 'Checkout.com',
+    priority: 9,
+    countries: ['fr', 'gb', 'de', 'nl', 'be', 'es', 'it', 'us', 'ca', 'au', 'sg', 'hk', 'ae', 'sa', 'ng', 'ke', 'za', 'gh', 'eg'],
+    methods: {
+      fr: ['card', 'apple_pay', 'google_pay'],
+      gb: ['card', 'apple_pay', 'google_pay'],
+      us: ['card', 'apple_pay', 'google_pay'],
+      ae: ['card'],
+      sa: ['card'],
+      ng: ['card'],
+      ke: ['card'],
+      za: ['card'],
+      gh: ['card'],
+      eg: ['card'],
+    },
+    currency: 'USD',
+  },
+
+  braintree: {
+    name: 'Braintree',
+    priority: 9,
+    countries: ['us', 'ca', 'gb', 'au', 'de', 'fr', 'es', 'it', 'nl', 'be', 'at', 'ch', 'se', 'dk', 'no', 'pl', 'ie'],
+    methods: {
+      us: ['card', 'paypal', 'venmo', 'apple_pay', 'google_pay'],
+      gb: ['card', 'paypal'],
+      ca: ['card', 'paypal'],
+      au: ['card', 'paypal'],
+      de: ['card', 'paypal'],
+      fr: ['card', 'paypal'],
+      es: ['card', 'paypal'],
+      it: ['card', 'paypal'],
+      nl: ['card', 'paypal'],
+    },
+    currency: 'USD',
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // INDE
+  // ════════════════════════════════════════════════════════════════════════
+
+  razorpay: {
+    name: 'Razorpay',
+    priority: 2,
+    countries: ['in'],
+    methods: {
+      in: ['card', 'upi', 'bank_transfer', 'mobile_money'],
+    },
+    currency: 'INR',
+  },
+
+  // ════════════════════════════════════════════════════════════════════════
+  // USA / AMÉRIQUE DU NORD
+  // ════════════════════════════════════════════════════════════════════════
+
+  square: {
+    name: 'Square',
+    priority: 7,
+    countries: ['us', 'ca', 'gb', 'au', 'jp', 'ie', 'fr', 'es'],
+    methods: {
+      us: ['card', 'apple_pay', 'google_pay', 'cash_app'],
+      ca: ['card', 'apple_pay', 'google_pay'],
+      gb: ['card', 'apple_pay', 'google_pay'],
+      au: ['card', 'apple_pay', 'google_pay'],
+      jp: ['card'],
+      fr: ['card'],
+      es: ['card'],
+      ie: ['card'],
+    },
+    currency: 'USD',
+  },
+
+  authnet: {
+    name: 'Authorize.net',
+    priority: 8,
+    countries: ['us', 'ca'],
+    methods: {
+      us: ['card', 'bank_transfer', 'apple_pay'],
+      ca: ['card'],
     },
     currency: 'USD',
   },
@@ -253,6 +514,7 @@ const CAPABILITIES = {
 // ─── Noms lisibles des méthodes ───────────────────────────────────────────────
 
 const METHOD_NAMES = {
+  // Mobile Money Afrique
   mtn_money:      'MTN Mobile Money',
   moov_money:     'Moov Money',
   orange_money:   'Orange Money',
@@ -265,25 +527,31 @@ const METHOD_NAMES = {
   afrimoney:      'Afrimoney',
   coris:          'Coris Money',
   qmoney:         'QMoney',
+  wallet:         'Wallet (Coris)',
+  flouci_wallet:  'Flouci Wallet',
+  // Carte & bancaire
   card:           'Carte Bancaire',
   bank_transfer:  'Virement Bancaire',
   ussd:           'USSD',
+  eft:            'EFT',
+  qr:             'QR Code',
+  ach:            'ACH',
+  upi:            'UPI',
+  // Wallets internationaux
   paypal:         'PayPal',
+  venmo:          'Venmo',
   apple_pay:      'Apple Pay',
   google_pay:     'Google Pay',
-  chipper_wallet: 'Chipper Wallet',
-  mobile_money:   'Mobile Money',
-  wallet:         'Wallet (Coris)',
+  cash_app:       'Cash App',
+  // Local Europe
   ideal:          'iDEAL',
   giropay:        'Giropay',
   sofort:         'Sofort',
   bancontact:     'Bancontact',
   bacs:           'BACS',
   bizum:          'Bizum',
-  eft:            'EFT',
-  qr:             'QR Code',
-  ach:            'ACH',
-  venmo:          'Venmo',
+  // Divers
+  mobile_money:   'Mobile Money',
 };
 
 // ─── Fonctions ────────────────────────────────────────────────────────────────
@@ -361,6 +629,7 @@ export async function initPayment({ amount, phone, email, country, method, descr
 
   for (const { id, name } of availableProviders) {
     try {
+      // Note : authnet.js = Authorize.net (renommé pour compatibilité Windows)
       const providerModule = await import(`./${id}.js`);
       const config = providersCache[id];
       const instance = new providerModule.default(config);

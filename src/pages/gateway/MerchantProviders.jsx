@@ -187,24 +187,212 @@ const styles = `
     display:flex; gap:10px; align-items:flex-start;
     margin-bottom:24px;
   }
+
+  .mp-section-title {
+    font-size:11px; font-weight:600; color:#94a3b8;
+    text-transform:uppercase; letter-spacing:.06em;
+    margin:28px 0 12px;
+  }
 `;
 
+// ─── Liste complète des providers ─────────────────────────────────────────────
+
 const PROVIDER_LIST = [
-  { id:'feexpay',     name:'FeexPay',      keys:['FEEXPAY_TOKEN','FEEXPAY_SHOP_ID'],                                website:'https://feexpay.me',        countries:5,   methods:['MTN Mobile Money','Moov Money','CELTIIS Money'],                             desc:"Bénin · Togo · Côte d'Ivoire · Sénégal · Congo" },
-  { id:'stripe',      name:'Stripe',       keys:['STRIPE_SECRET_KEY','STRIPE_PUBLIC_KEY'],                          website:'https://stripe.com',        countries:35,  methods:['Carte Bancaire','Apple Pay','Google Pay','iDEAL','Giropay'],                desc:'Europe · USA · Canada' },
-  { id:'paystack',    name:'Paystack',     keys:['PAYSTACK_SECRET_KEY','PAYSTACK_PUBLIC_KEY'],                      website:'https://paystack.com',      countries:4,   methods:['Carte Bancaire','Virement Bancaire','USSD','QR Code'],                      desc:'Nigeria · Ghana · Kenya · Afrique du Sud' },
-  { id:'flutterwave', name:'Flutterwave',  keys:['FLW_SECRET_KEY','FLW_PUBLIC_KEY'],                                website:'https://flutterwave.com',   countries:15,  methods:['Carte Bancaire','Mobile Money','USSD','Bank Transfer'],                     desc:'15 pays africains' },
-  { id:'kkiapay',     name:'KKiaPay',      keys:['KKIAPAY_PUBLIC_KEY','KKIAPAY_PRIVATE_KEY','KKIAPAY_SECRET_KEY'],  website:'https://kkiapay.me',        countries:9,   methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],    desc:'UEMOA · CEMAC' },
-  { id:'fedapay',     name:'FedaPay',      keys:['FEDAPAY_SECRET_KEY','FEDAPAY_PUBLIC_KEY'],                        website:'https://fedapay.com',       countries:10,  methods:['Mobile Money','Carte Bancaire'],                                            desc:'10 pays Afrique' },
-  { id:'paydunya',    name:'PayDunya',     keys:['PAYDUNYA_MASTER_KEY','PAYDUNYA_PRIVATE_KEY'],                     website:'https://paydunya.com',      countries:8,   methods:['Orange Money','Free Money','Wave','MTN Mobile Money','Carte Bancaire'],    desc:"Sénégal · Côte d'Ivoire · Bénin · Togo" },
-  { id:'cinetpay',    name:'CinetPay',     keys:['CINETPAY_API_KEY','CINETPAY_SITE_ID','CINETPAY_SECRET_KEY'],      website:'https://cinetpay.com',      countries:11,  methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],    desc:'11 pays Afrique' },
-  { id:'lygos',       name:'Lygos',        keys:['LYGOS_API_KEY','LYGOS_SECRET_KEY'],                               website:'https://lygosapp.com',      countries:13,  methods:['Mobile Money','Carte Bancaire'],                                            desc:'13 pays Afrique' },
-  { id:'paypal',      name:'PayPal',       keys:['PAYPAL_CLIENT_ID','PAYPAL_SECRET_KEY'],                           website:'https://paypal.com',        countries:200, methods:['PayPal','Carte Bancaire','Venmo'],                                          desc:'200+ pays dans le monde' },
-  { id:'mbiyopay',    name:'MbiyoPay',     keys:['MBIYOPAY_API_KEY'],                                               website:'https://mbiyopay.com',      countries:11,  methods:['Mobile Money'],                                                            desc:'11 pays Afrique' },
-  { id:'qosic',       name:'Qosic',        keys:['QOSIC_API_KEY','QOSIC_MERCHANT_ID'],                              website:'https://qosic.com',         countries:13,  methods:['Mobile Money'],                                                            desc:'13 pays Afrique' },
-  { id:'bizao',       name:'Bizao',        keys:['BIZAO_API_KEY','BIZAO_MERCHANT_ID'],                              website:'https://bizao.com',         countries:11,  methods:['Mobile Money'],                                                            desc:'11 pays Afrique' },
-  { id:'hub2',        name:'Hub2',         keys:['HUB2_API_KEY'],                                                   website:'https://hub2.io',           countries:10,  methods:['Mobile Money','Carte Bancaire','Wave'],                                     desc:'10 pays Afrique' },
-  { id:'chipper',     name:'Chipper Cash', keys:['CHIPPER_API_KEY'],                                                website:'https://chippercash.com',   countries:9,   methods:['Chipper Wallet','Mobile Money','Carte Bancaire'],                           desc:'Afrique anglophone · USA · UK' },
+
+  // ── Agrégateurs Afrique de l'Ouest ──────────────────────────────────────
+  { id:'feexpay',     name:'FeexPay',       section:'Afrique — Agrégateurs',
+    keys:['FEEXPAY_TOKEN','FEEXPAY_SHOP_ID'],
+    website:'https://feexpay.me',        countries:6,
+    methods:['MTN Mobile Money','Moov Money','CELTIIS Money','Wave','Orange Money'],
+    desc:"Bénin · Togo · Côte d'Ivoire · Sénégal · Burkina · Congo" },
+
+  { id:'kkiapay',     name:'KKiaPay',       section:'Afrique — Agrégateurs',
+    keys:['KKIAPAY_PUBLIC_KEY','KKIAPAY_PRIVATE_KEY','KKIAPAY_SECRET_KEY','KKIAPAY_SANDBOX'],
+    website:'https://kkiapay.me',        countries:11,
+    methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],
+    desc:'11 pays UEMOA · CEMAC' },
+
+  { id:'cinetpay',    name:'CinetPay',      section:'Afrique — Agrégateurs',
+    keys:['CINETPAY_API_KEY','CINETPAY_SITE_ID'],
+    website:'https://cinetpay.com',      countries:11,
+    methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],
+    desc:'11 pays Afrique' },
+
+  { id:'hub2',        name:'Hub2',          section:'Afrique — Agrégateurs',
+    keys:['HUB2_API_KEY','HUB2_MERCHANT_ID','HUB2_ENV'],
+    website:'https://hub2.io',           countries:10,
+    methods:['Mobile Money','Carte Bancaire','Wave'],
+    desc:'10 pays Afrique' },
+
+  { id:'fedapay',     name:'FedaPay',       section:'Afrique — Agrégateurs',
+    keys:['FEDAPAY_SECRET_KEY','FEDAPAY_ENV'],
+    website:'https://fedapay.com',       countries:10,
+    methods:['Mobile Money','Carte Bancaire'],
+    desc:'10 pays Afrique' },
+
+  { id:'qosic',       name:'Qosic',         section:'Afrique — Agrégateurs',
+    keys:['QOSIC_CLIENT_ID','QOSIC_PASSWORD','QOSIC_BASE_URL'],
+    website:'https://qosic.com',         countries:12,
+    methods:['MTN Mobile Money','Moov Money','TOGOCOM Money','Orange Money'],
+    desc:'12 pays Afrique · Bénin · Togo · Côte d\'Ivoire' },
+
+  { id:'lygos',       name:'Lygos',         section:'Afrique — Agrégateurs',
+    keys:['LYGOS_API_KEY','LYGOS_SHOP_NAME'],
+    website:'https://lygosapp.com',      countries:12,
+    methods:['Mobile Money','Carte Bancaire'],
+    desc:'12 pays Afrique' },
+
+  { id:'bizao',       name:'Bizao',         section:'Afrique — Agrégateurs',
+    keys:['BIZAO_TOKEN','BIZAO_ALIAS','BIZAO_TOKEN2'],
+    website:'https://bizao.com',         countries:11,
+    methods:['MTN Mobile Money','Moov Money','Orange Money'],
+    desc:'11 pays Afrique' },
+
+  { id:'paydunya',    name:'PayDunya',      section:'Afrique — Agrégateurs',
+    keys:['PAYDUNYA_MASTER_KEY','PAYDUNYA_PRIVATE_KEY','PAYDUNYA_TOKEN','PAYDUNYA_STORE_NAME','PAYDUNYA_SANDBOX'],
+    website:'https://paydunya.com',      countries:8,
+    methods:['Orange Money','Free Money','Wave','MTN Mobile Money','Carte Bancaire'],
+    desc:"Sénégal · Côte d'Ivoire · Bénin · Togo" },
+
+  { id:'mbiyopay',    name:'MbiyoPay',      section:'Afrique — Agrégateurs',
+    keys:['MBIYOPAY_API_KEY'],
+    website:'https://dashboard.mbiyo.africa', countries:11,
+    methods:['Mobile Money'],
+    desc:'11 pays Afrique · Bénin · Gambie · RDC' },
+
+  // ── Mobile Money direct ──────────────────────────────────────────────────
+  { id:'wave',        name:'Wave',          section:'Afrique — Mobile Money Direct',
+    keys:['WAVE_API_KEY','WAVE_SIGNING_SECRET'],
+    website:'https://wave.com',          countries:6,
+    methods:['Wave'],
+    desc:'Sénégal · Côte d\'Ivoire · Mali · Ouganda · Cameroun' },
+
+  { id:'mtn',         name:'MTN MoMo',      section:'Afrique — Mobile Money Direct',
+    keys:['MTN_API_USER','MTN_API_KEY','MTN_SUBSCRIPTION_KEY','MTN_SANDBOX'],
+    website:'https://momodeveloper.mtn.com', countries:12,
+    methods:['MTN Mobile Money'],
+    desc:'12 pays africains · API directe MTN' },
+
+  { id:'mpesa',       name:'M-Pesa Daraja', section:'Afrique — Mobile Money Direct',
+    keys:['MPESA_CONSUMER_KEY','MPESA_CONSUMER_SECRET','MPESA_SHORTCODE','MPESA_PASSKEY','MPESA_SANDBOX'],
+    website:'https://developer.safaricom.co.ke', countries:3,
+    methods:['M-Pesa'],
+    desc:'Kenya · Tanzanie · Mozambique' },
+
+  { id:'orange',      name:'Orange Money',  section:'Afrique — Mobile Money Direct',
+    keys:['ORANGE_CLIENT_ID','ORANGE_CLIENT_SECRET','ORANGE_MERCHANT_KEY'],
+    website:'https://developer.orange.com', countries:7,
+    methods:['Orange Money'],
+    desc:"Côte d'Ivoire · Sénégal · Mali · Cameroun · Guinée" },
+
+  { id:'airtel',      name:'Airtel Money',  section:'Afrique — Mobile Money Direct',
+    keys:['AIRTEL_CLIENT_ID','AIRTEL_CLIENT_SECRET'],
+    website:'https://developers.airtel.africa', countries:14,
+    methods:['Airtel Money'],
+    desc:'14 pays Afrique de l\'Est & Centrale' },
+
+  // ── Afrique anglophone ───────────────────────────────────────────────────
+  { id:'paystack',    name:'Paystack',      section:'Afrique — Anglophone',
+    keys:['PAYSTACK_SECRET_KEY'],
+    website:'https://paystack.com',      countries:4,
+    methods:['Carte Bancaire','Virement Bancaire','USSD','QR Code','M-Pesa'],
+    desc:'Nigeria · Ghana · Kenya · Afrique du Sud' },
+
+  { id:'flutterwave', name:'Flutterwave',   section:'Afrique — Anglophone',
+    keys:['FLW_SECRET_KEY'],
+    website:'https://flutterwave.com',   countries:11,
+    methods:['Carte Bancaire','Mobile Money','USSD','Bank Transfer'],
+    desc:'11 pays africains' },
+
+  // ── Tunisie ───────────────────────────────────────────────────────────────
+  { id:'flouci',      name:'Flouci',        section:'Afrique — Tunisie',
+    keys:['FLOUCI_APP_TOKEN','FLOUCI_APP_SECRET'],
+    website:'https://developers.flouci.com', countries:1,
+    methods:['Carte Bancaire','Flouci Wallet'],
+    desc:'Tunisie uniquement' },
+
+  { id:'paymee',      name:'Paymee',        section:'Afrique — Tunisie',
+    keys:['PAYMEE_API_KEY'],
+    website:'https://app.paymee.tn',     countries:1,
+    methods:['Carte Bancaire','Virement Bancaire'],
+    desc:'Tunisie uniquement' },
+
+  // ── Afrique du Sud ────────────────────────────────────────────────────────
+  { id:'yoco',        name:'Yoco',          section:'Afrique du Sud',
+    keys:['YOCO_SECRET_KEY'],
+    website:'https://developer.yoco.com', countries:1,
+    methods:['Carte Bancaire','Apple Pay','Google Pay'],
+    desc:'Afrique du Sud · ZAR uniquement' },
+
+  // ── International ─────────────────────────────────────────────────────────
+  { id:'paypal',      name:'PayPal',        section:'International',
+    keys:['PAYPAL_CLIENT_ID','PAYPAL_SECRET_KEY','PAYPAL_SANDBOX'],
+    website:'https://paypal.com',        countries:200,
+    methods:['PayPal','Carte Bancaire','Venmo'],
+    desc:'200+ pays dans le monde' },
+
+  { id:'stripe',      name:'Stripe',        section:'International',
+    keys:['STRIPE_SECRET_KEY'],
+    website:'https://stripe.com',        countries:40,
+    methods:['Carte Bancaire','Apple Pay','Google Pay','iDEAL','Giropay','Bancontact'],
+    desc:'Europe · USA · Canada · Australie' },
+
+  { id:'mollie',      name:'Mollie',        section:'International',
+    keys:['MOLLIE_API_KEY'],
+    website:'https://mollie.com',        countries:15,
+    methods:['Carte Bancaire','iDEAL','Bancontact','Giropay','Sofort'],
+    desc:'Europe — spécialiste paiements locaux' },
+
+  { id:'adyen',       name:'Adyen',         section:'International',
+    keys:['ADYEN_API_KEY','ADYEN_MERCHANT_ACCOUNT','ADYEN_LIVE_PREFIX','ADYEN_SANDBOX'],
+    website:'https://adyen.com',         countries:50,
+    methods:['Carte Bancaire','Apple Pay','Google Pay','iDEAL','Sofort'],
+    desc:'Mondial · Europe · Afrique · Asie' },
+
+  { id:'checkout',    name:'Checkout.com',  section:'International',
+    keys:['CHECKOUT_SECRET_KEY','CHECKOUT_PREFIX','CHECKOUT_SANDBOX'],
+    website:'https://checkout.com',      countries:60,
+    methods:['Carte Bancaire','Apple Pay','Google Pay'],
+    desc:'Mondial · Europe · Moyen-Orient · Afrique' },
+
+  { id:'braintree',   name:'Braintree',     section:'International',
+    keys:['BRAINTREE_MERCHANT_ID','BRAINTREE_PUBLIC_KEY','BRAINTREE_PRIVATE_KEY','BRAINTREE_SANDBOX'],
+    website:'https://braintreepayments.com', countries:20,
+    methods:['Carte Bancaire','PayPal','Venmo','Apple Pay','Google Pay'],
+    desc:'USA · Europe · Australie · Canada' },
+
+  // ── Inde ──────────────────────────────────────────────────────────────────
+  { id:'razorpay',    name:'Razorpay',      section:'Inde',
+    keys:['RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET'],
+    website:'https://razorpay.com',      countries:1,
+    methods:['Carte Bancaire','UPI','Virement Bancaire','Mobile Money'],
+    desc:'Inde uniquement' },
+
+  // ── USA / Canada ──────────────────────────────────────────────────────────
+  { id:'square',      name:'Square',        section:'USA / Canada',
+    keys:['SQUARE_ACCESS_TOKEN','SQUARE_LOCATION_ID','SQUARE_SANDBOX'],
+    website:'https://squareup.com',      countries:8,
+    methods:['Carte Bancaire','Apple Pay','Google Pay','Cash App'],
+    desc:'USA · Canada · UK · Australie · Japon' },
+
+  { id:'authnet',     name:'Authorize.net', section:'USA / Canada',
+    keys:['AUTHORIZENET_API_LOGIN_ID','AUTHORIZENET_TRANSACTION_KEY','AUTHORIZENET_SANDBOX'],
+    website:'https://authorize.net',     countries:2,
+    methods:['Carte Bancaire','Virement Bancaire','Apple Pay'],
+    desc:'USA · Canada' },
+];
+
+// ─── Sections pour affichage groupé ──────────────────────────────────────────
+
+const SECTIONS = [
+  'Afrique — Agrégateurs',
+  'Afrique — Mobile Money Direct',
+  'Afrique — Anglophone',
+  'Afrique — Tunisie',
+  'Afrique du Sud',
+  'International',
+  'Inde',
+  'USA / Canada',
 ];
 
 /* ── Suggest modal ── */
@@ -282,10 +470,7 @@ function SuggestModal({ onClose }) {
               </div>
             ))}
             <button className="mp-btn-save" onClick={handleSubmit} disabled={loading} style={{marginTop:4}}>
-              {loading
-                ? <span className="mp-spinner"/>
-                : <Send size={13}/>
-              }
+              {loading ? <span className="mp-spinner"/> : <Send size={13}/>}
               {loading ? 'Envoi en cours…' : 'Envoyer la suggestion'}
             </button>
           </div>
@@ -514,18 +699,28 @@ export default function MerchantProviders() {
         </p>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))',gap:16}}>
-        {providers.map(provider=>(
-          <ProviderCard
-            key={provider.id}
-            provider={provider}
-            onToggle={handleToggle}
-            onSave={handleSave}
-            onShowMethods={setMethodsModal}
-            saving={saving}
-          />
-        ))}
-      </div>
+      {/* Rendu par section */}
+      {SECTIONS.map(section => {
+        const sectionProviders = providers.filter(p => p.section === section);
+        if (!sectionProviders.length) return null;
+        return (
+          <div key={section}>
+            <div className="mp-section-title">{section}</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))',gap:16}}>
+              {sectionProviders.map(provider=>(
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  onToggle={handleToggle}
+                  onSave={handleSave}
+                  onShowMethods={setMethodsModal}
+                  saving={saving}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
 
       <div className="mp-suggest-banner">
         <div>

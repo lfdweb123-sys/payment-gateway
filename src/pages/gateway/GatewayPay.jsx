@@ -114,6 +114,7 @@ export default function GatewayPay() {
   const [savedPhones, setSavedPhones]           = useState([]);
   const [showSuggestions, setShowSuggestions]   = useState(false);
   const [kkiapayPublicKey, setKkiapayPublicKey] = useState(null);
+  const [countrySearch, setCountrySearch]       = useState(''); // ← recherche pays
 
   /* ─── Charger le script KKiaPay une seule fois ───── */
   useEffect(() => {
@@ -130,12 +131,7 @@ export default function GatewayPay() {
     if (!token) { setFetchingMerchant(false); return; }
 
     getDoc(doc(db,'gateway_settings','config'))
-      .then(snap => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setGatewaySettings(p => ({ ...p, ...data }));
-        }
-      })
+      .then(snap => { if (snap.exists()) setGatewaySettings(p => ({ ...p, ...snap.data() })); })
       .catch(()=>{});
 
     fetch(`/api/gateway/merchant/${token}`)
@@ -144,9 +140,7 @@ export default function GatewayPay() {
         if (data.success) {
           setMerchant(data);
           setCountries(getCountriesForProviders(data.activeProviders || []));
-          if (data.kkiapayPublicKey) {
-            setKkiapayPublicKey(data.kkiapayPublicKey);
-          }
+          if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
         }
       })
       .catch(() => toast.error('Impossible de charger le marchand'))
@@ -168,20 +162,11 @@ export default function GatewayPay() {
     } catch {}
   }, [token]);
 
-  /* ─── Appliquer defaultCountry une fois les données chargées ── */
+  /* ─── Appliquer defaultCountry ── */
   useEffect(() => {
-    if (
-      !fetchingMerchant &&
-      step === 1 &&
-      !country &&
-      gatewaySettings.defaultCountry &&
-      countries.length > 0
-    ) {
-      const defaultCode = gatewaySettings.defaultCountry;
-      const exists = countries.find(c => c.code === defaultCode);
-      if (exists) {
-        handleSelectCountry(defaultCode);
-      }
+    if (!fetchingMerchant && step === 1 && !country && gatewaySettings.defaultCountry && countries.length > 0) {
+      const exists = countries.find(c => c.code === gatewaySettings.defaultCountry);
+      if (exists) handleSelectCountry(gatewaySettings.defaultCountry);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchingMerchant, countries, gatewaySettings.defaultCountry]);
@@ -190,6 +175,7 @@ export default function GatewayPay() {
     setCountry(code);
     setCountryData(getMethodsForCountryWithProviders(code, merchant?.activeProviders || []));
     setPhoneSuffix('');
+    setCountrySearch('');
     setStep(2);
   };
 
@@ -224,7 +210,7 @@ export default function GatewayPay() {
     }, 5000);
   };
 
-  /* ─── Submit standard (non-KKiaPay) ─────────────── */
+  /* ─── Submit standard ────────────────────────────── */
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
@@ -232,31 +218,18 @@ export default function GatewayPay() {
     try {
       const fullPhone = getFullPhoneNumber();
       const phoneCheck = validatePhone(fullPhone, country, selectedMethod?.id);
-      if (!phoneCheck.valid) {
-        toast.error(phoneCheck.error);
-        setLoading(false);
-        return;
-      }
+      if (!phoneCheck.valid) { toast.error(phoneCheck.error); setLoading(false); return; }
       const res = await fetch('/api/gateway/pay', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-api-key':token },
-        body: JSON.stringify({
-          amount: parseFloat(amount),
-          country,
-          method: selectedMethod?.id,
-          phone: fullPhone,
-          description,
-        }),
+        body: JSON.stringify({ amount: parseFloat(amount), country, method: selectedMethod?.id, phone: fullPhone, description }),
       });
       const data = await res.json();
       if (data.success) {
         setLoading(false);
         savePhoneNumber(fullPhone);
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          pollStatus(data.transactionId);
-        }
+        if (data.url) window.location.href = data.url;
+        else pollStatus(data.transactionId);
       } else {
         toast.error(data.error || 'Une erreur est survenue');
         setLoading(false);
@@ -267,17 +240,10 @@ export default function GatewayPay() {
     }
   };
 
-  /* ─── Ouvrir le widget KKiaPay ───────────────────── */
+  /* ─── KKiaPay widget ─────────────────────────────── */
   const handleKkiapayPayment = () => {
-    if (!window.openKkiapayWidget) {
-      toast.error('Widget KKiaPay non chargé, réessayez dans quelques secondes');
-      return;
-    }
-
-    if (window.removeKkiapayListener) {
-      window.removeKkiapayListener('success', () => {});
-      window.removeKkiapayListener('failed', () => {});
-    }
+    if (!window.openKkiapayWidget) { toast.error('Widget KKiaPay non chargé, réessayez dans quelques secondes'); return; }
+    if (window.removeKkiapayListener) { window.removeKkiapayListener('success', () => {}); window.removeKkiapayListener('failed', () => {}); }
 
     window.addSuccessListener(async (response) => {
       setStatus('pending');
@@ -289,16 +255,11 @@ export default function GatewayPay() {
           body: JSON.stringify({ transactionId: response.transactionId }),
         });
         const data = await res.json();
-        if (data.success) setStatus('completed');
-        else setStatus('failed');
-      } catch {
-        setStatus('failed');
-      }
+        setStatus(data.success ? 'completed' : 'failed');
+      } catch { setStatus('failed'); }
     });
 
-    window.addFailedListener(() => {
-      setStatus('failed');
-    });
+    window.addFailedListener(() => setStatus('failed'));
 
     window.openKkiapayWidget({
       amount:   parseFloat(amount),
@@ -320,76 +281,35 @@ export default function GatewayPay() {
   /* ─── Computed ───────────────────────────────────── */
   const currency     = countryData?.currency || gatewaySettings.defaultCurrency;
   const primaryColor = gatewaySettings.primaryColor || '#C8931A';
-
-  /* ─── Dériver les variables de thème selon paymentDesign ── */
-  const design = gatewaySettings.paymentDesign || 'modern';
+  const design       = gatewaySettings.paymentDesign || 'modern';
 
   const themeVars = (() => {
     switch (design) {
-      case 'classic':
-        return {
-          pageBackground: '#F4F6FA',
-          cardBackground: '#FFFFFF',
-          cardBorder: '1px solid #DDE3EE',
-          cardRadius: '16px',
-          rightBackground: '#F0F3FA',
-          inputBackground: '#F8FAFC',
-          inputBorder: '1.5px solid #DDE3EE',
-          countryBtnBackground: '#F8FAFC',
-          countryBtnBorder: '1.5px solid #DDE3EE',
-          methodBtnBackground: '#F8FAFC',
-          methodBtnBorder: '1.5px solid #DDE3EE',
-          summaryBackground: '#EEF2FA',
-          totalBackground: '#E8EDF8',
-          textPrimary: '#1A2340',
-          textSecondary: '#6B7A9F',
-          textMuted: '#A0AACC',
-          fontFamily: "'DM Sans', sans-serif",
-          shadow: '0 2px 4px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08)',
-        };
-      case 'bold':
-        return {
-          pageBackground: '#0F0F0F',
-          cardBackground: '#1A1A1A',
-          cardBorder: '1px solid #2A2A2A',
-          cardRadius: '20px',
-          rightBackground: '#141414',
-          inputBackground: '#242424',
-          inputBorder: '1.5px solid #333',
-          countryBtnBackground: '#222',
-          countryBtnBorder: '1.5px solid #2A2A2A',
-          methodBtnBackground: '#222',
-          methodBtnBorder: '1.5px solid #2A2A2A',
-          summaryBackground: '#222',
-          totalBackground: '#2A2A2A',
-          textPrimary: '#FFFFFF',
-          textSecondary: '#999',
-          textMuted: '#555',
-          fontFamily: "'DM Sans', sans-serif",
-          shadow: '0 4px 6px rgba(0,0,0,.3), 0 20px 60px rgba(0,0,0,.5)',
-        };
+      case 'classic': return {
+        pageBackground:'#F4F6FA', cardBackground:'#FFFFFF', cardBorder:'1px solid #DDE3EE',
+        cardRadius:'16px', rightBackground:'#F0F3FA', inputBackground:'#F8FAFC',
+        inputBorder:'1.5px solid #DDE3EE', countryBtnBackground:'#F8FAFC', countryBtnBorder:'1.5px solid #DDE3EE',
+        methodBtnBackground:'#F8FAFC', methodBtnBorder:'1.5px solid #DDE3EE', summaryBackground:'#EEF2FA',
+        totalBackground:'#E8EDF8', textPrimary:'#1A2340', textSecondary:'#6B7A9F', textMuted:'#A0AACC',
+        fontFamily:"'DM Sans', sans-serif", shadow:'0 2px 4px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.08)',
+      };
+      case 'bold': return {
+        pageBackground:'#0F0F0F', cardBackground:'#1A1A1A', cardBorder:'1px solid #2A2A2A',
+        cardRadius:'20px', rightBackground:'#141414', inputBackground:'#242424',
+        inputBorder:'1.5px solid #333', countryBtnBackground:'#222', countryBtnBorder:'1.5px solid #2A2A2A',
+        methodBtnBackground:'#222', methodBtnBorder:'1.5px solid #2A2A2A', summaryBackground:'#222',
+        totalBackground:'#2A2A2A', textPrimary:'#FFFFFF', textSecondary:'#999', textMuted:'#555',
+        fontFamily:"'DM Sans', sans-serif", shadow:'0 4px 6px rgba(0,0,0,.3), 0 20px 60px rgba(0,0,0,.5)',
+      };
       case 'modern':
-      default:
-        return {
-          pageBackground: '#F0EBE3',
-          cardBackground: '#FFFFFF',
-          cardBorder: 'none',
-          cardRadius: '24px',
-          rightBackground: '#FAFAF8',
-          inputBackground: '#FAFAF8',
-          inputBorder: '1.5px solid #EDE9E3',
-          countryBtnBackground: '#FAFAF8',
-          countryBtnBorder: '1.5px solid #EDE9E3',
-          methodBtnBackground: '#FAFAF8',
-          methodBtnBorder: '1.5px solid #EDE9E3',
-          summaryBackground: '#FAFAF8',
-          totalBackground: '#F7F5F2',
-          textPrimary: '#111111',
-          textSecondary: '#AAA',
-          textMuted: '#CCC',
-          fontFamily: "'DM Sans', sans-serif",
-          shadow: '0 4px 6px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.10), 0 40px 80px rgba(0,0,0,.08)',
-        };
+      default: return {
+        pageBackground:'#F0EBE3', cardBackground:'#FFFFFF', cardBorder:'none',
+        cardRadius:'24px', rightBackground:'#FAFAF8', inputBackground:'#FAFAF8',
+        inputBorder:'1.5px solid #EDE9E3', countryBtnBackground:'#FAFAF8', countryBtnBorder:'1.5px solid #EDE9E3',
+        methodBtnBackground:'#FAFAF8', methodBtnBorder:'1.5px solid #EDE9E3', summaryBackground:'#FAFAF8',
+        totalBackground:'#F7F5F2', textPrimary:'#111111', textSecondary:'#AAA', textMuted:'#CCC',
+        fontFamily:"'DM Sans', sans-serif", shadow:'0 4px 6px rgba(0,0,0,.04), 0 12px 40px rgba(0,0,0,.10), 0 40px 80px rgba(0,0,0,.08)',
+      };
     }
   })();
 
@@ -401,9 +321,15 @@ export default function GatewayPay() {
   const btnTextColor = hexL(primaryColor) > 0.45 ? '#1a0f00' : '#fff';
   const filteredSuggestions = savedPhones.filter(p => p.country === country);
 
+  // Pays filtrés par la recherche
+  const filteredCountries = countries.filter(c =>
+    c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    c.code.toLowerCase().includes(countrySearch.toLowerCase())
+  );
+
   const isKkiapayMethod = selectedMethod?.provider === 'kkiapay' && kkiapayPublicKey;
 
-  /* ─── CSS dynamique selon thème ─────────────────── */
+  /* ─── CSS dynamique ─────────────────────────────── */
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
     @keyframes gw-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -413,66 +339,54 @@ export default function GatewayPay() {
     *{box-sizing:border-box;}
 
     .gw-page{
-      min-height:100vh;
-      background:${themeVars.pageBackground};
+      min-height:100vh;background:${themeVars.pageBackground};
       display:flex;align-items:center;justify-content:center;
-      padding:24px 16px;
-      font-family:${themeVars.fontFamily};
+      padding:24px 16px;font-family:${themeVars.fontFamily};
     }
     .gw-wrapper{
-      display:grid;
-      grid-template-columns:1fr 340px;
-      gap:0;
-      width:100%;
-      max-width:860px;
+      display:grid;grid-template-columns:1fr 340px;gap:0;
+      width:100%;max-width:860px;
       background:${themeVars.cardBackground};
-      border-radius:${themeVars.cardRadius};
-      overflow:hidden;
-      border:${themeVars.cardBorder};
-      box-shadow:${themeVars.shadow};
+      border-radius:${themeVars.cardRadius};overflow:hidden;
+      border:${themeVars.cardBorder};box-shadow:${themeVars.shadow};
       animation:gw-scaleIn .4s cubic-bezier(.34,1.3,.64,1) both;
     }
     .gw-left{
       padding:36px 40px;
-      border-right:1px solid ${design === 'bold' ? '#2A2A2A' : design === 'classic' ? '#DDE3EE' : '#F3F0EC'};
-      min-height:500px;
-      display:flex;flex-direction:column;
+      border-right:1px solid ${design==='bold'?'#2A2A2A':design==='classic'?'#DDE3EE':'#F3F0EC'};
+      min-height:500px;display:flex;flex-direction:column;
     }
     .gw-right{
-      background:${themeVars.rightBackground};
-      padding:36px 28px;
+      background:${themeVars.rightBackground};padding:36px 28px;
       display:flex;flex-direction:column;
-      border-left:${design === 'classic' ? '1px solid #DDE3EE' : 'none'};
+      border-left:${design==='classic'?'1px solid #DDE3EE':'none'};
     }
-    .gw-right-header{
-      display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;
-    }
+    .gw-right-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
     .gw-logo-row{display:flex;align-items:center;gap:8px;}
     .gw-logo-icon{
       width:32px;height:32px;border-radius:9px;
-      background:${design === 'bold' ? `linear-gradient(135deg,${primaryColor},${primaryColor}cc)` : 'linear-gradient(135deg,#1C0F00,#2E1A00)'};
+      background:${design==='bold'?`linear-gradient(135deg,${primaryColor},${primaryColor}cc)`:'linear-gradient(135deg,#1C0F00,#2E1A00)'};
       display:flex;align-items:center;justify-content:center;
     }
     .gw-company{font-size:13px;font-weight:700;color:${themeVars.textPrimary};}
     .gw-amount-card{
       background:${themeVars.cardBackground};
-      border:1px solid ${design === 'bold' ? '#2A2A2A' : design === 'classic' ? '#DDE3EE' : '#EDE9E3'};
-      border-radius:16px;
-      padding:20px;text-align:center;margin-bottom:20px;
+      border:1px solid ${design==='bold'?'#2A2A2A':design==='classic'?'#DDE3EE':'#EDE9E3'};
+      border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;
     }
     .gw-amount-label{font-size:10px;font-weight:700;color:${themeVars.textMuted};text-transform:uppercase;letter-spacing:.12em;margin-bottom:8px;}
     .gw-amount-val{font-size:38px;font-weight:900;color:${themeVars.textPrimary};letter-spacing:-.03em;line-height:1;}
     .gw-amount-curr{font-size:14px;font-weight:500;color:${themeVars.textSecondary};margin-left:6px;}
     .gw-amount-desc{font-size:12px;color:${themeVars.textSecondary};margin-top:8px;}
-    .gw-divider{height:1px;background:${design === 'bold' ? '#2A2A2A' : design === 'classic' ? '#DDE3EE' : '#F0EDE8'};margin:16px 0;}
+    .gw-divider{height:1px;background:${design==='bold'?'#2A2A2A':design==='classic'?'#DDE3EE':'#F0EDE8'};margin:16px 0;}
     .gw-summary-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
     .gw-summary-key{font-size:12px;color:${themeVars.textSecondary};font-weight:500;}
-    .gw-summary-val{font-size:12px;font-weight:700;color:${design === 'bold' ? '#CCC' : '#555'};}
+    .gw-summary-val{font-size:12px;font-weight:700;color:${design==='bold'?'#CCC':'#555'};}
     .gw-total-row{
       display:flex;justify-content:space-between;align-items:center;
       padding:14px 16px;background:${themeVars.totalBackground};border-radius:12px;margin-top:8px;
     }
-    .gw-total-key{font-size:12px;font-weight:700;color:${design === 'bold' ? '#999' : '#555'};}
+    .gw-total-key{font-size:12px;font-weight:700;color:${design==='bold'?'#999':'#555'};}
     .gw-total-val{font-size:18px;font-weight:900;color:${themeVars.textPrimary};letter-spacing:-.02em;}
     .gw-secure-row{
       display:flex;align-items:center;justify-content:center;gap:6px;
@@ -481,53 +395,75 @@ export default function GatewayPay() {
     }
     .gw-section-lbl{
       font-size:10px;font-weight:800;color:${themeVars.textMuted};
-      text-transform:uppercase;letter-spacing:.12em;
-      margin-bottom:14px;display:block;
+      text-transform:uppercase;letter-spacing:.12em;margin-bottom:14px;display:block;
     }
+
+    /* ── Search input ── */
+    .gw-search-wrap{position:relative;margin-bottom:14px;}
+    .gw-search-icon{
+      position:absolute;left:12px;top:50%;transform:translateY(-50%);
+      pointer-events:none;color:${themeVars.textMuted};
+    }
+    .gw-search-input{
+      width:100%;padding:11px 14px 11px 36px;
+      background:${themeVars.inputBackground};border:${themeVars.inputBorder};
+      border-radius:12px;font-size:13px;font-family:${themeVars.fontFamily};
+      color:${themeVars.textPrimary};outline:none;transition:all .2s;
+    }
+    .gw-search-input::placeholder{color:${themeVars.textMuted};}
+    .gw-search-input:focus{
+      border-color:${primaryColor};
+      background:${design==='bold'?'#2A2A2A':'#fff'};
+      box-shadow:0 0 0 3px ${primaryColor}18;
+    }
+    .gw-search-clear{
+      position:absolute;right:10px;top:50%;transform:translateY(-50%);
+      background:none;border:none;cursor:pointer;
+      color:${themeVars.textMuted};padding:2px;
+      display:flex;align-items:center;
+      border-radius:4px;transition:color .15s;
+    }
+    .gw-search-clear:hover{color:${themeVars.textPrimary};}
+
     .gw-country-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
     .gw-country-btn{
       padding:14px 8px;border-radius:14px;
       background:${themeVars.countryBtnBackground};border:${themeVars.countryBtnBorder};
-      cursor:pointer;text-align:center;
-      transition:all .2s;font-family:inherit;
+      cursor:pointer;text-align:center;transition:all .2s;font-family:inherit;
     }
     .gw-country-btn:hover{
-      background:${design === 'bold' ? '#2A2A2A' : '#FFF8EE'};
-      border-color:${primaryColor};
-      transform:translateY(-2px);
-      box-shadow:0 6px 20px ${primaryColor}22;
+      background:${design==='bold'?'#2A2A2A':'#FFF8EE'};border-color:${primaryColor};
+      transform:translateY(-2px);box-shadow:0 6px 20px ${primaryColor}22;
     }
     .gw-flag{font-size:24px;display:block;margin-bottom:6px;line-height:1;}
     .gw-cname{font-size:11px;font-weight:700;color:${themeVars.textPrimary};}
     .gw-ccurr{font-size:10px;color:${themeVars.textSecondary};margin-top:1px;}
+    .gw-no-result{
+      text-align:center;padding:20px 0;
+      font-size:13px;color:${themeVars.textMuted};
+    }
     .gw-method-btn{
       width:100%;padding:14px 16px;border-radius:14px;
       background:${themeVars.methodBtnBackground};border:${themeVars.methodBtnBorder};
       cursor:pointer;display:flex;align-items:center;gap:12px;
-      transition:all .2s;font-family:inherit;text-align:left;
-      margin-bottom:8px;
+      transition:all .2s;font-family:inherit;text-align:left;margin-bottom:8px;
     }
     .gw-method-btn:hover{
-      background:${design === 'bold' ? '#2A2A2A' : '#FFF8EE'};border-color:${primaryColor};transform:translateX(2px);
+      background:${design==='bold'?'#2A2A2A':'#FFF8EE'};border-color:${primaryColor};transform:translateX(2px);
     }
     .gw-method-icon{
       width:40px;height:40px;border-radius:12px;flex-shrink:0;
-      background:${primaryColor}18;
-      border:1px solid ${primaryColor}30;
-      display:flex;align-items:center;justify-content:center;
-      color:${primaryColor};
+      background:${primaryColor}18;border:1px solid ${primaryColor}30;
+      display:flex;align-items:center;justify-content:center;color:${primaryColor};
     }
     .gw-method-name{flex:1;font-size:13px;font-weight:700;color:${themeVars.textPrimary};}
     .gw-pill{
-      display:flex;align-items:center;gap:10px;
-      padding:12px 14px;border-radius:14px;
-      background:${primaryColor}0d;border:1.5px solid ${primaryColor}22;
-      margin-bottom:22px;
+      display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
+      background:${primaryColor}0d;border:1.5px solid ${primaryColor}22;margin-bottom:22px;
     }
     .gw-pill-icon{
       width:38px;height:38px;border-radius:11px;flex-shrink:0;
-      background:${primaryColor};
-      display:flex;align-items:center;justify-content:center;color:#fff;
+      background:${primaryColor};display:flex;align-items:center;justify-content:center;color:#fff;
     }
     .gw-pill-name{font-size:13px;font-weight:700;color:${themeVars.textPrimary};}
     .gw-pill-sub{font-size:11px;color:${themeVars.textSecondary};margin-top:1px;}
@@ -538,21 +474,19 @@ export default function GatewayPay() {
       font-size:15px;font-family:'DM Mono',monospace;color:${themeVars.textPrimary};
       outline:none;transition:all .2s;
     }
-    .gw-input:focus{border-color:${primaryColor};background:${design === 'bold' ? '#2A2A2A' : '#fff'};box-shadow:0 0 0 3px ${primaryColor}18;}
+    .gw-input:focus{border-color:${primaryColor};background:${design==='bold'?'#2A2A2A':'#fff'};box-shadow:0 0 0 3px ${primaryColor}18;}
     .gw-suggestion{
       width:100%;text-align:left;padding:9px 12px;
-      background:${themeVars.inputBackground};border:1px solid ${design === 'bold' ? '#333' : '#EDE9E3'};border-radius:10px;
+      background:${themeVars.inputBackground};border:1px solid ${design==='bold'?'#333':'#EDE9E3'};border-radius:10px;
       margin-bottom:4px;cursor:pointer;display:flex;align-items:center;gap:8px;
       transition:background .15s;font-family:inherit;
     }
     .gw-suggestion:hover{background:${primaryColor}0d;}
     .gw-submit{
       width:100%;padding:16px;border-radius:14px;border:none;cursor:pointer;
-      background:${primaryColor};
-      color:${btnTextColor};font-size:15px;font-weight:800;
+      background:${primaryColor};color:${btnTextColor};font-size:15px;font-weight:800;
       display:flex;align-items:center;justify-content:center;gap:8px;
-      font-family:'DM Sans',sans-serif;
-      box-shadow:0 4px 20px ${primaryColor}44;
+      font-family:'DM Sans',sans-serif;box-shadow:0 4px 20px ${primaryColor}44;
       transition:all .25s;margin-top:20px;
     }
     .gw-submit:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 36px ${primaryColor}66;}
@@ -566,60 +500,31 @@ export default function GatewayPay() {
     .gw-back:hover{color:${primaryColor};}
     .gw-fade{animation:gw-fadeUp .3s ease both;}
     .gw-spin{animation:gw-spin .8s linear infinite;}
-
-    /* ── KKiaPay info box ── */
     .gw-kkiapay-info{
-      background:${design === 'bold' ? '#1E1E2E' : '#F8F5FF'};
-      border:1.5px solid ${design === 'bold' ? '#312B55' : '#E9E0FF'};
-      border-radius:14px;
-      padding:16px 18px;margin-bottom:20px;
+      background:${design==='bold'?'#1E1E2E':'#F8F5FF'};
+      border:1.5px solid ${design==='bold'?'#312B55':'#E9E0FF'};
+      border-radius:14px;padding:16px 18px;margin-bottom:20px;
       font-size:13px;color:${themeVars.textSecondary};line-height:1.6;
     }
-    .gw-kkiapay-logo{
-      display:flex;align-items:center;gap:8px;
-      margin-bottom:10px;font-weight:700;font-size:13px;color:${themeVars.textPrimary};
-    }
-    .gw-kkiapay-dot{
-      width:10px;height:10px;border-radius:50%;
-      background:linear-gradient(135deg,#e03131,#c92a2a);
-      flex-shrink:0;
-    }
-
-    /* ── STATUS PAGES ── */
+    .gw-kkiapay-logo{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:700;font-size:13px;color:${themeVars.textPrimary};}
+    .gw-kkiapay-dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#e03131,#c92a2a);flex-shrink:0;}
     .gw-status-page{
       min-height:100vh;background:${themeVars.pageBackground};
       display:flex;align-items:center;justify-content:center;padding:24px;
       font-family:${themeVars.fontFamily};
     }
     .gw-status-card{
-      width:100%;max-width:420px;
-      background:${themeVars.cardBackground};
-      border:${themeVars.cardBorder};
-      border-radius:${themeVars.cardRadius};
-      padding:48px 36px;text-align:center;
-      box-shadow:${themeVars.shadow};
+      width:100%;max-width:420px;background:${themeVars.cardBackground};
+      border:${themeVars.cardBorder};border-radius:${themeVars.cardRadius};
+      padding:48px 36px;text-align:center;box-shadow:${themeVars.shadow};
       animation:gw-scaleIn .4s cubic-bezier(.34,1.3,.64,1) both;
     }
     .gw-status-card h2{color:${themeVars.textPrimary};}
-    .gw-status-icon{
-      width:72px;height:72px;border-radius:50%;
-      display:flex;align-items:center;justify-content:center;
-      margin:0 auto 20px;
-    }
-    .gw-status-amount{
-      background:${themeVars.totalBackground};border-radius:14px;padding:18px;margin-top:20px;
-    }
-
-    /* ── MOBILE ── */
+    .gw-status-icon{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;}
+    .gw-status-amount{background:${themeVars.totalBackground};border-radius:14px;padding:18px;margin-top:20px;}
     @media(max-width:680px){
       .gw-page{padding:0;align-items:flex-end;}
-      .gw-wrapper{
-        grid-template-columns:1fr;
-        border-radius:24px 24px 0 0;
-        max-width:100%;
-        max-height:92vh;
-        overflow-y:auto;
-      }
+      .gw-wrapper{grid-template-columns:1fr;border-radius:24px 24px 0 0;max-width:100%;max-height:92vh;overflow-y:auto;}
       .gw-right{display:none;}
       .gw-left{padding:28px 22px 32px;min-height:auto;}
     }
@@ -636,11 +541,7 @@ export default function GatewayPay() {
         <div className="gw-logo-row">
           {gatewaySettings.logo
             ? <img src={gatewaySettings.logo} alt="" style={{height:28,objectFit:'contain'}}/>
-            : (
-              <div className="gw-logo-icon">
-                <Shield size={14} style={{color:'#fff'}}/>
-              </div>
-            )
+            : <div className="gw-logo-icon"><Shield size={14} style={{color:'#fff'}}/></div>
           }
           {(gatewaySettings.companyName || merchant?.name) && (
             <span className="gw-company">{gatewaySettings.companyName || merchant?.name}</span>
@@ -650,7 +551,6 @@ export default function GatewayPay() {
           <Shield size={9}/> Sécurisé
         </div>
       </div>
-
       <div className="gw-amount-card">
         <p className="gw-amount-label">Total à payer</p>
         <div>
@@ -659,7 +559,6 @@ export default function GatewayPay() {
         </div>
         {description && <p className="gw-amount-desc">{description}</p>}
       </div>
-
       <div>
         {country && countryData && (
           <div className="gw-summary-row">
@@ -678,26 +577,20 @@ export default function GatewayPay() {
           <span className="gw-summary-val">{currency}</span>
         </div>
       </div>
-
       <div className="gw-divider"/>
-
       <div className="gw-total-row">
         <span className="gw-total-key">Total</span>
         <span className="gw-total-val" style={{color:primaryColor}}>
           {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}
         </span>
       </div>
-
-      <div className="gw-secure-row">
-        <Lock size={9}/> Chiffrement SSL · PCI DSS
-      </div>
+      <div className="gw-secure-row"><Lock size={9}/> Chiffrement SSL · PCI DSS</div>
     </div>
   );
 
   /* ── STATUS: PENDING ── */
   if (status === 'pending') return (
-    <div className="gw-status-page">
-      <style>{css}</style>
+    <div className="gw-status-page"><style>{css}</style>
       <div className="gw-status-card">
         <div className="gw-status-icon" style={{background:`${primaryColor}18`,border:`2px solid ${primaryColor}33`}}>
           <div style={{width:32,height:32,borderRadius:'50%',border:`3px solid ${primaryColor}33`,borderTopColor:primaryColor}} className="gw-spin"/>
@@ -719,8 +612,7 @@ export default function GatewayPay() {
 
   /* ── STATUS: COMPLETED ── */
   if (status === 'completed') return (
-    <div className="gw-status-page">
-      <style>{css}</style>
+    <div className="gw-status-page"><style>{css}</style>
       <div className="gw-status-card">
         <div className="gw-status-icon" style={{background:'#ECFDF5',border:'2px solid rgba(16,185,129,.25)'}}>
           <CheckCircle2 size={32} style={{color:'#10B981'}}/>
@@ -741,8 +633,7 @@ export default function GatewayPay() {
 
   /* ── STATUS: FAILED ── */
   if (status === 'failed') return (
-    <div className="gw-status-page">
-      <style>{css}</style>
+    <div className="gw-status-page"><style>{css}</style>
       <div className="gw-status-card">
         <div className="gw-status-icon" style={{background:'#FEF2F2',border:'2px solid rgba(239,68,68,.2)'}}>
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
@@ -751,9 +642,7 @@ export default function GatewayPay() {
         </div>
         <h2 style={{fontSize:22,fontWeight:900,marginBottom:8,letterSpacing:'-.02em'}}>Paiement échoué</h2>
         <p style={{fontSize:13,color:themeVars.textSecondary,marginBottom:28}}>La transaction n'a pas pu être finalisée.</p>
-        <button onClick={() => { setStatus(null); setStep(3); }} className="gw-submit" style={{marginTop:0}}>
-          Réessayer
-        </button>
+        <button onClick={() => { setStatus(null); setStep(3); }} className="gw-submit" style={{marginTop:0}}>Réessayer</button>
       </div>
     </div>
   );
@@ -765,8 +654,6 @@ export default function GatewayPay() {
       <style>{css}</style>
 
       <div className="gw-wrapper">
-
-        {/* ── LEFT — Form ── */}
         <div className="gw-left">
 
           {/* Header */}
@@ -774,7 +661,7 @@ export default function GatewayPay() {
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               {gatewaySettings.logo
                 ? <img src={gatewaySettings.logo} alt="" style={{height:24,objectFit:'contain'}}/>
-                : <div style={{width:28,height:28,borderRadius:8,background: design === 'bold' ? primaryColor : '#1C0F00',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={13} style={{color:'#fff'}}/></div>
+                : <div style={{width:28,height:28,borderRadius:8,background:design==='bold'?primaryColor:'#1C0F00',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={13} style={{color:'#fff'}}/></div>
               }
               {(gatewaySettings.companyName || merchant?.name) && (
                 <span style={{fontSize:13,fontWeight:700,color:themeVars.textPrimary}}>{gatewaySettings.companyName || merchant?.name}</span>
@@ -797,19 +684,47 @@ export default function GatewayPay() {
           {step === 1 && (
             <div className="gw-fade" style={{flex:1}}>
               <span className="gw-section-lbl">Sélectionnez votre pays</span>
+
+              {/* ── Barre de recherche ── */}
+              <div className="gw-search-wrap">
+                <svg className="gw-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  type="text"
+                  className="gw-search-input"
+                  value={countrySearch}
+                  onChange={e => setCountrySearch(e.target.value)}
+                  placeholder="Rechercher un pays…"
+                  autoComplete="off"
+                />
+                {countrySearch && (
+                  <button className="gw-search-clear" onClick={() => setCountrySearch('')}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+
               {fetchingMerchant ? (
                 <div style={{display:'flex',justifyContent:'center',padding:'28px 0'}}>
-                  <div style={{width:28,height:28,borderRadius:'50%',border:`3px solid ${design === 'bold' ? '#333' : '#EDE9E3'}`,borderTopColor:primaryColor}} className="gw-spin"/>
+                  <div style={{width:28,height:28,borderRadius:'50%',border:`3px solid ${design==='bold'?'#333':'#EDE9E3'}`,borderTopColor:primaryColor}} className="gw-spin"/>
                 </div>
-              ) : countries.length > 0 ? (
+              ) : filteredCountries.length > 0 ? (
                 <div className="gw-country-grid">
-                  {countries.map(c => (
+                  {filteredCountries.map(c => (
                     <button key={c.code} onClick={() => handleSelectCountry(c.code)} className="gw-country-btn">
                       <span className="gw-flag">{c.flag}</span>
                       <div className="gw-cname">{c.name}</div>
                       <div className="gw-ccurr">{c.currency}</div>
                     </button>
                   ))}
+                </div>
+              ) : countrySearch ? (
+                <div className="gw-no-result">
+                  Aucun pays trouvé pour « {countrySearch} »
                 </div>
               ) : (
                 <div style={{textAlign:'center',padding:'28px 0',color:themeVars.textMuted}}>
@@ -852,7 +767,6 @@ export default function GatewayPay() {
               <button className="gw-back" onClick={() => { setStep(2); setSelectedMethod(null); setPhoneSuffix(''); }}>
                 <ArrowLeft size={13}/> Changer de méthode
               </button>
-
               <div className="gw-pill">
                 <div className="gw-pill-icon">{getMethodIcon(selectedMethod.id, 18)}</div>
                 <div>
@@ -861,7 +775,6 @@ export default function GatewayPay() {
                 </div>
               </div>
 
-              {/* ── KKiaPay : widget direct ── */}
               {isKkiapayMethod ? (
                 <div>
                   <div className="gw-kkiapay-info">
@@ -871,22 +784,14 @@ export default function GatewayPay() {
                     </div>
                     <p style={{margin:0,fontSize:12,color:themeVars.textSecondary}}>
                       Une fenêtre sécurisée KKiaPay s'ouvrira pour finaliser votre paiement.
-                      Vous pourrez choisir votre méthode de paiement (Mobile Money, carte bancaire, etc.).
                     </p>
                   </div>
-
-                  <button
-                    className="gw-submit"
-                    style={{marginTop:0}}
-                    onClick={handleKkiapayPayment}
-                  >
+                  <button className="gw-submit" style={{marginTop:0}} onClick={handleKkiapayPayment}>
                     <Zap size={16}/>
                     Payer {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}
                   </button>
                 </div>
-
               ) : (
-                /* ── Autres providers : formulaire téléphone ── */
                 <form onSubmit={handleSubmit}>
                   <div style={{marginBottom:6}}>
                     <label className="gw-input-label">Numéro de téléphone</label>
@@ -933,10 +838,7 @@ export default function GatewayPay() {
                         Traitement en cours…
                       </>
                     ) : (
-                      <>
-                        <Zap size={16}/>
-                        Payer {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}
-                      </>
+                      <><Zap size={16}/> Payer {parseFloat(amount||0).toLocaleString('fr-FR')} {currency}</>
                     )}
                   </button>
                 </form>
@@ -949,7 +851,6 @@ export default function GatewayPay() {
           )}
         </div>
 
-        {/* ── RIGHT — Summary ── */}
         <SummaryPanel/>
       </div>
     </div>
