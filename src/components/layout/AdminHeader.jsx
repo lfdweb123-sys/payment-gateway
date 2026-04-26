@@ -17,7 +17,7 @@ export default function AdminHeader() {
   const photoURL = user?.photoURL;
 
   return (
-    <header className="h-16 bg-gray-900 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
+    <header className="h-16 bg-gray-900 flex items-center justify-between px-4 sm:px-6">
       <div className="flex items-center gap-4">
         <Link to="/admin" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
