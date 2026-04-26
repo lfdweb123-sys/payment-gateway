@@ -49,23 +49,44 @@ export default function AdminMerchants() {
   const loadMerchants = async () => {
     try {
       const snap = await getDocs(collection(db, 'gateway_merchants'));
-      setMerchants(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) { console.error(e); }
+      const merchantsData = snap.docs.map(d => ({ 
+        id: d.id, 
+        ...d.data(),
+        // S'assurer que le nom est bien récupéré
+        name: d.data().name || d.data().displayName || d.data().companyName || 'Sans nom',
+        email: d.data().email || d.data().contactEmail || '—'
+      }));
+      setMerchants(merchantsData);
+    } catch (e) { 
+      console.error(e);
+      toast.error('Erreur lors du chargement des marchands');
+    }
     finally { setLoading(false); }
   };
 
   const handleToggleActive = async (id, active) => {
     try {
-      await updateDoc(doc(db, 'gateway_merchants', id), { active: !active, updatedAt: new Date().toISOString() });
+      await updateDoc(doc(db, 'gateway_merchants', id), { 
+        active: !active, 
+        updatedAt: new Date().toISOString() 
+      });
       setMerchants(prev => prev.map(m => m.id === id ? { ...m, active: !active } : m));
       toast.success(active ? 'Marchand désactivé' : 'Marchand activé');
-    } catch { toast.error('Erreur de mise à jour'); }
+    } catch { 
+      toast.error('Erreur de mise à jour'); 
+    }
   };
 
   const filtered = merchants.filter(m => {
     const s   = search.toLowerCase();
-    const matchSearch = !s || (m.name || '').toLowerCase().includes(s) || (m.email || '').toLowerCase().includes(s);
-    const matchFilter = filter === 'all' || m.verificationStatus === filter || (filter === 'active' && m.active !== false) || (filter === 'inactive' && m.active === false);
+    const matchSearch = !s || 
+      (m.name || '').toLowerCase().includes(s) || 
+      (m.email || '').toLowerCase().includes(s) ||
+      (m.id || '').toLowerCase().includes(s);
+    const matchFilter = filter === 'all' || 
+      m.verificationStatus === filter || 
+      (filter === 'active' && m.active !== false) || 
+      (filter === 'inactive' && m.active === false);
     return matchSearch && matchFilter;
   });
 
@@ -88,7 +109,7 @@ export default function AdminMerchants() {
   );
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 24px 60px', fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -204,7 +225,7 @@ export default function AdminMerchants() {
               className="adm-row"
               style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 100px 80px', padding: '13px 22px', gap: 12, borderBottom: i < paginated.length - 1 ? '1px solid #f8fafc' : 'none', alignItems: 'center', transition: 'background .1s' }}
             >
-              {/* Nom */}
+              {/* Nom - Affichage du nom du marchand depuis Firebase */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
@@ -216,11 +237,12 @@ export default function AdminMerchants() {
                   {m.name?.charAt(0)?.toUpperCase() || '?'}
                 </div>
                 <div style={{ minWidth: 0 }}>
+                  {/* Le nom du marchand est affiché ici */}
                   <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {m.name || 'Sans nom'}
                   </p>
                   <p style={{ fontSize: 10, color: '#94a3b8', margin: '1px 0 0' }}>
-                    {m.totalTransactions || 0} transaction{m.totalTransactions !== 1 ? 's' : ''}
+                    ID: {m.id?.substring(0, 8)}...
                   </p>
                 </div>
               </div>

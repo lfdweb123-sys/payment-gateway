@@ -6,7 +6,7 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <AdminHeader />
-      <div className="flex flex-1">
+      <div className="flex flex-1" style={{ paddingTop: '64px' }}> {/* Ajout du padding-top pour le header fixe */}
         <AdminSidebar />
         <div className="flex-1 lg:ml-64 p-4 sm:p-6">
           <Outlet />
