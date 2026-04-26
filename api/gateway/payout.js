@@ -1,3 +1,4 @@
+import { log, logError } from '../logs/logger.js';
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -183,6 +184,8 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString(),
     });
 
+    await log('payout', 'INFO', 'Solde décrémenté — payout initié', { withdrawalId, amount: w.amount, merchantId: w.merchantId });
+
     const network = detectNetwork(w.phone);
 
     // Exécuter le payout avec le provider choisi ou par ordre de priorité
@@ -197,6 +200,8 @@ export default async function handler(req, res) {
       const result = await provider.payout(config, { amount: w.amount, phone: w.phone, network });
 
       if (result.success) {
+        await log('payout', 'INFO', `Payout initié via ${pid}`, { withdrawalId, reference: result.reference, status: result.status, provider: pid });
+
         // Marquer le retrait comme 'processing' (confirmation via webhook)
         await db.collection('withdrawals').doc(withdrawalId).update({
           status:      'processing',
@@ -234,10 +239,13 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString(),
     });
 
+    await log('payout', 'WARN', 'Tous les providers payout ont échoué — solde remboursé', { withdrawalId, amount: w.amount, merchantId: w.merchantId });
+
     return res.status(400).json({ error: 'Aucun provider payout disponible.' });
 
   } catch (error) {
     console.error('Erreur payout:', error);
+    await logError('payout', error, { withdrawalId, body: req.body });
     return res.status(500).json({ error: error.message });
   }
 }

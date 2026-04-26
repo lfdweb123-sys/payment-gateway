@@ -6,6 +6,7 @@
  * tourne côté Node.js/Vercel et non dans le contexte Vite.
  */
 
+import { log, logError } from '../logs/logger.js';
 import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
@@ -170,14 +171,6 @@ function parseWebhook(provider, body) {
         reference: body.order_id || body.reference,
         status:    body.status === 'Successful' ? 'SUCCESSFUL'
                  : body.status === 'Failed'     ? 'FAILED'
-                 : null,
-      };
-
-    case 'paydunya':
-      return {
-        reference: body.invoice?.token || body.token,
-        status:    body.status === 'completed' ? 'SUCCESSFUL'
-                 : body.status === 'cancelled' ? 'FAILED'
                  : null,
       };
 
@@ -372,6 +365,8 @@ function parseWebhook(provider, body) {
 export default async function handler(req, res) {
   const { provider } = req.query;
 
+  await log('webhook', 'INFO', `Webhook reçu : ${provider}`, { provider, body: req.body });
+
   // Heartbeat GET
   if (req.method === 'GET') return res.status(200).send('OK');
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
@@ -422,6 +417,8 @@ export default async function handler(req, res) {
       failedAt:    !isSuccessful ? new Date().toISOString() : null,
       updatedAt:   new Date().toISOString(),
     });
+
+    await log('webhook', 'INFO', `Transaction ${newStatus}`, { provider, reference, transactionId: txDoc.id, newStatus });
 
     // ── Mettre à jour le solde marchand (si succès) ────────────────────
     if (isSuccessful && tx.merchantId) {
@@ -475,6 +472,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Erreur webhook:', error);
+    await logError('webhook', error, { provider, body: req.body });
     return res.status(500).json({ error: error.message });
   }
 }

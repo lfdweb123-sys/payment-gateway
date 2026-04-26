@@ -1,3 +1,4 @@
+import { log, logRequest, logError } from '../logs/logger.js';
 import { validatePhone } from '../../src/services/phoneValidator.js';
 import admin from 'firebase-admin';
 
@@ -888,6 +889,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST')    return res.status(405).json({ error: 'POST requis' });
 
+  await logRequest(req, 'pay');
+
   const apiKey = req.body?.token || req.headers['x-api-key'];
   if (!checkRateLimit(apiKey).allowed) return res.status(429).json({ error: 'Trop de requêtes' });
 
@@ -916,6 +919,8 @@ export default async function handler(req, res) {
     const providerId = getBestProvider(method, country, providers);
     if (!providerId) return res.status(400).json({ error: `Aucun provider disponible pour ${method} en ${country}` });
 
+    await log('pay', 'INFO', 'Provider sélectionné', { method, country, providerId, merchantId: merchant.id });
+
     const callFn = PROVIDER_CALLS[providerId];
     if (!callFn) return res.status(400).json({ error: `Provider ${providerId} non implémenté` });
 
@@ -927,6 +932,8 @@ export default async function handler(req, res) {
       amount: netAmount, phone, email, country, method, description,
       currency: currency || 'XOF',
     });
+
+    await log('pay', result.success ? 'INFO' : 'WARN', result.success ? 'Paiement initié' : 'Paiement échoué', { providerId, amount: amountNum, status: result.status, error: result.error || null, merchantId: merchant.id });
 
     const isCompleted = result.success && (result.status === 'SUCCESSFUL' || result.status === 'completed');
 
@@ -977,6 +984,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('Erreur pay.js:', error);
+    await logError('pay', error, { body: req.body });
     return res.status(500).json({ error: error.message });
   }
 }

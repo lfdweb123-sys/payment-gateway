@@ -31,11 +31,9 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminMerchants from './pages/admin/AdminMerchants';
 import AdminVerifications from './pages/admin/AdminVerifications';
 import AdminCommissions from './pages/admin/AdminCommissions';
+import AdminLogs from './pages/admin/AdminLogs';          // ← nouveau
 import AdminRoute from './components/auth/AdminRoute';
 import AdminPayouts from './pages/admin/AdminPayouts';
-
-
-
 
 function PublicRoute({ children }) {
   const { user } = useAuth();
@@ -46,59 +44,58 @@ function PublicRoute({ children }) {
 function AppContent() {
   const { user } = useAuth();
   const location = useLocation();
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+  const isAuthPage   = location.pathname === '/login' || location.pathname === '/register';
   const isAdminRoute = location.pathname.startsWith('/admin');
-  const isPublicPage = location.pathname === '/' || location.pathname === '/pay' || 
+  const isPublicPage = location.pathname === '/' || location.pathname === '/pay' ||
     location.pathname.startsWith('/api-documentation') ||
-    location.pathname === '/help' || location.pathname === '/privacy' ||
-    location.pathname === '/contact' || location.pathname === '/terms' || 
+    location.pathname === '/help'    || location.pathname === '/privacy' ||
+    location.pathname === '/contact' || location.pathname === '/terms'   ||
     location.pathname === '/cookies' || location.pathname === '/legal';
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header marchand (pas sur admin, pas sur auth, pas sur public) */}
       {user && !isAuthPage && !isPublicPage && !isAdminRoute && <MerchantHeader />}
-      
+
       <div className="flex flex-1">
-        {/* Sidebar marchand (pas sur admin, pas sur auth, pas sur public) */}
         {user && !isAuthPage && !isPublicPage && !isAdminRoute && <MerchantSidebar />}
-        
+
         <main className={`flex-1 min-w-0 overflow-x-hidden ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'lg:ml-64' : ''} ${user && !isAuthPage && !isPublicPage && !isAdminRoute ? 'pt-16 pb-16 lg:pb-0' : ''}`}>
           <Routes>
             {/* Pages publiques */}
-            <Route path="/" element={<GatewayHome />} />
+            <Route path="/"    element={<GatewayHome />} />
             <Route path="/pay" element={<GatewayPay />} />
-            <Route path="/login" element={<PublicRoute><LoginForm /></PublicRoute>} />
+            <Route path="/login"    element={<PublicRoute><LoginForm /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterForm /></PublicRoute>} />
-            
+
             {/* Pages info publiques */}
             <Route path="/api-documentation" element={<GatewayApiDocs />} />
-            <Route path="/help" element={<Help />} />
+            <Route path="/help"    element={<Help />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/contact" element={<Contact />} />
-            <Route path="/terms" element={<Terms />} />
+            <Route path="/terms"   element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
-            <Route path="/legal" element={<Legal />} />
-            
-            {/* Pages protégées - Marchand */}
-            <Route path="/dashboard" element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
-            <Route path="/providers" element={<ProtectedRoute><MerchantProviders /></ProtectedRoute>} />
-            <Route path="/transactions" element={<ProtectedRoute><GatewayTransactions /></ProtectedRoute>} />
-            <Route path="/payouts" element={<ProtectedRoute><MerchantPayouts /></ProtectedRoute>} />
-            <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
-            <Route path="/verification" element={<ProtectedRoute><Verification /></ProtectedRoute>} />
+            <Route path="/legal"   element={<Legal />} />
+
+            {/* Pages protégées — Marchand */}
+            <Route path="/dashboard"   element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
+            <Route path="/providers"   element={<ProtectedRoute><MerchantProviders /></ProtectedRoute>} />
+            <Route path="/transactions"element={<ProtectedRoute><GatewayTransactions /></ProtectedRoute>} />
+            <Route path="/payouts"     element={<ProtectedRoute><MerchantPayouts /></ProtectedRoute>} />
+            <Route path="/developer"   element={<ProtectedRoute><Developer /></ProtectedRoute>} />
+            <Route path="/settings"    element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
+            <Route path="/verification"element={<ProtectedRoute><Verification /></ProtectedRoute>} />
 
             {/* Pages Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="merchants" element={<AdminMerchants />} />
-              <Route path="verifications" element={<AdminVerifications />} />
-              <Route path="transactions" element={<GatewayTransactions />} />
-              <Route path="commissions" element={<AdminCommissions />} />
-              <Route path="payouts" element={<AdminPayouts />} />
+              <Route index                  element={<AdminDashboard />} />
+              <Route path="merchants"       element={<AdminMerchants />} />
+              <Route path="verifications"   element={<AdminVerifications />} />
+              <Route path="transactions"    element={<GatewayTransactions />} />
+              <Route path="commissions"     element={<AdminCommissions />} />
+              <Route path="payouts"         element={<AdminPayouts />} />
+              <Route path="logs"            element={<AdminLogs />} />  {/* ← nouveau */}
             </Route>
-            
+
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
