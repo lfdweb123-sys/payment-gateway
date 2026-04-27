@@ -646,7 +646,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Trop de requêtes' });
   }
 
-  const { amount, country, method, phone, email, description, currency } = req.body;
+  const { amount, country, method, phone, email, description, currency, customerName, customerSurname } = req.body;
   if (!apiKey)                return res.status(401).json({ error: 'Clé API requise' });
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Montant invalide' });
 
@@ -721,6 +721,8 @@ export default async function handler(req, res) {
     const result = await callFn(providers[providerId], {
       amount: netAmount, phone, email, country, method, description,
       currency: currency || 'XOF',
+      customerName,
+      customerSurname,
     });
 
     await log('pay', result.success ? 'INFO' : 'WARN',
