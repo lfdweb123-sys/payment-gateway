@@ -35,6 +35,9 @@ import AdminLogs from './pages/admin/AdminLogs';          // ← nouveau
 import AdminRoute from './components/auth/AdminRoute';
 import AdminPayouts from './pages/admin/AdminPayouts';
 
+import FraudDashboard from './pages/admin/FraudDashboard';
+
+
 function PublicRoute({ children }) {
   const { user } = useAuth();
   if (user) return <Navigate to="/dashboard" />;
@@ -93,7 +96,10 @@ function AppContent() {
               <Route path="transactions"    element={<GatewayTransactions />} />
               <Route path="commissions"     element={<AdminCommissions />} />
               <Route path="payouts"         element={<AdminPayouts />} />
+              <Route path="fraud" element={<FraudDashboard />} />
               <Route path="logs"            element={<AdminLogs />} />  {/* ← nouveau */}
+              
+
             </Route>
 
             {/* Fallback */}

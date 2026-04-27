@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Layout, Users, Shield, DollarSign, ArrowLeft, LogOut, FileText, LayoutGrid, X, Wallet, Activity } from 'lucide-react';
+import { Layout, Users, Shield, DollarSign, ArrowLeft, LogOut, FileText, LayoutGrid, X, Wallet, Activity, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -14,13 +14,14 @@ export default function AdminSidebar() {
   }, [location.pathname]);
 
   const menuItems = [
-    { title: 'Dashboard',     icon: Layout,    path: '/admin' },
-    { title: 'Marchands',     icon: Users,     path: '/admin/merchants' },
-    { title: 'Vérifications', icon: Shield,    path: '/admin/verifications' },
-    { title: 'Transactions',  icon: FileText,  path: '/admin/transactions' },
-    { title: 'Commissions',   icon: DollarSign,path: '/admin/commissions' },
-    { title: 'Retraits',      icon: Wallet,    path: '/admin/payouts' },
-    { title: 'Logs',          icon: Activity,  path: '/admin/logs' },
+    { title: 'Dashboard',     icon: Layout,        path: '/admin' },
+    { title: 'Marchands',     icon: Users,          path: '/admin/merchants' },
+    { title: 'Vérifications', icon: Shield,         path: '/admin/verifications' },
+    { title: 'Transactions',  icon: FileText,       path: '/admin/transactions' },
+    { title: 'Commissions',   icon: DollarSign,     path: '/admin/commissions' },
+    { title: 'Retraits',      icon: Wallet,         path: '/admin/payouts' },
+    { title: 'Anti-Fraude',   icon: AlertTriangle,  path: '/admin/fraud' },
+    { title: 'Logs',          icon: Activity,       path: '/admin/logs' },
   ];
 
   const bottomItems = menuItems.slice(0, 4);
@@ -30,6 +31,7 @@ export default function AdminSidebar() {
 
   return (
     <>
+      {/* ── Desktop sidebar ── */}
       <aside className={`hidden lg:flex flex-col fixed left-0 top-16 bottom-0 bg-gray-900 text-white z-30 transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'}`}>
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -54,9 +56,12 @@ export default function AdminSidebar() {
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
+            const active = isActive(item.path);
             return (
               <Link key={item.path} to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive(item.path) ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'} ${collapsed ? 'justify-center' : ''}`}>
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all
+                  ${active ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}
+                  ${collapsed ? 'justify-center' : ''}`}>
                 <Icon size={20}/>
                 {!collapsed && <span>{item.title}</span>}
               </Link>
@@ -102,10 +107,12 @@ export default function AdminSidebar() {
         </div>
       </nav>
 
+      {/* ── Overlay ── */}
       {drawerOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)}/>
       )}
 
+      {/* ── Drawer ── */}
       <div className={`lg:hidden fixed top-0 left-0 bottom-0 w-72 bg-gray-900 z-50 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <div className="flex items-center gap-2">
