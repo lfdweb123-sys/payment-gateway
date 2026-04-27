@@ -33,6 +33,14 @@ const CARD_METHODS = [
   'ideal','bancontact','giropay','sofort','chipper_wallet',
 ];
 
+/* ─── Devise cible par pays ─────────────────────────────── */
+const COUNTRY_TARGET_CURRENCY = {
+  bj:'XOF', ci:'XOF', tg:'XOF', sn:'XOF', bf:'XOF', ml:'XOF', ne:'XOF', gn:'GNF',
+  cm:'XAF', ga:'XAF', cd:'CDF', cg:'XAF',
+  ng:'NGN', gh:'GHS', ke:'KES', ug:'UGX', tz:'TZS', rw:'RWF', za:'ZAR',
+  fr:'EUR', be:'EUR', de:'EUR', nl:'EUR', gb:'GBP', us:'USD',
+};
+
 /* ─── Taux de conversion XOF → autres devises ──────────────
    Affichage côté client uniquement — la conversion réelle
    est faite côté serveur dans pay.js avec les mêmes taux.
@@ -49,6 +57,12 @@ const XOF_DISPLAY_RATES = {
   GHS: 1 / 45,
   KES: 1 / 4.5,
   TND: 1 / 195,
+  XAF: 1,       // parité fixe XOF/XAF
+  GNF: 1 / 0.072,
+  CDF: 1 / 0.3,
+  UGX: 1 / 0.16,
+  TZS: 1 / 0.23,
+  RWF: 1 / 0.55,
 };
 
 /* Providers qui nécessitent une conversion (pas XOF natif) */
@@ -60,22 +74,40 @@ const PROVIDER_DISPLAY_CURRENCY = {
 };
 
 /**
- * Retourne { amount, currency } à afficher côté client selon le provider.
- * Si merchantCurrency === XOF et provider ne supporte pas XOF → convertit.
+ * Retourne { amount, currency } à afficher.
+ * Priorité : devise du pays > devise du provider.
+ * Si merchantCurrency === XOF et targetCurrency est différent → convertit.
  */
-function getDisplayAmount(amount, merchantCurrency, providerId) {
+function getDisplayAmount(amount, merchantCurrency, targetCurrency, providerId) {
   const mc = (merchantCurrency || 'XOF').toUpperCase();
-  if (!PROVIDERS_EUR.has(providerId)) return { amount, currency: mc };
-  const targetCurrency = PROVIDER_DISPLAY_CURRENCY[providerId] || 'EUR';
-  if (mc === targetCurrency) return { amount, currency: mc };
-  if (mc === 'XOF' && XOF_DISPLAY_RATES[targetCurrency]) {
-    const converted = amount * XOF_DISPLAY_RATES[targetCurrency];
-    const noDecimal = new Set(['NGN','KES','GHS','INR']);
-    const rounded = noDecimal.has(targetCurrency)
+  const tc = (targetCurrency || mc).toUpperCase();
+
+  // Si même devise, pas de conversion
+  if (mc === tc) return { amount, currency: mc };
+
+  // Conversion XOF → devise cible
+  if (mc === 'XOF' && XOF_DISPLAY_RATES[tc]) {
+    const converted = amount * XOF_DISPLAY_RATES[tc];
+    const noDecimal = new Set(['NGN','KES','GHS','INR','UGX','TZS','RWF','GNF','CDF','XAF']);
+    const rounded = noDecimal.has(tc)
       ? Math.round(converted)
       : Math.round(converted * 100) / 100;
-    return { amount: rounded, currency: targetCurrency };
+    return { amount: rounded, currency: tc };
   }
+
+  // Fallback : logique provider si pas de taux pays
+  if (providerId && PROVIDERS_EUR.has(providerId)) {
+    const providerCurrency = PROVIDER_DISPLAY_CURRENCY[providerId] || 'EUR';
+    if (mc === 'XOF' && XOF_DISPLAY_RATES[providerCurrency]) {
+      const converted = amount * XOF_DISPLAY_RATES[providerCurrency];
+      const noDecimal = new Set(['NGN','KES','GHS','INR']);
+      const rounded = noDecimal.has(providerCurrency)
+        ? Math.round(converted)
+        : Math.round(converted * 100) / 100;
+      return { amount: rounded, currency: providerCurrency };
+    }
+  }
+
   return { amount, currency: mc };
 }
 
@@ -560,17 +592,26 @@ export default function GatewayPay() {
   }, [status, gatewaySettings.redirectUrl]);
 
   /* ─── Computed ── */
-  const merchantCurrency = (countryData?.currency || gatewaySettings.defaultCurrency || 'XOF').toUpperCase();
+  const merchantCurrency = (gatewaySettings.defaultCurrency || 'XOF').toUpperCase();
   const primaryColor     = gatewaySettings.primaryColor || '#C8931A';
   const design           = gatewaySettings.paymentDesign || 'modern';
 
-  /* Devise et montant à afficher selon la méthode sélectionnée */
-  const displayProviderId = selectedMethod?.provider || null;
-  const { amount: displayAmount, currency: displayCurrency } = displayProviderId
-    ? getDisplayAmount(parseFloat(amount || 0), merchantCurrency, displayProviderId)
-    : { amount: parseFloat(amount || 0), currency: merchantCurrency };
+  /*
+   * ── CONVERSION AU NIVEAU DU PAYS ──────────────────────────
+   * Dès qu'un pays est sélectionné, on calcule la devise cible
+   * du pays (ex: France → EUR, Nigeria → NGN).
+   * Cette conversion s'affiche partout dès le step 2.
+   * ──────────────────────────────────────────────────────────
+   */
+  const countryTargetCurrency = country ? (COUNTRY_TARGET_CURRENCY[country] || merchantCurrency) : merchantCurrency;
+  const { amount: displayAmount, currency: displayCurrency } = getDisplayAmount(
+    parseFloat(amount || 0),
+    merchantCurrency,
+    countryTargetCurrency,
+    selectedMethod?.provider || null
+  );
 
-  /* Pour le panneau résumé (avant sélection méthode) */
+  /* Pour le panneau résumé — devise marchand d'origine */
   const summaryAmount   = parseFloat(amount || 0);
   const summaryCurrency = merchantCurrency;
 
@@ -710,9 +751,7 @@ export default function GatewayPay() {
 
   /* ── Summary panel ── */
   const SummaryPanel = () => {
-    /* Dans le panneau résumé, on montre toujours la devise marchand (XOF)
-       et si une méthode est sélectionnée avec conversion, on montre les deux */
-    const showConversion = selectedMethod && displayCurrency !== summaryCurrency;
+    const showConversion = country && displayCurrency !== summaryCurrency;
     return (
       <div className="gw-right">
         <div className="gw-right-header">
@@ -732,10 +771,21 @@ export default function GatewayPay() {
 
         <div className="gw-amount-card">
           <p className="gw-amount-label">Total à payer</p>
-          <div>
-            <span className="gw-amount-val">{summaryAmount.toLocaleString('fr-FR')}</span>
-            <span className="gw-amount-curr">{summaryCurrency}</span>
-          </div>
+          {showConversion ? (
+            /* Après sélection d'un pays avec devise différente : afficher la devise convertie */
+            <div>
+              <span className="gw-amount-val">{displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })}</span>
+              <span className="gw-amount-curr">{displayCurrency}</span>
+              <p style={{fontSize:11,color:themeVars.textMuted,marginTop:6}}>
+                ≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <span className="gw-amount-val">{summaryAmount.toLocaleString('fr-FR')}</span>
+              <span className="gw-amount-curr">{summaryCurrency}</span>
+            </div>
+          )}
           {description && <p className="gw-amount-desc">{description}</p>}
         </div>
 
@@ -754,7 +804,7 @@ export default function GatewayPay() {
           )}
           <div className="gw-summary-row">
             <span className="gw-summary-key">Devise</span>
-            <span className="gw-summary-val">{summaryCurrency}</span>
+            <span className="gw-summary-val">{showConversion ? displayCurrency : summaryCurrency}</span>
           </div>
         </div>
 
@@ -763,21 +813,12 @@ export default function GatewayPay() {
         <div className="gw-total-row">
           <span className="gw-total-key">Total</span>
           <span className="gw-total-val" style={{color:primaryColor}}>
-            {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}
+            {showConversion
+              ? `${displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} ${displayCurrency}`
+              : `${summaryAmount.toLocaleString('fr-FR')} ${summaryCurrency}`
+            }
           </span>
         </div>
-
-        {/* Note de conversion si nécessaire */}
-        {showConversion && (
-          <div style={{marginTop:10,padding:'8px 12px',background:`${primaryColor}08`,border:`1px solid ${primaryColor}20`,borderRadius:10,fontSize:11,color:themeVars.textSecondary,display:'flex',alignItems:'center',gap:6}}>
-            <span style={{fontSize:13}}>≈</span>
-            <span>
-              Débité : <strong style={{color:themeVars.textPrimary}}>
-                {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: displayCurrency === 'XOF' ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
-              </strong>
-            </span>
-          </div>
-        )}
 
         <div className="gw-secure-row"><Lock size={9}/> Chiffrement SSL · PCI DSS</div>
       </div>
@@ -798,7 +839,7 @@ export default function GatewayPay() {
         <div className="gw-status-amount">
           <p style={{fontSize:11,color:themeVars.textMuted,marginBottom:4}}>{description}</p>
           <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
-            {summaryAmount.toLocaleString('fr-FR')} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{summaryCurrency}</span>
+            {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
           </p>
         </div>
         <p style={{fontSize:11,color:themeVars.textMuted,marginTop:16}}>Ne fermez pas cette page</p>
@@ -819,7 +860,7 @@ export default function GatewayPay() {
         <div className="gw-status-amount" style={{background:'#ECFDF5',border:'1px solid rgba(16,185,129,.15)'}}>
           <p style={{fontSize:11,color:'#6EE7B7',marginBottom:4}}>{description}</p>
           <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
-            {summaryAmount.toLocaleString('fr-FR')} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{summaryCurrency}</span>
+            {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
           </p>
         </div>
         {gatewaySettings.redirectUrl && <p style={{fontSize:11,color:themeVars.textMuted,marginTop:14}}>Redirection en cours…</p>}
@@ -864,10 +905,22 @@ export default function GatewayPay() {
               )}
             </div>
             <div style={{textAlign:'right'}}>
-              <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
-                {summaryAmount.toLocaleString('fr-FR')} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{summaryCurrency}</span>
-              </div>
-              {description && <div style={{fontSize:10,color:themeVars.textMuted}}>{description}</div>}
+              {/* Dès qu'un pays est sélectionné, afficher le montant converti dans le header */}
+              {country && displayCurrency !== summaryCurrency ? (
+                <>
+                  <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+                    {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
+                  </div>
+                  <div style={{fontSize:10,color:themeVars.textMuted}}>≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}</div>
+                </>
+              ) : (
+                <>
+                  <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+                    {summaryAmount.toLocaleString('fr-FR')} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{summaryCurrency}</span>
+                  </div>
+                  {description && <div style={{fontSize:10,color:themeVars.textMuted}}>{description}</div>}
+                </>
+              )}
             </div>
           </div>
 
@@ -903,33 +956,48 @@ export default function GatewayPay() {
                 <div className="gw-pill-icon"><span style={{fontSize:20}}>{countryData.flag}</span></div>
                 <div>
                   <div className="gw-pill-name">{countryData.name}</div>
-                  <div className="gw-pill-sub">{countryData.currency}</div>
+                  {/* Afficher la devise convertie dès le step 2 */}
+                  <div className="gw-pill-sub">
+                    {displayCurrency !== summaryCurrency
+                      ? `${displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} ${displayCurrency}`
+                      : countryData.currency
+                    }
+                  </div>
                 </div>
               </div>
+
+              {/* Note de conversion au niveau du pays dès le step 2 */}
+              {displayCurrency !== summaryCurrency && (
+                <div className="gw-conversion-note" style={{marginBottom:16}}>
+                  <span style={{fontSize:14}}>💱</span>
+                  <span>
+                    {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} → <strong style={{color:themeVars.textPrimary}}>
+                      {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                    </strong> (taux appliqué automatiquement)
+                  </span>
+                </div>
+              )}
+
               <span className="gw-section-lbl">Mode de paiement</span>
-              {countryData.methods?.length > 0 ? countryData.methods.map(method => {
-                /* Afficher la devise convertie dans le bouton si nécessaire */
-                const { amount: mAmt, currency: mCur } = getDisplayAmount(parseFloat(amount||0), merchantCurrency, method.provider);
-                const showConv = mCur !== merchantCurrency;
-                return (
-                  <button key={method.id} onClick={() => {
-                    setSelectedMethod(method);
-                    setCustomerFirstName(''); setCustomerLastName(''); setCustomerEmail('');
-                    setStep(3);
-                  }} className="gw-method-btn">
-                    <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
-                    <div style={{flex:1}}>
-                      <span className="gw-method-name">{method.name}</span>
-                      {showConv && (
-                        <div style={{fontSize:10,color:themeVars.textMuted,marginTop:2}}>
-                          ≈ {mAmt.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} {mCur}
-                        </div>
-                      )}
-                    </div>
-                    <ChevronRight size={14} style={{color:themeVars.textMuted}}/>
-                  </button>
-                );
-              }) : (
+              {countryData.methods?.length > 0 ? countryData.methods.map(method => (
+                <button key={method.id} onClick={() => {
+                  setSelectedMethod(method);
+                  setCustomerFirstName(''); setCustomerLastName(''); setCustomerEmail('');
+                  setStep(3);
+                }} className="gw-method-btn">
+                  <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
+                  <div style={{flex:1}}>
+                    <span className="gw-method-name">{method.name}</span>
+                    {/* Montant converti déjà calculé au niveau pays, pas besoin de recalculer par provider */}
+                    {displayCurrency !== summaryCurrency && (
+                      <div style={{fontSize:10,color:themeVars.textMuted,marginTop:2}}>
+                        {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight size={14} style={{color:themeVars.textMuted}}/>
+                </button>
+              )) : (
                 <p style={{fontSize:13,color:themeVars.textMuted,textAlign:'center',padding:'20px 0'}}>Aucune méthode disponible</p>
               )}
             </div>
@@ -949,13 +1017,13 @@ export default function GatewayPay() {
                 </div>
               </div>
 
-              {/* Note de conversion si la méthode nécessite une devise différente */}
-              {displayCurrency !== merchantCurrency && (
+              {/* Note de conversion */}
+              {displayCurrency !== summaryCurrency && (
                 <div className="gw-conversion-note">
                   <span style={{fontSize:14}}>💱</span>
                   <span>
-                    {summaryAmount.toLocaleString('fr-FR')} {merchantCurrency} → <strong style={{color:themeVars.textPrimary}}>
-                      {displayAmount.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} {displayCurrency}
+                    {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} → <strong style={{color:themeVars.textPrimary}}>
+                      {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
                     </strong> (taux appliqué automatiquement)
                   </span>
                 </div>
@@ -974,7 +1042,7 @@ export default function GatewayPay() {
                   </div>
                   <button className="gw-submit" style={{marginTop:0}} onClick={handleKkiapayPayment}>
                     <Zap size={16}/>
-                    Payer {displayAmount.toLocaleString('fr-FR',{minimumFractionDigits: displayCurrency==='XOF'?0:2, maximumFractionDigits:2})} {displayCurrency}
+                    Payer {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
                   </button>
                 </div>
               ) : (
@@ -1062,7 +1130,7 @@ export default function GatewayPay() {
                         Traitement en cours…
                       </>
                     ) : (
-                      <><Zap size={16}/> Payer {displayAmount.toLocaleString('fr-FR',{minimumFractionDigits: displayCurrency==='XOF'?0:2, maximumFractionDigits:2})} {displayCurrency}</>
+                      <><Zap size={16}/> Payer {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}</>
                     )}
                   </button>
                 </form>
