@@ -264,43 +264,40 @@ const PROVIDER_CALLS = {
     return { success: true, reference: `kkia-${Date.now()}`, url: `https://widget.kkiapay.me/?${params.toString()}`, status: 'pending', provider: 'kkiapay' };
   },
 
-cinetpay: async (config, { amount, phone, email, description, method, customerName, customerSurname }) => {
-  const body = JSON.stringify({
-    apikey:                  config.CINETPAY_API_KEY,
-    site_id:                 config.CINETPAY_SITE_ID,
-    secret_key:  config.CINETPAY_SECRET_KEY,
-    transaction_id:          `GW-${Date.now()}`,
-    amount:                  Math.round(amount),
-    currency:                'XOF',
-    description:             (description || 'Paiement').replace(/[#/$_&]/g, '').substring(0, 200),
-    channels:                method === 'card' ? ['CREDIT_CARD'] : ['MOBILE_MONEY'],
-    notify_url:              `${process.env.VITE_APP_URL}/api/webhook/cinetpay`,
-    return_url:              `${process.env.VITE_APP_URL}/success`,
-    customer_name:           customerName    || 'Client',
-    customer_surname:        customerSurname || 'Client',
-    customer_email:          email           || 'client@cinetpay.com',
-    customer_phone_number:   phone           || '',
-    customer_address:        'Abidjan',
-    customer_city:           'Abidjan',
-    customer_country:        'CI',
-    customer_state:          'CI',
-    customer_zip_code:       '00225',
-    lang:                    'FR',
-    metadata:                'gateway',
-  });
+  cinetpay: async (config, { amount, phone, email, description, method, customerName, customerSurname }) => {
+    const body = JSON.stringify({
+      apikey:                  config.CINETPAY_API_KEY,
+      site_id:                 config.CINETPAY_SITE_ID,
+      secret_key:              config.CINETPAY_SECRET_KEY,
+      transaction_id:          `GW-${Date.now()}`,
+      amount:                  Math.round(amount),
+      currency:                'XOF',
+      description:             (description || 'Paiement').replace(/[#/$_&]/g, '').substring(0, 200),
+      channels:                method === 'card' ? ['CREDIT_CARD'] : ['MOBILE_MONEY'],
+      notify_url:              `${process.env.VITE_APP_URL}/api/webhook/cinetpay`,
+      return_url:              `${process.env.VITE_APP_URL}/success`,
+      customer_name:           customerName    || 'Client',
+      customer_surname:        customerSurname || 'Paiement',
+      customer_email:          email           || 'no-reply@gateway.local',
+      customer_phone_number:   phone           || '+2250000000000',
+      customer_address:        'Abidjan',
+      customer_city:           'Abidjan',
+      customer_country:        'CI',
+      customer_state:          'CI',
+      customer_zip_code:       '00225',
+      lang:                    'FR',
+      metadata:                'gateway',
+    });
 
-  const { ok, data } = await safeFetch('https://api-checkout.cinetpay.com/v2/payment', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-  });
+    const { ok, data } = await safeFetch('https://api-checkout.cinetpay.com/v2/payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
 
-  // ← Ajoute ça temporairement pour voir l'erreur exacte
-  console.error('CinetPay response:', JSON.stringify(data));
-
-  if (!ok || data.code !== '201') return { success: false, error: data.message || data.description || JSON.stringify(data) };
-  return { success: true, reference: data.data?.payment_token, url: data.data?.payment_url, status: 'pending', provider: 'cinetpay' };
-},
+    if (!ok || data.code !== '201') return { success: false, error: data.message || data.description || JSON.stringify(data) };
+    return { success: true, reference: data.data?.payment_token, url: data.data?.payment_url, status: 'pending', provider: 'cinetpay' };
+  },
 
   hub2: async (config, { amount, phone, email, currency, country }) => {
     const headers = { 'ApiKey': config.HUB2_API_KEY, 'MerchantId': config.HUB2_MERCHANT_ID, 'Environment': config.HUB2_ENV || 'live', 'Content-Type': 'application/json' };
