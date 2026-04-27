@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Shield, Lock, Smartphone, CreditCard, ChevronRight, CheckCircle2, Globe, ArrowLeft, Zap } from 'lucide-react';
+import { Shield, Lock, Smartphone, CreditCard, ChevronRight, CheckCircle2, Globe, ArrowLeft, Zap, Mail, User } from 'lucide-react';
 import { getMethodsForCountryWithProviders, getCountriesForProviders } from '../../services/countryMethods';
 import toast from 'react-hot-toast';
 import { validatePhone } from '../../services/phoneValidator';
@@ -26,6 +26,12 @@ const MOBILE_METHODS = [
   'wallet','coris','qmoney',
 ];
 
+/* ─── Méthodes carte (nécessitent email + nom) ─────────── */
+const CARD_METHODS = [
+  'card','paypal','apple_pay','google_pay','bank_transfer',
+  'ideal','bancontact','giropay','sofort','chipper_wallet',
+];
+
 /* ─── Loading bar ──────────────────────────────────────── */
 function TopLoadingBar({ visible, color = '#C8931A' }) {
   if (!visible) return null;
@@ -42,8 +48,7 @@ function TopLoadingBar({ visible, color = '#C8931A' }) {
 }
 
 function getMethodIcon(methodId, size=18) {
-  const cards = ['card','paypal','apple_pay','google_pay','chipper_wallet','bank_transfer','ideal','bancontact','giropay','sofort'];
-  return cards.includes(methodId) ? <CreditCard size={size}/> : <Smartphone size={size}/>;
+  return CARD_METHODS.includes(methodId) ? <CreditCard size={size}/> : <Smartphone size={size}/>;
 }
 
 function maskPhone(phone) {
@@ -121,7 +126,12 @@ export default function GatewayPay() {
   const [savedPhones, setSavedPhones]           = useState([]);
   const [showSuggestions, setShowSuggestions]   = useState(false);
   const [kkiapayPublicKey, setKkiapayPublicKey] = useState(null);
-  const [countrySearch, setCountrySearch]       = useState(''); // ← recherche pays
+  const [countrySearch, setCountrySearch]       = useState('');
+
+  /* ─── Champs carte ───────────────────────────────────── */
+  const [customerFirstName, setCustomerFirstName] = useState('');
+  const [customerLastName, setCustomerLastName]   = useState('');
+  const [customerEmail, setCustomerEmail]         = useState('');
 
   /* ─── Charger le script KKiaPay une seule fois ───── */
   useEffect(() => {
@@ -221,9 +231,19 @@ export default function GatewayPay() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
+
+    const isMobile = MOBILE_METHODS.includes(selectedMethod?.id);
+    const isCard   = CARD_METHODS.includes(selectedMethod?.id);
+
+    /* Validation carte */
+    if (isCard && !isKkiapayMethod) {
+      if (!customerEmail.trim()) { toast.error('L\'email est requis'); return; }
+      if (!customerFirstName.trim()) { toast.error('Le prénom est requis'); return; }
+      if (!customerLastName.trim()) { toast.error('Le nom est requis'); return; }
+    }
+
     setLoading(true);
     try {
-      const isMobile = MOBILE_METHODS.includes(selectedMethod?.id);
       const fullPhone = isMobile ? getFullPhoneNumber() : null;
 
       if (isMobile) {
@@ -234,7 +254,16 @@ export default function GatewayPay() {
       const res = await fetch('/api/gateway/pay', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-api-key':token },
-        body: JSON.stringify({ amount: parseFloat(amount), country, method: selectedMethod?.id, phone: fullPhone, description }),
+        body: JSON.stringify({
+          amount:          parseFloat(amount),
+          country,
+          method:          selectedMethod?.id,
+          phone:           fullPhone,
+          email:           customerEmail || null,
+          customerName:    customerFirstName || null,
+          customerSurname: customerLastName  || null,
+          description,
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -333,7 +362,6 @@ export default function GatewayPay() {
   const btnTextColor = hexL(primaryColor) > 0.45 ? '#1a0f00' : '#fff';
   const filteredSuggestions = savedPhones.filter(p => p.country === country);
 
-  // Pays filtrés par la recherche
   const filteredCountries = countries.filter(c =>
     c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
     c.code.toLowerCase().includes(countrySearch.toLowerCase())
@@ -341,6 +369,7 @@ export default function GatewayPay() {
 
   const isKkiapayMethod = selectedMethod?.provider === 'kkiapay' && kkiapayPublicKey;
   const isMobileMethod  = MOBILE_METHODS.includes(selectedMethod?.id);
+  const isCardMethod    = CARD_METHODS.includes(selectedMethod?.id);
 
   /* ─── CSS dynamique ─────────────────────────────── */
   const css = `
@@ -488,6 +517,26 @@ export default function GatewayPay() {
       outline:none;transition:all .2s;
     }
     .gw-input:focus{border-color:${primaryColor};background:${design==='bold'?'#2A2A2A':'#fff'};box-shadow:0 0 0 3px ${primaryColor}18;}
+    .gw-input-text{
+      width:100%;padding:13px 16px;
+      background:${themeVars.inputBackground};border:${themeVars.inputBorder};border-radius:14px;
+      font-size:14px;font-family:${themeVars.fontFamily};color:${themeVars.textPrimary};
+      outline:none;transition:all .2s;
+    }
+    .gw-input-text::placeholder{color:${themeVars.textMuted};}
+    .gw-input-text:focus{border-color:${primaryColor};background:${design==='bold'?'#2A2A2A':'#fff'};box-shadow:0 0 0 3px ${primaryColor}18;}
+    .gw-input-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    .gw-input-wrap{position:relative;margin-bottom:14px;}
+    .gw-input-icon{
+      position:absolute;right:14px;top:50%;transform:translateY(-50%);
+      pointer-events:none;color:${themeVars.textMuted};opacity:.5;
+    }
+    .gw-card-notice{
+      display:flex;align-items:center;gap:8px;padding:10px 14px;
+      background:${primaryColor}08;border:1px solid ${primaryColor}20;
+      border-radius:12px;margin-bottom:16px;
+      font-size:11px;color:${themeVars.textSecondary};font-weight:500;
+    }
     .gw-suggestion{
       width:100%;text-align:left;padding:9px 12px;
       background:${themeVars.inputBackground};border:1px solid ${design==='bold'?'#333':'#EDE9E3'};border-radius:10px;
@@ -540,6 +589,7 @@ export default function GatewayPay() {
       .gw-wrapper{grid-template-columns:1fr;border-radius:24px 24px 0 0;max-width:100%;max-height:92vh;overflow-y:auto;}
       .gw-right{display:none;}
       .gw-left{padding:28px 22px 32px;min-height:auto;}
+      .gw-input-row{grid-template-columns:1fr;}
     }
     @media(min-width:681px) and (max-width:900px){
       .gw-wrapper{max-width:720px;grid-template-columns:1fr 280px;}
@@ -698,7 +748,6 @@ export default function GatewayPay() {
             <div className="gw-fade" style={{flex:1}}>
               <span className="gw-section-lbl">Sélectionnez votre pays</span>
 
-              {/* ── Barre de recherche ── */}
               <div className="gw-search-wrap">
                 <svg className="gw-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -763,7 +812,14 @@ export default function GatewayPay() {
               </div>
               <span className="gw-section-lbl">Mode de paiement</span>
               {countryData.methods?.length > 0 ? countryData.methods.map(method => (
-                <button key={method.id} onClick={() => { setSelectedMethod(method); setStep(3); }} className="gw-method-btn">
+                <button key={method.id} onClick={() => {
+                  setSelectedMethod(method);
+                  /* Reset champs carte à chaque changement de méthode */
+                  setCustomerFirstName('');
+                  setCustomerLastName('');
+                  setCustomerEmail('');
+                  setStep(3);
+                }} className="gw-method-btn">
                   <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
                   <span className="gw-method-name">{method.name}</span>
                   <ChevronRight size={14} style={{color:themeVars.textMuted}}/>
@@ -807,7 +863,7 @@ export default function GatewayPay() {
               ) : (
                 <form onSubmit={handleSubmit}>
 
-                  {/* ── Champ téléphone : uniquement pour les méthodes mobile ── */}
+                  {/* ── Champs MOBILE : téléphone ── */}
                   {isMobileMethod && (
                     <>
                       <div style={{marginBottom:6}}>
@@ -847,6 +903,64 @@ export default function GatewayPay() {
                           })}
                         </div>
                       )}
+                    </>
+                  )}
+
+                  {/* ── Champs CARTE : prénom, nom, email ── */}
+                  {isCardMethod && !isKkiapayMethod && (
+                    <>
+                      <div className="gw-card-notice">
+                        <CreditCard size={13} style={{color:primaryColor,flexShrink:0}}/>
+                        <span>Informations requises pour le paiement par carte sécurisé</span>
+                      </div>
+
+                      <div className="gw-input-row">
+                        <div>
+                          <label className="gw-input-label">Prénom</label>
+                          <div className="gw-input-wrap" style={{marginBottom:0}}>
+                            <input
+                              type="text"
+                              className="gw-input-text"
+                              value={customerFirstName}
+                              onChange={e => setCustomerFirstName(e.target.value)}
+                              placeholder="Jean"
+                              autoComplete="given-name"
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="gw-input-label">Nom</label>
+                          <div className="gw-input-wrap" style={{marginBottom:0}}>
+                            <input
+                              type="text"
+                              className="gw-input-text"
+                              value={customerLastName}
+                              onChange={e => setCustomerLastName(e.target.value)}
+                              placeholder="Dupont"
+                              autoComplete="family-name"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{marginTop:12,marginBottom:4}}>
+                        <label className="gw-input-label">Adresse email</label>
+                        <div style={{position:'relative'}}>
+                          <input
+                            type="email"
+                            className="gw-input-text"
+                            value={customerEmail}
+                            onChange={e => setCustomerEmail(e.target.value)}
+                            placeholder="jean.dupont@email.com"
+                            autoComplete="email"
+                            required
+                            style={{paddingRight:42}}
+                          />
+                          <Mail size={14} className="gw-input-icon"/>
+                        </div>
+                      </div>
                     </>
                   )}
 

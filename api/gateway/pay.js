@@ -484,13 +484,61 @@ cinetpay: async (config, { amount, phone, email, description, method }) => {
     return { success: true, reference: data.id, url: data._links?.checkout?.href || null, status: 'pending', provider: 'mollie' };
   },
 
-  adyen: async (config, { amount, currency, email, country }) => {
-    const sandbox = config.ADYEN_SANDBOX !== 'false';
-    const checkoutUrl = sandbox ? 'https://checkout-test.adyen.com/v71' : `https://${config.ADYEN_LIVE_PREFIX}-checkout-live.adyenpayments.com/v71`;
-    const { ok, data } = await safeFetch(`${checkoutUrl}/sessions`, { method: 'POST', headers: { 'X-API-Key': config.ADYEN_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ merchantAccount: config.ADYEN_MERCHANT_ACCOUNT, amount: { currency: (currency || 'EUR').toUpperCase(), value: Math.round(parseFloat(amount) * 100) }, returnUrl: `${process.env.VITE_APP_URL}/success`, reference: `GW-${Date.now()}`, countryCode: (country || 'FR').toUpperCase(), shopperEmail: email || undefined, channel: 'Web' }) });
-    if (!ok || data.status) return { success: false, error: data.message || 'Erreur Adyen' };
-    return { success: true, reference: data.id, url: `${process.env.VITE_APP_URL}/checkout/adyen?session=${data.id}`, status: 'pending', provider: 'adyen' };
-  },
+adyen: async (config, { amount, currency, email, country, customerName, customerSurname }) => {
+  const sandbox = config.ADYEN_SANDBOX !== 'false';
+  const checkoutUrl = sandbox
+    ? 'https://checkout-test.adyen.com/v71'
+    : `https://${config.ADYEN_LIVE_PREFIX}-checkout-live.adyenpayments.com/v71`;
+
+  const countryCode = (country || 'FR').toUpperCase();
+
+  const { ok, data } = await safeFetch(`${checkoutUrl}/sessions`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key':     config.ADYEN_API_KEY,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      merchantAccount: config.ADYEN_MERCHANT_ACCOUNT,
+      amount: {
+        currency: (currency || 'EUR').toUpperCase(),
+        value:    Math.round(parseFloat(amount) * 100),
+      },
+      returnUrl:    `${process.env.VITE_APP_URL}/success`,
+      reference:    `GW-${Date.now()}`,
+      countryCode,
+      channel:      'Web',
+
+      // ── Shopper (email requis pour 3DS Visa/JCB) ─────────────────
+      ...(email ? { shopperEmail: email } : {}),
+      ...(customerName || customerSurname ? {
+        shopperName: {
+          firstName: customerName    || '',
+          lastName:  customerSurname || '',
+        },
+      } : {}),
+
+      // ── billingAddress minimal (requis pour 3DS sur toutes cartes) ─
+      billingAddress: {
+        country:           countryCode,
+        city:              'N/A',
+        street:            'N/A',
+        houseNumberOrName: 'N/A',
+        postalCode:        '00000',
+        stateOrProvince:   'N/A',
+      },
+    }),
+  });
+
+  if (!ok || data.status) return { success: false, error: data.message || 'Erreur Adyen' };
+  return {
+    success:   true,
+    reference: data.id,
+    url:       `${process.env.VITE_APP_URL}/checkout/adyen?session=${data.id}`,
+    status:    'pending',
+    provider:  'adyen',
+  };
+},
 
   checkout: async (config, { amount, currency, email, country, description }) => {
     const sandbox = config.CHECKOUT_SANDBOX !== 'false';
