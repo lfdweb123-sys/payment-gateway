@@ -212,9 +212,9 @@ const PROVIDER_LIST = [
     methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],
     desc:'11 pays UEMOA · CEMAC' },
 
-  { id:'cinetpay',    name:'CinetPay',      section:'Afrique — Agrégateurs',
-    keys:['CINETPAY_API_KEY','CINETPAY_SITE_ID'],
-    website:'https://cinetpay.com',      countries:11,
+  { id:'cinetpay', name:'CinetPay', section:'Afrique — Agrégateurs',
+    keys:['CINETPAY_API_KEY','CINETPAY_SITE_ID','CINETPAY_SECRET_KEY'],
+    website:'https://cinetpay.com', countries:11,
     methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],
     desc:'11 pays Afrique' },
 

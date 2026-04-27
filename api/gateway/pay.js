@@ -264,35 +264,41 @@ const PROVIDER_CALLS = {
     return { success: true, reference: `kkia-${Date.now()}`, url: `https://widget.kkiapay.me/?${params.toString()}`, status: 'pending', provider: 'kkiapay' };
   },
 
-cinetpay: async (config, { amount, phone, email, description, method }) => {
+cinetpay: async (config, { amount, phone, email, description, method, customerName, customerSurname }) => {
+  const body = JSON.stringify({
+    apikey:                  config.CINETPAY_API_KEY,
+    site_id:                 config.CINETPAY_SITE_ID,
+    secret_key:  config.CINETPAY_SECRET_KEY,
+    transaction_id:          `GW-${Date.now()}`,
+    amount:                  Math.round(amount),
+    currency:                'XOF',
+    description:             (description || 'Paiement').replace(/[#/$_&]/g, '').substring(0, 200),
+    channels:                method === 'card' ? ['CREDIT_CARD'] : ['MOBILE_MONEY'],
+    notify_url:              `${process.env.VITE_APP_URL}/api/webhook/cinetpay`,
+    return_url:              `${process.env.VITE_APP_URL}/success`,
+    customer_name:           customerName    || 'Client',
+    customer_surname:        customerSurname || 'Client',
+    customer_email:          email           || 'client@cinetpay.com',
+    customer_phone_number:   phone           || '',
+    customer_address:        'Abidjan',
+    customer_city:           'Abidjan',
+    customer_country:        'CI',
+    customer_state:          'CI',
+    customer_zip_code:       '00225',
+    lang:                    'FR',
+    metadata:                'gateway',
+  });
+
   const { ok, data } = await safeFetch('https://api-checkout.cinetpay.com/v2/payment', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      apikey:                  config.CINETPAY_API_KEY,
-      site_id:                 config.CINETPAY_SITE_ID,
-      transaction_id:          `GW-${Date.now()}`,
-      amount:                  Math.round(amount),
-      currency:                'XOF',
-      description:             (description || 'Paiement').replace(/[#/$_&]/g, '').substring(0, 200),
-      channels:                method === 'card' ? ['CREDIT_CARD'] : ['MOBILE_MONEY'], // ✅ tableau
-      notify_url:              `${process.env.VITE_APP_URL}/api/webhook/cinetpay`,
-      return_url:              `${process.env.VITE_APP_URL}/success`,
-      customer_name:           'Client',
-      customer_surname:        'Client',           // ✅ requis par CinetPay v2
-      customer_email:          email || 'client@cinetpay.com',
-      customer_phone_number:   phone || '',
-      customer_address:        'Abidjan',          // ✅ requis pour la carte
-      customer_city:           'Abidjan',          // ✅ requis pour la carte
-      customer_country:        'CI',               // ✅ requis pour la carte
-      customer_state:          'CI',               // ✅ requis pour la carte
-      customer_zip_code:       '00225',            // ✅ requis pour la carte
-      lang:                    'FR',
-      metadata:                'gateway',
-    }),
+    body,
   });
 
-  if (!ok || data.code !== '201') return { success: false, error: data.message || data.description };
+  // ← Ajoute ça temporairement pour voir l'erreur exacte
+  console.error('CinetPay response:', JSON.stringify(data));
+
+  if (!ok || data.code !== '201') return { success: false, error: data.message || data.description || JSON.stringify(data) };
   return { success: true, reference: data.data?.payment_token, url: data.data?.payment_url, status: 'pending', provider: 'cinetpay' };
 },
 
