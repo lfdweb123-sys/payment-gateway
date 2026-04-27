@@ -44,12 +44,12 @@ async function isAntiFraudEnabled() {
     _antiFraudEnabled = snap.exists ? (snap.data().enabled !== false) : true;
     _antiFraudLastCheck = now;
   } catch {
-    _antiFraudEnabled = true; // fail open — on active par défaut
+    _antiFraudEnabled = true;
   }
   return _antiFraudEnabled;
 }
 
-/* ─── Anti-fraude (Node.js — pas d'import client Firebase) ──────────────── */
+/* ─── Anti-fraude ────────────────────────────────────────────────────────── */
 const FRAUD_RULES = {
   MAX_SAME_PHONE_PER_MINUTE: 3,
   MAX_SAME_PHONE_PER_10MIN:  5,
@@ -69,7 +69,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
   const signals = [];
   let score = 0;
 
-  // ── 1. Montant ────────────────────────────────────────────────────────────
   if (amount > FRAUD_RULES.MAX_SINGLE_AMOUNT) {
     signals.push({ code: 'AMOUNT_EXCEEDS_LIMIT', score: 80, detail: `${amount} XOF > plafond ${FRAUD_RULES.MAX_SINGLE_AMOUNT}` });
     score += 80;
@@ -78,7 +77,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     score += 10;
   }
 
-  // ── 2. Doublon exact (même téléphone + montant + méthode en 60s) ──────────
   if (phone) {
     const since = minutesAgoStr(1);
     const dupSnap = await db.collection('gateway_transactions')
@@ -94,7 +92,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     }
   }
 
-  // ── 3. Vélocité téléphone ─────────────────────────────────────────────────
   if (phone) {
     const [snap1, snap10] = await Promise.all([
       db.collection('gateway_transactions').where('phone', '==', phone).where('createdAt', '>=', minutesAgoStr(1)).limit(10).get(),
@@ -109,7 +106,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     }
   }
 
-  // ── 4. Vélocité compte marchand ───────────────────────────────────────────
   const [snapM1, snapM60] = await Promise.all([
     db.collection('gateway_transactions').where('merchantId', '==', merchantId).where('createdAt', '>=', minutesAgoStr(1)).limit(25).get(),
     db.collection('gateway_transactions').where('merchantId', '==', merchantId).where('createdAt', '>=', minutesAgoStr(60)).limit(250).get(),
@@ -122,7 +118,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     score += 20;
   }
 
-  // ── 5. Pattern : même montant répété 5x aujourd'hui ───────────────────────
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const repeatSnap = await db.collection('gateway_transactions')
     .where('merchantId', '==', merchantId)
@@ -134,14 +129,12 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     score += 25;
   }
 
-  // ── 6. Heure suspecte + gros montant ─────────────────────────────────────
   const hour = new Date().getHours();
   if (FRAUD_RULES.SUSPICIOUS_HOURS.includes(hour) && amount > 100_000) {
     signals.push({ code: 'SUSPICIOUS_HOUR', score: 15, detail: `Gros montant (${amount} XOF) à ${hour}h du matin` });
     score += 15;
   }
 
-  // ── 7. Blacklist ──────────────────────────────────────────────────────────
   const blChecks = [
     { type: 'user',  value: merchantId },
     { type: 'phone', value: phone },
@@ -159,7 +152,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     }
   }
 
-  // ── 8. Score de confiance du marchand ─────────────────────────────────────
   const trustDoc = await db.collection('trust_scores').doc(merchantId).get();
   const trustScore = trustDoc.exists ? (trustDoc.data().score ?? 60) : 60;
   if (trustScore < 40 && signals.length > 0) {
@@ -168,13 +160,11 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     score += bonus;
   }
 
-  // ── Décision ──────────────────────────────────────────────────────────────
   const riskScore = Math.min(100, score);
   const decision  = riskScore >= 70 ? 'BLOCKED'
                   : riskScore >= 40 ? 'REVIEW'
                   :                   'APPROVED';
 
-  // Persister le log fraude
   await db.collection('fraud_logs').add({
     merchantId, amount, method, country,
     phone:     phone ? phone.substring(0, 6) + '****' : null,
@@ -182,7 +172,6 @@ async function runAntiFraud({ merchantId, amount, method, country, phone, email 
     timestamp: new Date().toISOString(),
   });
 
-  // Créer une alerte si risque >= 50
   if (riskScore >= 50) {
     await db.collection('fraud_alerts').add({
       merchantId, amount, method, country,
@@ -206,6 +195,74 @@ async function safeFetch(url, options) {
     console.error(`Non-JSON from ${url} (${res.status}):`, text.substring(0, 200));
     return { ok: false, status: res.status, data: { message: `Invalid response (HTTP ${res.status})` } };
   }
+}
+
+/* ─── Conversion devise ──────────────────────────────────────────────────────
+   Taux fixes XOF ↔ autres devises.
+   1 EUR ≈ 655 XOF  →  1 XOF ≈ 0.001527 EUR
+   Utilisés uniquement quand le merchant est en XOF et le provider
+   n'accepte pas XOF (Stripe, Adyen, Mollie, PayPal, Square, etc.)
+─────────────────────────────────────────────────────────────────────────────*/
+const XOF_RATES = {
+  EUR: 1 / 655.957,   // taux officiel BCEAO
+  USD: 1 / 600,
+  GBP: 1 / 780,
+  ZAR: 1 / 33,
+  INR: 1 / 7.2,
+  CAD: 1 / 445,
+  AUD: 1 / 395,
+  NGN: 1 / 0.4,      // 1 NGN ≈ 2.5 XOF
+  GHS: 1 / 45,
+  KES: 1 / 4.5,
+  TND: 1 / 195,      // Tunisie
+};
+
+/* Devises qui n'acceptent PAS XOF — nécessitent conversion */
+const PROVIDERS_NEEDING_CONVERSION = new Set([
+  'stripe','adyen','mollie','checkout','braintree',
+  'paypal','square','authnet','razorpay','yoco',
+]);
+
+/* Devise native de chaque provider (si le merchant est en XOF) */
+const PROVIDER_NATIVE_CURRENCY = {
+  stripe:    'EUR',
+  adyen:     'EUR',
+  mollie:    'EUR',
+  checkout:  'EUR',
+  braintree: 'USD',
+  paypal:    'EUR',
+  square:    'USD',
+  authnet:   'USD',
+  razorpay:  'INR',
+  yoco:      'ZAR',
+  paystack:  'NGN',
+  flutterwave: 'NGN',
+};
+
+/**
+ * Convertit un montant de merchantCurrency vers targetCurrency.
+ * Si les deux devises sont identiques, retourne le montant tel quel.
+ */
+function convertAmount(amount, fromCurrency, toCurrency) {
+  const from = (fromCurrency || 'XOF').toUpperCase();
+  const to   = (toCurrency   || 'XOF').toUpperCase();
+  if (from === to) return amount;
+
+  // XOF → autre devise
+  if (from === 'XOF' && XOF_RATES[to]) {
+    const converted = amount * XOF_RATES[to];
+    // Arrondir à 2 décimales sauf pour les devises sans décimales
+    const noDecimal = new Set(['NGN', 'KES', 'GHS', 'INR']);
+    return noDecimal.has(to) ? Math.round(converted) : Math.round(converted * 100) / 100;
+  }
+
+  // autre devise → XOF
+  if (to === 'XOF' && XOF_RATES[from]) {
+    return Math.round(amount / XOF_RATES[from]);
+  }
+
+  // Pas de taux connu → on retourne tel quel
+  return amount;
 }
 
 /* ─── Commission 1% vers compte propriétaire ────────────────────────────── */
@@ -259,9 +316,83 @@ const PROVIDER_CALLS = {
     return { success: true, reference: data.reference, url: data.payment_url || null, status: data.status || 'PENDING', provider: 'feexpay' };
   },
 
-kkiapay: async (config, { amount, phone, email }) => {
+  kkiapay: async (config, { amount, phone, email }) => {
     const params = new URLSearchParams({ amount: String(Math.round(amount)), key: config.KKIAPAY_PUBLIC_KEY, callback: `${process.env.VITE_APP_URL}/success`, ...(phone ? { phone } : {}), ...(email ? { email } : {}) });
     return { success: true, reference: `kkia-${Date.now()}`, url: `https://widget.kkiapay.me/?${params.toString()}`, status: 'pending', provider: 'kkiapay' };
+  },
+
+    geniuspay: async (config, { amount, phone, email, description, method, country, customerName }) => {
+    /* GeniusPay — https://pay.genius.ci/docs/api
+      Clés : GENIUSPAY_API_KEY (pk_...) + GENIUSPAY_API_SECRET (sk_...)
+      Devise native : XOF — pas de conversion nécessaire
+      Modes :
+        - Sans payment_method → checkout page GeniusPay (client choisit)
+        - Avec payment_method → redirection directe vers le gateway
+    */
+
+    // Mapping méthode interne → code GeniusPay
+    const METHOD_MAP = {
+      wave_money:    'wave',
+      orange_money:  'orange_money',
+      mtn_money:     'mtn_money',
+      moov_money:    'moov_money',
+      airtel_money:  'airtel_money',
+      card:          'card',
+      paypal:        'paystack',   // paystack gère les cartes aussi
+      // pawapay = auto-routing depuis le numéro
+      mtn_money_bj:  'pawapay',
+      moov_money_bj: 'pawapay',
+    };
+
+    const geniusMethod = METHOD_MAP[method] || null;
+    // Si la méthode n'est pas reconnue → mode checkout (le client choisit)
+
+    const body = {
+      amount:      Math.round(amount),
+      currency:    'XOF',
+      description: (description || 'Paiement').substring(0, 500),
+      success_url: `${process.env.VITE_APP_URL}/success`,
+      error_url:   `${process.env.VITE_APP_URL}/cancel`,
+      customer: {
+        ...(customerName ? { name: customerName } : {}),
+        ...(email        ? { email }              : {}),
+        ...(phone        ? { phone }              : {}),
+        ...(country      ? { country: country.toUpperCase() } : {}),
+      },
+      metadata: { gateway_ref: `GW-${Date.now()}` },
+    };
+
+    // Ajouter payment_method seulement si connu — sinon checkout GeniusPay
+    if (geniusMethod) body.payment_method = geniusMethod;
+
+    // Pour PawaPay : auto-routing depuis le numéro, pas besoin de mmo_provider
+    // Si besoin de forcer un opérateur, ajouter : body.mmo_provider = 'ORANGE_CIV'
+
+    const { ok, data } = await safeFetch('https://pay.genius.ci/api/v1/merchant/payments', {
+      method: 'POST',
+      headers: {
+        'X-API-Key':    config.GENIUSPAY_API_KEY,
+        'X-API-Secret': config.GENIUSPAY_API_SECRET,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!ok || !data.success) {
+      return { success: false, error: data?.error?.message || 'Erreur GeniusPay' };
+    }
+
+    // L'API retourne payment_url (direct) ou checkout_url (mode checkout)
+    const url = data.data?.payment_url || data.data?.checkout_url || null;
+    const reference = data.data?.reference || `GW-${Date.now()}`;
+
+    return {
+      success:   true,
+      reference,
+      url,
+      status:    'pending',
+      provider:  'geniuspay',
+    };
   },
 
   cinetpay: async (config, { amount, phone, email, description, method, customerName, customerSurname }) => {
@@ -288,13 +419,11 @@ kkiapay: async (config, { amount, phone, email }) => {
       lang:                    'FR',
       metadata:                'gateway',
     });
-
     const { ok, data } = await safeFetch('https://api-checkout.cinetpay.com/v2/payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
     });
-
     if (!ok || data.code !== '201') return { success: false, error: data.message || data.description || JSON.stringify(data) };
     return { success: true, reference: data.data?.payment_token, url: data.data?.payment_url, status: 'pending', provider: 'cinetpay' };
   },
@@ -487,61 +616,30 @@ kkiapay: async (config, { amount, phone, email }) => {
     return { success: true, reference: data.id, url: data._links?.checkout?.href || null, status: 'pending', provider: 'mollie' };
   },
 
-adyen: async (config, { amount, currency, email, country, customerName, customerSurname }) => {
-  const sandbox = config.ADYEN_SANDBOX !== 'false';
-  const checkoutUrl = sandbox
-    ? 'https://checkout-test.adyen.com/v71'
-    : `https://${config.ADYEN_LIVE_PREFIX}-checkout-live.adyenpayments.com/v71`;
-
-  const countryCode = (country || 'FR').toUpperCase();
-
-  const { ok, data } = await safeFetch(`${checkoutUrl}/sessions`, {
-    method: 'POST',
-    headers: {
-      'X-API-Key':     config.ADYEN_API_KEY,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      merchantAccount: config.ADYEN_MERCHANT_ACCOUNT,
-      amount: {
-        currency: (currency || 'EUR').toUpperCase(),
-        value:    Math.round(parseFloat(amount) * 100),
-      },
-      returnUrl:    `${process.env.VITE_APP_URL}/success`,
-      reference:    `GW-${Date.now()}`,
-      countryCode,
-      channel:      'Web',
-
-      // ── Shopper (email requis pour 3DS Visa/JCB) ─────────────────
-      ...(email ? { shopperEmail: email } : {}),
-      ...(customerName || customerSurname ? {
-        shopperName: {
-          firstName: customerName    || '',
-          lastName:  customerSurname || '',
-        },
-      } : {}),
-
-      // ── billingAddress minimal (requis pour 3DS sur toutes cartes) ─
-      billingAddress: {
-        country:           countryCode,
-        city:              'N/A',
-        street:            'N/A',
-        houseNumberOrName: 'N/A',
-        postalCode:        '00000',
-        stateOrProvince:   'N/A',
-      },
-    }),
-  });
-
-  if (!ok || data.status) return { success: false, error: data.message || 'Erreur Adyen' };
-  return {
-    success:   true,
-    reference: data.id,
-    url:       `${process.env.VITE_APP_URL}/checkout/adyen?session=${data.id}`,
-    status:    'pending',
-    provider:  'adyen',
-  };
-},
+  adyen: async (config, { amount, currency, email, country, customerName, customerSurname }) => {
+    const sandbox = config.ADYEN_SANDBOX !== 'false';
+    const checkoutUrl = sandbox
+      ? 'https://checkout-test.adyen.com/v71'
+      : `https://${config.ADYEN_LIVE_PREFIX}-checkout-live.adyenpayments.com/v71`;
+    const countryCode = (country || 'FR').toUpperCase();
+    const { ok, data } = await safeFetch(`${checkoutUrl}/sessions`, {
+      method: 'POST',
+      headers: { 'X-API-Key': config.ADYEN_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchantAccount: config.ADYEN_MERCHANT_ACCOUNT,
+        amount: { currency: (currency || 'EUR').toUpperCase(), value: Math.round(parseFloat(amount) * 100) },
+        returnUrl:    `${process.env.VITE_APP_URL}/success`,
+        reference:    `GW-${Date.now()}`,
+        countryCode,
+        channel:      'Web',
+        ...(email ? { shopperEmail: email } : {}),
+        ...(customerName || customerSurname ? { shopperName: { firstName: customerName || '', lastName: customerSurname || '' } } : {}),
+        billingAddress: { country: countryCode, city: 'N/A', street: 'N/A', houseNumberOrName: 'N/A', postalCode: '00000', stateOrProvince: 'N/A' },
+      }),
+    });
+    if (!ok || data.status) return { success: false, error: data.message || 'Erreur Adyen' };
+    return { success: true, reference: data.id, url: `${process.env.VITE_APP_URL}/checkout/adyen?session=${data.id}`, status: 'pending', provider: 'adyen' };
+  },
 
   checkout: async (config, { amount, currency, email, country, description }) => {
     const sandbox = config.CHECKOUT_SANDBOX !== 'false';
@@ -591,20 +689,20 @@ adyen: async (config, { amount, currency, email, country, customerName, customer
 /* ─── Sélection du meilleur provider ────────────────────────────────────── */
 function getBestProvider(method, country, providers) {
   const PRIORITY = {
-    mtn_money:      ['feexpay','kkiapay','cinetpay','hub2','fedapay','mbiyopay','lygos','qosic','bizao','mtn'],
-    moov_money:     ['feexpay','kkiapay','cinetpay','fedapay','mbiyopay','lygos','qosic','bizao'],
+    mtn_money:      ['feexpay','kkiapay','geniuspay','cinetpay','hub2','fedapay','mbiyopay','lygos','qosic','bizao','mtn'],
+    moov_money:     ['feexpay','kkiapay','geniuspay','cinetpay','fedapay','mbiyopay','lygos','qosic','bizao'],
     celtiis_money:  ['feexpay','cinetpay','mbiyopay','qosic'],
-    orange_money:   ['feexpay','kkiapay','cinetpay','fedapay','mbiyopay','lygos','qosic','bizao','orange'],
-    free_money:     ['feexpay','kkiapay','cinetpay','fedapay','paydunya'],
-    wave_money:     ['feexpay','kkiapay','cinetpay','hub2','paydunya','wave'],
+    orange_money:   ['feexpay','kkiapay','geniuspay','cinetpay','fedapay','mbiyopay','lygos','qosic','bizao','orange'],
+    free_money:     ['feexpay','kkiapay','geniuspay','cinetpay','fedapay','paydunya'],
+    wave_money:     ['feexpay','kkiapay','geniuspay','cinetpay','hub2','paydunya','wave'],
     togocom_money:  ['feexpay','kkiapay','cinetpay','fedapay'],
     wallet:         ['feexpay'],
     coris:          ['feexpay','mbiyopay'],
-    mpesa:          ['mpesa','paystack','flutterwave','mbiyopay'],
-    airtel_money:   ['airtel','mbiyopay','fedapay','cinetpay','lygos'],
+    mpesa:          ['mpesa','geniuspay','paystack','flutterwave','mbiyopay'],
+    airtel_money:   ['airtel','geniuspay','mbiyopay','fedapay','cinetpay','lygos'],
     afrimoney:      ['mbiyopay'],
     qmoney:         ['mbiyopay'],
-    card:           ['stripe','checkout','adyen','paystack','flutterwave','paypal','mollie','square','braintree','cinetpay','kkiapay','yoco','razorpay','authnet'],
+    card:           ['stripe','checkout','adyen','geniuspay','paystack','flutterwave','paypal','mollie','square','braintree','cinetpay','kkiapay','yoco','razorpay','authnet'],
     paypal:         ['paypal','braintree'],
     venmo:          ['braintree','paypal'],
     apple_pay:      ['stripe','checkout','adyen','square','braintree','authnet'],
@@ -622,7 +720,7 @@ function getBestProvider(method, country, providers) {
     bacs:           ['stripe'],
     bizum:          ['stripe'],
     flouci_wallet:  ['flouci'],
-    mobile_money:   ['flutterwave','paystack','mbiyopay'],
+    mobile_money:   ['geniuspay','flutterwave','paystack','mbiyopay'],
   };
   const candidates = PRIORITY[method] || ['feexpay'];
   for (const pid of candidates) { if (providers[pid]?.active) return pid; }
@@ -672,17 +770,13 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Compte non activé' });
     }
 
-    // ── Anti-fraude ──────────────────────────────────────────────────────────
-    // Activable/désactivable depuis FraudDashboard → gateway_settings/antiFraud
+    // ── Anti-fraude ────────────────────────────────────────────────────────
     const antiFraudActive = await isAntiFraudEnabled();
     if (antiFraudActive) {
       const fraud = await runAntiFraud({
         merchantId: merchant.id,
         amount:     parseFloat(amount),
-        method,
-        country,
-        phone,
-        email,
+        method, country, phone, email,
       });
 
       await log('pay', fraud.blocked ? 'WARN' : 'INFO', `Anti-fraude : ${fraud.decision}`, {
@@ -700,7 +794,6 @@ export default async function handler(req, res) {
         });
       }
     }
-    // ────────────────────────────────────────────────────────────────────────
 
     const providers  = merchant.providers || {};
     const providerId = getBestProvider(method, country, providers);
@@ -718,25 +811,54 @@ export default async function handler(req, res) {
     const commission = Math.round(amountNum * 0.01);
     const netAmount  = amountNum - commission;
 
+    /* ── Devise : devise du marchand (XOF par défaut) ──────────────────────
+       Si le provider ne supporte pas la devise du marchand, on convertit.
+       La transaction est toujours enregistrée en devise marchand (XOF).
+    ──────────────────────────────────────────────────────────────────────── */
+    const merchantCurrency = (currency || merchant.currency || 'XOF').toUpperCase();
+
+    let providerCurrency = merchantCurrency;
+    let providerAmount   = netAmount;
+
+    if (PROVIDERS_NEEDING_CONVERSION.has(providerId)) {
+      // Utiliser la devise native du provider sauf si le merchant l'a
+      // explicitement indiqué et que le provider l'accepte
+      const nativeCurrency = PROVIDER_NATIVE_CURRENCY[providerId] || 'EUR';
+      if (merchantCurrency !== nativeCurrency) {
+        providerCurrency = nativeCurrency;
+        providerAmount   = convertAmount(netAmount, merchantCurrency, nativeCurrency);
+        await log('pay', 'INFO', `Conversion devise ${merchantCurrency} → ${nativeCurrency}`, {
+          original:   netAmount,
+          converted:  providerAmount,
+          providerId,
+          merchantId: merchant.id,
+        });
+      }
+    }
+
     const result = await callFn(providers[providerId], {
-      amount: netAmount, phone, email, country, method, description,
-      currency: currency || 'XOF',
+      amount:          providerAmount,   // ← montant converti si besoin
+      phone, email, country, method, description,
+      currency:        providerCurrency, // ← devise du provider
       customerName,
       customerSurname,
     });
 
     await log('pay', result.success ? 'INFO' : 'WARN',
       result.success ? 'Paiement initié avec succès' : 'Paiement échoué côté provider',
-      { providerId, amount: amountNum, status: result.status, reference: result.reference || null, error: result.error || null, merchantId: merchant.id }
+      { providerId, amount: amountNum, providerAmount, providerCurrency, merchantCurrency, status: result.status, reference: result.reference || null, error: result.error || null, merchantId: merchant.id }
     );
 
     const isCompleted = result.success && (result.status === 'SUCCESSFUL' || result.status === 'completed');
 
     const txRef = await db.collection('gateway_transactions').add({
       merchantId:       merchant.id,
-      amount:           amountNum,
+      amount:           amountNum,          // toujours en devise marchand
       commission,
       netAmount,
+      providerAmount,                        // montant réellement envoyé au provider
+      providerCurrency,                      // devise utilisée côté provider
+      merchantCurrency,
       country,
       method,
       phone:            phone || null,
@@ -748,7 +870,11 @@ export default async function handler(req, res) {
       createdAt:        new Date().toISOString(),
     });
 
-    await log('pay', 'INFO', 'Transaction enregistrée', { transactionId: txRef.id, status: result.success ? (isCompleted ? 'completed' : 'pending') : 'failed', providerId, merchantId: merchant.id });
+    await log('pay', 'INFO', 'Transaction enregistrée', {
+      transactionId: txRef.id,
+      status: result.success ? (isCompleted ? 'completed' : 'pending') : 'failed',
+      providerId, merchantId: merchant.id,
+    });
 
     if (isCompleted) {
       await db.collection('gateway_merchants').doc(merchant.id).update({
@@ -764,7 +890,6 @@ export default async function handler(req, res) {
       });
       await log('pay', 'INFO', 'Commission envoyée', { commission, commissionRef, merchantId: merchant.id });
 
-      // Mettre à jour le score de confiance positivement
       const trustRef = db.collection('trust_scores').doc(merchant.id);
       const trustSnap = await trustRef.get();
       const current = trustSnap.exists ? (trustSnap.data().score ?? 60) : 60;
@@ -772,14 +897,14 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      success:       result.success,
-      transactionId: txRef.id,
-      reference:     result.reference,
-      status:        result.status,
-      provider:      providerId,
-      url:           result.url        || null,
-      clientToken:   result.clientToken || null,
-      message:       result.success ? 'Paiement initié.' : result.error,
+      success:         result.success,
+      transactionId:   txRef.id,
+      reference:       result.reference,
+      status:          result.status,
+      provider:        providerId,
+      url:             result.url        || null,
+      clientToken:     result.clientToken || null,
+      message:         result.success ? 'Paiement initié.' : result.error,
     });
 
   } catch (error) {

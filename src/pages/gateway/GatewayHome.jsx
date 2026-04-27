@@ -170,6 +170,8 @@ const PROVIDERS = [
   { name: 'Lygos',        region: 'Afrique' },
   { name: 'MbiyoPay',     region: 'Afrique' },
   { name: 'Bizao',        region: 'Afrique' },
+  { name: 'GeniusPay', region: 'Afrique' },
+
   /* ── Mobile Money direct ── */
   { name: 'Wave',         region: 'Afrique' },
   { name: 'MTN MoMo',     region: 'Afrique' },

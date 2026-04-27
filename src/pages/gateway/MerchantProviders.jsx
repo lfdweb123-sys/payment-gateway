@@ -260,6 +260,14 @@ const PROVIDER_LIST = [
     methods:['Mobile Money'],
     desc:'11 pays Afrique · Bénin · Gambie · RDC' },
 
+
+  { id:'geniuspay', name:'GeniusPay', section:'Afrique — Agrégateurs',
+  keys:['GENIUSPAY_API_KEY','GENIUSPAY_API_SECRET','GENIUSPAY_WEBHOOK_SECRET'],
+  website:'https://pay.genius.ci',
+  countries:12,
+  methods:['Wave','Orange Money','MTN MoMo','Moov Money','Airtel Money','Carte Bancaire','PawaPay'],
+  desc:"Côte d'Ivoire · Sénégal · Bénin · Cameroun · RDC · Kenya · 12 pays" },
+
   // ── Mobile Money direct ──────────────────────────────────────────────────
   { id:'wave',        name:'Wave',          section:'Afrique — Mobile Money Direct',
     keys:['WAVE_API_KEY','WAVE_SIGNING_SECRET'],

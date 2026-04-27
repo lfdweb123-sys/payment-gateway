@@ -93,10 +93,7 @@ function tplPaymentFailed(name, amount, currency, reference, reason) {
 }
 
 /* ─── Normalisation des webhooks par provider ────────────────────────────── */
-function parseWebhook(provider, body) {
-  // Retourne { reference, status } ou null si non reconnu
-  // status : 'SUCCESSFUL' | 'FAILED' | 'PENDING' | null (ignorer)
-
+function parseWebhook(provider, body, req) {
   switch (provider) {
 
     // ── Agrégateurs Afrique de l'Ouest ──────────────────────────────────
@@ -121,7 +118,7 @@ function parseWebhook(provider, body) {
         reference: body.transaction_id || body.payment_token,
         status:    body.status === 'ACCEPTED'  ? 'SUCCESSFUL'
                  : body.status === 'REFUSED'   ? 'FAILED'
-                 : body.status === 'WAITING_FOR_CUSTOMER' ? null // pas encore terminé
+                 : body.status === 'WAITING_FOR_CUSTOMER' ? null
                  : null,
       };
 
@@ -150,7 +147,6 @@ function parseWebhook(provider, body) {
       };
 
     case 'qosic':
-      // Qosic envoie responsecode === "00" pour succès
       return {
         reference: body.transref || body.reference,
         status:    body.responsecode === '00' || body.status === 'success' ? 'SUCCESSFUL'
@@ -182,6 +178,26 @@ function parseWebhook(provider, body) {
                  : null,
       };
 
+    // ── GeniusPay ────────────────────────────────────────────────────────
+    // Doc : https://pay.genius.ci/docs/api#webhook-events
+    // Headers : X-Webhook-Event, X-Webhook-Signature, X-Webhook-Timestamp
+    // Payload  : { event, data: { reference, status, ... } }
+    // Clés du marchand stockées dans Firestore → merchant.providers.geniuspay
+    // { GENIUSPAY_API_KEY, GENIUSPAY_API_SECRET, GENIUSPAY_WEBHOOK_SECRET }
+    case 'geniuspay': {
+      const event  = (req?.headers?.['x-webhook-event'] || body.event || '').toLowerCase();
+      const ref    = body.data?.reference;
+      const status = (body.data?.status || '').toLowerCase();
+      return {
+        reference: ref,
+        status: event === 'payment.success' || status === 'completed'  ? 'SUCCESSFUL'
+              : event === 'payment.failed'  || status === 'failed'     ? 'FAILED'
+              : event === 'payment.expired' || status === 'expired'    ? 'FAILED'
+              : event === 'payment.cancelled' || status === 'cancelled'? 'FAILED'
+              : null,
+      };
+    }
+
     // ── Mobile Money direct ──────────────────────────────────────────────
     case 'wave':
       return {
@@ -200,7 +216,6 @@ function parseWebhook(provider, body) {
       };
 
     case 'mpesa':
-      // Daraja STK callback
       return {
         reference: body.Body?.stkCallback?.CheckoutRequestID,
         status:    body.Body?.stkCallback?.ResultCode === 0 ? 'SUCCESSFUL'
@@ -211,9 +226,9 @@ function parseWebhook(provider, body) {
     case 'orange':
       return {
         reference: body.order_id || body.reference,
-        status:    body.status === 'SUCCESS'    ? 'SUCCESSFUL'
-                 : body.status === 'FAILED'     ? 'FAILED'
-                 : body.status === 'CANCELLED'  ? 'FAILED'
+        status:    body.status === 'SUCCESS'   ? 'SUCCESSFUL'
+                 : body.status === 'FAILED'    ? 'FAILED'
+                 : body.status === 'CANCELLED' ? 'FAILED'
                  : null,
       };
 
@@ -238,8 +253,8 @@ function parseWebhook(provider, body) {
     case 'paystack':
       return {
         reference: body.data?.reference,
-        status:    body.event === 'charge.success'   ? 'SUCCESSFUL'
-                 : body.event === 'charge.failed'    ? 'FAILED'
+        status:    body.event === 'charge.success' ? 'SUCCESSFUL'
+                 : body.event === 'charge.failed'  ? 'FAILED'
                  : null,
       };
 
@@ -247,7 +262,7 @@ function parseWebhook(provider, body) {
       return {
         reference: body.data?.tx_ref || body.txRef,
         status:    body.event === 'charge.completed' && body.data?.status === 'successful' ? 'SUCCESSFUL'
-                 : body.data?.status === 'failed'   ? 'FAILED'
+                 : body.data?.status === 'failed' ? 'FAILED'
                  : null,
       };
 
@@ -288,8 +303,7 @@ function parseWebhook(provider, body) {
     case 'mollie':
       return {
         reference: body.id,
-        // Mollie envoie juste l'ID — on ira vérifier le statut
-        status:    'CHECK', // statut à vérifier via l'API
+        status:    'CHECK',
       };
 
     case 'adyen':
@@ -303,9 +317,9 @@ function parseWebhook(provider, body) {
     case 'checkout':
       return {
         reference: body.data?.id,
-        status:    body.type === 'payment_captured'   ? 'SUCCESSFUL'
-                 : body.type === 'payment_declined'   ? 'FAILED'
-                 : body.type === 'payment_expired'    ? 'FAILED'
+        status:    body.type === 'payment_captured' ? 'SUCCESSFUL'
+                 : body.type === 'payment_declined' ? 'FAILED'
+                 : body.type === 'payment_expired'  ? 'FAILED'
                  : null,
       };
 
@@ -330,13 +344,12 @@ function parseWebhook(provider, body) {
     case 'square':
       return {
         reference: body.data?.object?.payment_link?.id || body.data?.id,
-        status:    body.type === 'payment.completed'   ? 'SUCCESSFUL'
-                 : body.type === 'payment.failed'      ? 'FAILED'
+        status:    body.type === 'payment.completed' ? 'SUCCESSFUL'
+                 : body.type === 'payment.failed'    ? 'FAILED'
                  : null,
       };
 
     case 'authnet':
-      // Authorize.net envoie un XML converti en JSON via leur Silent Post
       return {
         reference: body.x_trans_id || body.transId,
         status:    body.x_response_code === '1' || body.responseCode === '1' ? 'SUCCESSFUL'
@@ -345,7 +358,6 @@ function parseWebhook(provider, body) {
       };
 
     default:
-      // Fallback générique
       return {
         reference: body.reference || body.transaction_id || body.id || body.order_id,
         status:
@@ -372,18 +384,65 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST requis' });
 
   try {
-    const { reference, status } = parseWebhook(provider, req.body);
+
+    // ── Vérification signature GeniusPay ────────────────────────────────
+    // La clé whsec est stockée dans Firestore → merchant.providers.geniuspay.GENIUSPAY_WEBHOOK_SECRET
+    // Pour la vérifier ici on cherche le marchand depuis la référence dans le body
+    if (provider === 'geniuspay') {
+      const signature = req.headers['x-webhook-signature'];
+      const timestamp = req.headers['x-webhook-timestamp'];
+
+      if (signature && timestamp) {
+        // Chercher le webhook secret depuis le marchand concerné
+        // body.data.metadata.gateway_ref contient notre référence interne GW-...
+        // On cherche la transaction pour retrouver le merchantId
+        const ref = req.body?.data?.reference;
+        if (ref) {
+          const txSnap = await db.collection('gateway_transactions')
+            .where('providerRef', '==', ref)
+            .limit(1).get();
+
+          if (!txSnap.empty) {
+            const merchantId    = txSnap.docs[0].data().merchantId;
+            const merchantSnap  = await db.collection('gateway_merchants').doc(merchantId).get();
+            const whsecret      = merchantSnap.exists
+              ? merchantSnap.data()?.providers?.geniuspay?.GENIUSPAY_WEBHOOK_SECRET
+              : null;
+
+            if (whsecret) {
+              const crypto   = await import('crypto');
+              const payload  = JSON.stringify(req.body);
+              const expected = crypto.default
+                .createHmac('sha256', whsecret)
+                .update(`${timestamp}.${payload}`)
+                .digest('hex');
+
+              if (expected !== signature) {
+                await log('webhook', 'WARN', 'GeniusPay signature invalide', { provider, ref });
+                return res.status(401).json({ error: 'Signature invalide' });
+              }
+
+              // Protection anti-replay (5 minutes)
+              if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > 300) {
+                await log('webhook', 'WARN', 'GeniusPay timestamp trop ancien', { provider, ref });
+                return res.status(400).json({ error: 'Timestamp trop ancien' });
+              }
+            }
+          }
+        }
+      }
+    }
+    // ───────────────────────────────────────────────────────────────────
+
+    const { reference, status } = parseWebhook(provider, req.body, req);
 
     // ── Cas Mollie : vérifier le statut via l'API ──────────────────────
     if (provider === 'mollie' && status === 'CHECK' && reference) {
-      // On laisse passer — la mise à jour se fera via polling ou vérification manuelle
-      // car Mollie envoie juste l'ID sans le statut dans le webhook
       console.info(`Mollie webhook reçu pour ${reference} — vérification manuelle requise`);
       return res.status(200).json({ success: true, message: 'Webhook Mollie reçu' });
     }
 
     if (!reference || !status || status === null) {
-      // Webhook ignoré (event non pertinent ou incomplet)
       return res.status(200).json({ success: true, message: 'Webhook ignoré' });
     }
 

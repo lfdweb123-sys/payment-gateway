@@ -17,6 +17,8 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import Developer from './pages/gateway/Developer';
 import Verification from './pages/gateway/Verification';
 import MerchantPayouts from './pages/gateway/MerchantPayouts';
+import PaymentSuccess from './pages/gateway/PaymentSuccess';
+
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -50,6 +52,7 @@ function AppContent() {
   const isAuthPage   = location.pathname === '/login' || location.pathname === '/register';
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isPublicPage = location.pathname === '/' || location.pathname === '/pay' ||
+    location.pathname === '/success' ||   // ← ajouter
     location.pathname.startsWith('/api-documentation') ||
     location.pathname === '/help'    || location.pathname === '/privacy' ||
     location.pathname === '/contact' || location.pathname === '/terms'   ||
@@ -78,6 +81,8 @@ function AppContent() {
             <Route path="/terms"   element={<Terms />} />
             <Route path="/cookies" element={<Cookies />} />
             <Route path="/legal"   element={<Legal />} />
+            <Route path="/success" element={<PaymentSuccess />} />
+
 
             {/* Pages protégées — Marchand */}
             <Route path="/dashboard"   element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
