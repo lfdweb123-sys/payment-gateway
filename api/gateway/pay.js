@@ -259,8 +259,8 @@ const PROVIDER_CALLS = {
     return { success: true, reference: data.reference, url: data.payment_url || null, status: data.status || 'PENDING', provider: 'feexpay' };
   },
 
-  kkiapay: async (config, { amount, phone, email }) => {
-    const params = new URLSearchParams({ amount: String(Math.round(amount)), key: config.KKIAPAY_PUBLIC_KEY, callback: `${process.env.VITE_APP_URL}/success`, ...(phone ? { phone } : {}), ...(email ? { email } : {}), ...(config.KKIAPAY_SANDBOX === 'true' ? { sandbox: 'true' } : {}) });
+kkiapay: async (config, { amount, phone, email }) => {
+    const params = new URLSearchParams({ amount: String(Math.round(amount)), key: config.KKIAPAY_PUBLIC_KEY, callback: `${process.env.VITE_APP_URL}/success`, ...(phone ? { phone } : {}), ...(email ? { email } : {}) });
     return { success: true, reference: `kkia-${Date.now()}`, url: `https://widget.kkiapay.me/?${params.toString()}`, status: 'pending', provider: 'kkiapay' };
   },
 

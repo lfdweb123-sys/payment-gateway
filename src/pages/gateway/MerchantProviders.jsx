@@ -207,7 +207,7 @@ const PROVIDER_LIST = [
     desc:"Bénin · Togo · Côte d'Ivoire · Sénégal · Burkina · Congo" },
 
   { id:'kkiapay',     name:'KKiaPay',       section:'Afrique — Agrégateurs',
-    keys:['KKIAPAY_PUBLIC_KEY','KKIAPAY_PRIVATE_KEY','KKIAPAY_SECRET_KEY','KKIAPAY_SANDBOX'],
+    keys:['KKIAPAY_PUBLIC_KEY','KKIAPAY_PRIVATE_KEY','KKIAPAY_SECRET_KEY'],
     website:'https://kkiapay.me',        countries:11,
     methods:['MTN Mobile Money','Moov Money','Orange Money','Wave','Carte Bancaire'],
     desc:'11 pays UEMOA · CEMAC' },
