@@ -19,6 +19,13 @@ const COUNTRY_PREFIXES = {
   tz:'255',rw:'250',za:'27',fr:'33',be:'32',de:'49',nl:'31',gb:'44',us:'1'
 };
 
+/* ─── Méthodes mobile (nécessitent un numéro de téléphone) ─ */
+const MOBILE_METHODS = [
+  'mtn_money','moov_money','orange_money','free_money','wave_money',
+  'celtiis_money','togocom_money','airtel_money','mpesa','afrimoney',
+  'wallet','coris','qmoney',
+];
+
 /* ─── Loading bar ──────────────────────────────────────── */
 function TopLoadingBar({ visible, color = '#C8931A' }) {
   if (!visible) return null;
@@ -216,9 +223,14 @@ export default function GatewayPay() {
     if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
     setLoading(true);
     try {
-      const fullPhone = getFullPhoneNumber();
-      const phoneCheck = validatePhone(fullPhone, country, selectedMethod?.id);
-      if (!phoneCheck.valid) { toast.error(phoneCheck.error); setLoading(false); return; }
+      const isMobile = MOBILE_METHODS.includes(selectedMethod?.id);
+      const fullPhone = isMobile ? getFullPhoneNumber() : null;
+
+      if (isMobile) {
+        const phoneCheck = validatePhone(fullPhone, country, selectedMethod?.id);
+        if (!phoneCheck.valid) { toast.error(phoneCheck.error); setLoading(false); return; }
+      }
+
       const res = await fetch('/api/gateway/pay', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-api-key':token },
@@ -227,7 +239,7 @@ export default function GatewayPay() {
       const data = await res.json();
       if (data.success) {
         setLoading(false);
-        savePhoneNumber(fullPhone);
+        if (isMobile && fullPhone) savePhoneNumber(fullPhone);
         if (data.url) window.location.href = data.url;
         else pollStatus(data.transactionId);
       } else {
@@ -328,6 +340,7 @@ export default function GatewayPay() {
   );
 
   const isKkiapayMethod = selectedMethod?.provider === 'kkiapay' && kkiapayPublicKey;
+  const isMobileMethod  = MOBILE_METHODS.includes(selectedMethod?.id);
 
   /* ─── CSS dynamique ─────────────────────────────── */
   const css = `
@@ -793,42 +806,48 @@ export default function GatewayPay() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit}>
-                  <div style={{marginBottom:6}}>
-                    <label className="gw-input-label">Numéro de téléphone</label>
-                    <input
-                      type="tel"
-                      className="gw-input"
-                      value={phoneSuffix ? `${COUNTRY_PREFIXES[country]||''} ${phoneSuffix}` : COUNTRY_PREFIXES[country]||''}
-                      onChange={e => {
-                        const prefix = COUNTRY_PREFIXES[country] || '';
-                        const val = e.target.value;
-                        if (prefix && !val.startsWith(prefix)) return;
-                        const suffix = prefix ? val.slice(prefix.length).trim() : val;
-                        setPhoneSuffix(suffix);
-                        setShowSuggestions(suffix.length === 0);
-                      }}
-                      onFocus={() => setShowSuggestions(phoneSuffix.length === 0)}
-                      placeholder={COUNTRY_PREFIXES[country] ? `${COUNTRY_PREFIXES[country]} 97000000` : '97000000'}
-                      required
-                    />
-                  </div>
 
-                  {showSuggestions && filteredSuggestions.length > 0 && phoneSuffix.length === 0 && (
-                    <div style={{marginTop:8,marginBottom:4}}>
-                      <p style={{fontSize:9,color:themeVars.textMuted,fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
-                      {filteredSuggestions.map((p, i) => {
-                        const prefix = COUNTRY_PREFIXES[country] || '';
-                        const suf = prefix ? p.number.replace(prefix,'') : p.number;
-                        return (
-                          <button key={i} type="button" className="gw-suggestion"
-                            onClick={() => { setPhoneSuffix(suf); setShowSuggestions(false); }}>
-                            <Smartphone size={12} style={{color:themeVars.textMuted}}/>
-                            <span style={{fontSize:12,color:themeVars.textPrimary,fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
-                            <span style={{fontSize:10,color:themeVars.textMuted,marginLeft:'auto'}}>Utiliser</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                  {/* ── Champ téléphone : uniquement pour les méthodes mobile ── */}
+                  {isMobileMethod && (
+                    <>
+                      <div style={{marginBottom:6}}>
+                        <label className="gw-input-label">Numéro de téléphone</label>
+                        <input
+                          type="tel"
+                          className="gw-input"
+                          value={phoneSuffix ? `${COUNTRY_PREFIXES[country]||''} ${phoneSuffix}` : COUNTRY_PREFIXES[country]||''}
+                          onChange={e => {
+                            const prefix = COUNTRY_PREFIXES[country] || '';
+                            const val = e.target.value;
+                            if (prefix && !val.startsWith(prefix)) return;
+                            const suffix = prefix ? val.slice(prefix.length).trim() : val;
+                            setPhoneSuffix(suffix);
+                            setShowSuggestions(suffix.length === 0);
+                          }}
+                          onFocus={() => setShowSuggestions(phoneSuffix.length === 0)}
+                          placeholder={COUNTRY_PREFIXES[country] ? `${COUNTRY_PREFIXES[country]} 97000000` : '97000000'}
+                          required
+                        />
+                      </div>
+
+                      {showSuggestions && filteredSuggestions.length > 0 && phoneSuffix.length === 0 && (
+                        <div style={{marginTop:8,marginBottom:4}}>
+                          <p style={{fontSize:9,color:themeVars.textMuted,fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
+                          {filteredSuggestions.map((p, i) => {
+                            const prefix = COUNTRY_PREFIXES[country] || '';
+                            const suf = prefix ? p.number.replace(prefix,'') : p.number;
+                            return (
+                              <button key={i} type="button" className="gw-suggestion"
+                                onClick={() => { setPhoneSuffix(suf); setShowSuggestions(false); }}>
+                                <Smartphone size={12} style={{color:themeVars.textMuted}}/>
+                                <span style={{fontSize:12,color:themeVars.textPrimary,fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
+                                <span style={{fontSize:10,color:themeVars.textMuted,marginLeft:'auto'}}>Utiliser</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <button type="submit" disabled={loading} className="gw-submit">
