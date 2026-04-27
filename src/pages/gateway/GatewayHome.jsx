@@ -80,7 +80,6 @@ function FloatingBadge({ style, iconColor, icon: Icon, children }) {
   );
 }
 
-/* ── LIGHTBOX ── */
 function Lightbox({ src, label, onClose }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -88,46 +87,11 @@ function Lightbox({ src, label, onClose }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1200,
-        background: 'rgba(0,0,0,0.82)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
-        animation: 'lbFadeIn .2s ease',
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          position: 'relative',
-          maxWidth: '90vw', maxHeight: '88vh',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-        }}
-      >
-        <img
-          src={src}
-          alt={label}
-          style={{
-            maxWidth: '88vw', maxHeight: '80vh',
-            borderRadius: 16,
-            objectFit: 'contain',
-            boxShadow: '0 32px 80px rgba(0,0,0,.5)',
-            display: 'block',
-          }}
-        />
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(0,0,0,0.82)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, animation: 'lbFadeIn .2s ease' }}>
+      <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '88vh', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <img src={src} alt={label} style={{ maxWidth: '88vw', maxHeight: '80vh', borderRadius: 16, objectFit: 'contain', boxShadow: '0 32px 80px rgba(0,0,0,.5)', display: 'block' }} />
         <span style={{ fontSize: 13, color: 'rgba(255,255,255,.65)', fontWeight: 500 }}>{label}</span>
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute', top: -14, right: -14,
-            width: 34, height: 34, borderRadius: '50%',
-            background: '#fff', border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(0,0,0,.25)',
-          }}
-        >
+        <button onClick={onClose} style={{ position: 'absolute', top: -14, right: -14, width: 34, height: 34, borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,.25)' }}>
           <X size={16} color="#333" />
         </button>
       </div>
@@ -135,73 +99,21 @@ function Lightbox({ src, label, onClose }) {
   );
 }
 
-/* ── SCREENSHOT CARD ── */
 function ScreenCard({ src, label, onClick }) {
   const [hovered, setHovered] = useState(false);
   return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        cursor: 'pointer',
-        borderRadius: 16,
-        overflow: 'hidden',
-        border: `2px solid ${hovered ? '#FF6B00' : '#E8E8E8'}`,
-        boxShadow: hovered
-          ? '0 16px 48px rgba(255,107,0,0.22)'
-          : '0 6px 24px rgba(0,0,0,0.08)',
-        transform: hovered ? 'translateY(-6px) scale(1.025)' : 'translateY(0) scale(1)',
-        transition: 'all .28s ease',
-        background: '#fff',
-        position: 'relative',
-      }}
-    >
-      <img
-        src={src}
-        alt={label}
-        style={{
-          width: '100%',
-          height: 190,
-          objectFit: 'cover',
-          objectPosition: 'top',
-          display: 'block',
-        }}
-      />
-      {/* zoom hint overlay */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'rgba(255,107,0,0)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        opacity: hovered ? 1 : 0,
-        transition: 'opacity .22s',
-      }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.92)',
-          borderRadius: 10,
-          padding: '8px 16px',
-          fontSize: 12,
-          fontWeight: 700,
-          color: '#FF6B00',
-          backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
+    <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ cursor: 'pointer', borderRadius: 16, overflow: 'hidden', border: `2px solid ${hovered ? '#FF6B00' : '#E8E8E8'}`, boxShadow: hovered ? '0 16px 48px rgba(255,107,0,0.22)' : '0 6px 24px rgba(0,0,0,0.08)', transform: hovered ? 'translateY(-6px) scale(1.025)' : 'translateY(0) scale(1)', transition: 'all .28s ease', background: '#fff', position: 'relative' }}>
+      <img src={src} alt={label} style={{ width: '100%', height: 190, objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,107,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hovered ? 1 : 0, transition: 'opacity .22s' }}>
+        <div style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 700, color: '#FF6B00', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', gap: 6 }}>
           🔍 Voir en grand
         </div>
       </div>
-      <div style={{
-        padding: '10px 14px',
-        fontSize: 12, fontWeight: 600, color: '#444',
-        borderTop: '1px solid #F0F0F0',
-        background: '#FAFAFA',
-      }}>
-        {label}
-      </div>
+      <div style={{ padding: '10px 14px', fontSize: 12, fontWeight: 600, color: '#444', borderTop: '1px solid #F0F0F0', background: '#FAFAFA' }}>{label}</div>
     </div>
   );
 }
 
-/* ── SCREENSHOTS SECTION ── */
 const SCREENS = [
   { src: screen1, label: 'Passerelle de paiement' },
   { src: screen2, label: 'Passerelle de paiement' },
@@ -209,13 +121,10 @@ const SCREENS = [
 ];
 
 function ScreenshotsSection() {
-  const [lightbox, setLightbox] = useState(null); // index | null
-
+  const [lightbox, setLightbox] = useState(null);
   return (
     <section style={{ background: '#F7F8FC', borderTop: '1px solid #EBEBEB', borderBottom: '1px solid #EBEBEB' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '90px 32px' }}>
-
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 56 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#FF6B00', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 12 }}>
             <BarChart3 size={11} /> Aperçu
@@ -227,82 +136,87 @@ function ScreenshotsSection() {
             Dashboard intuitif, suivi des transactions en temps réel et rapports détaillés. Cliquez sur une image pour l'agrandir.
           </p>
         </div>
-
-        {/*
-          ── TRIANGLE LAYOUT ──
-          Ligne 1 : image du centre (seule, centrée) → sommet
-          Ligne 2 : les deux autres côte à côte → base
-        */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-
-          {/* Sommet du triangle — image 1 centrée */}
           <div style={{ width: '100%', maxWidth: 360 }}>
-            <ScreenCard
-              src={SCREENS[0].src}
-              label={SCREENS[0].label}
-              onClick={() => setLightbox(0)}
-            />
+            <ScreenCard src={SCREENS[0].src} label={SCREENS[0].label} onClick={() => setLightbox(0)} />
           </div>
-
-          {/* Base du triangle — images 2 & 3 */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: 20,
-            width: '100%',
-            maxWidth: 760,
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, width: '100%', maxWidth: 760 }}>
             {SCREENS.slice(1).map((s, i) => (
-              <ScreenCard
-                key={i}
-                src={s.src}
-                label={s.label}
-                onClick={() => setLightbox(i + 1)}
-              />
+              <ScreenCard key={i} src={s.src} label={s.label} onClick={() => setLightbox(i + 1)} />
             ))}
           </div>
         </div>
-
-        {/* Hint clavier */}
         <p style={{ textAlign: 'center', marginTop: 28, fontSize: 12, color: '#BBB', fontWeight: 500 }}>
           Appuyez sur <kbd style={{ background: '#EEE', border: '1px solid #DDD', borderRadius: 5, padding: '2px 7px', fontSize: 11, color: '#666' }}>Échap</kbd> pour fermer
         </p>
       </div>
-
-      {/* Lightbox */}
       {lightbox !== null && (
-        <Lightbox
-          src={SCREENS[lightbox].src}
-          label={SCREENS[lightbox].label}
-          onClose={() => setLightbox(null)}
-        />
+        <Lightbox src={SCREENS[lightbox].src} label={SCREENS[lightbox].label} onClose={() => setLightbox(null)} />
       )}
     </section>
   );
 }
 
+/* ── 29 providers complets (sans Chipper Cash) ── */
 const PROVIDERS = [
-  { name: 'FeexPay', region: 'Afrique' },
-  { name: 'Stripe', region: 'Global' },
-  { name: 'Paystack', region: 'Afrique' },
-  { name: 'Flutterwave', region: 'Afrique' },
-  { name: 'KKiaPay', region: 'Afrique' },
-  { name: 'FedaPay', region: 'Afrique' },
-  { name: 'PayDunya', region: 'Afrique' },
-  { name: 'CinetPay', region: 'Afrique' },
-  { name: 'Lygos', region: 'Afrique' },
-  { name: 'PayPal', region: 'Global' },
-  { name: 'MbiyoPay', region: 'Afrique' },
-  { name: 'Qosic', region: 'Afrique' },
-  { name: 'Bizao', region: 'Afrique' },
-  { name: 'Hub2', region: 'Afrique' },
-  { name: 'Chipper Cash', region: 'Afrique' },
+  /* ── Agrégateurs Afrique de l'Ouest ── */
+  { name: 'FeexPay',      region: 'Afrique' },
+  { name: 'KKiaPay',      region: 'Afrique' },
+  { name: 'CinetPay',     region: 'Afrique' },
+  { name: 'FedaPay',      region: 'Afrique' },
+  { name: 'Hub2',         region: 'Afrique' },
+  { name: 'PayDunya',     region: 'Afrique' },
+  { name: 'Qosic',        region: 'Afrique' },
+  { name: 'Lygos',        region: 'Afrique' },
+  { name: 'MbiyoPay',     region: 'Afrique' },
+  { name: 'Bizao',        region: 'Afrique' },
+  /* ── Mobile Money direct ── */
+  { name: 'Wave',         region: 'Afrique' },
+  { name: 'MTN MoMo',     region: 'Afrique' },
+  { name: 'M-Pesa',       region: 'Afrique' },
+  { name: 'Orange Money', region: 'Afrique' },
+  { name: 'Airtel Money', region: 'Afrique' },
+  /* ── Tunisie ── */
+  { name: 'Flouci',       region: 'Afrique' },
+  { name: 'Paymee',       region: 'Afrique' },
+  /* ── Afrique du Sud ── */
+  { name: 'Yoco',         region: 'Afrique' },
+  /* ── Afrique anglophone ── */
+  { name: 'Paystack',     region: 'Afrique' },
+  { name: 'Flutterwave',  region: 'Afrique' },
+  /* ── International ── */
+  { name: 'Stripe',       region: 'Global' },
+  { name: 'PayPal',       region: 'Global' },
+  { name: 'Mollie',       region: 'Global' },
+  { name: 'Adyen',        region: 'Global' },
+  { name: 'Checkout.com', region: 'Global' },
+  { name: 'Braintree',    region: 'Global' },
+  /* ── Inde ── */
+  { name: 'Razorpay',     region: 'Asie' },
+  /* ── USA / Canada ── */
+  { name: 'Square',       region: 'Amériques' },
+  { name: 'Authorize.net',region: 'Amériques' },
 ];
 
 const REGION_COLORS = {
-  'Afrique': { bg: '#FFF3EA', color: '#FF6B00' },
-  'Global':  { bg: '#EBF0FF', color: '#0057FF' },
+  'Afrique':   { bg: '#FFF3EA', color: '#FF6B00' },
+  'Global':    { bg: '#EBF0FF', color: '#0057FF' },
+  'Asie':      { bg: '#EDFAF3', color: '#00A550' },
+  'Amériques': { bg: '#F4EBFF', color: '#9B00E8' },
 };
+
+/* ── Toutes les méthodes de paiement disponibles ── */
+const ALL_METHODS = [
+  'MTN Mobile Money', 'Orange Money', 'Moov Money', 'Wave', 'M-Pesa',
+  'Airtel Money', 'Celtiis Money', 'Togocom Money', 'Free Money',
+  'Coris Money', 'Afrimoney', 'QMoney',
+  'Visa', 'Mastercard', 'American Express',
+  'PayPal', 'Apple Pay', 'Google Pay',
+  'Virement SEPA', 'BACS', 'iDEAL',
+  'Giropay', 'Sofort', 'Bancontact', 'Bizum',
+  'USSD', 'QR Code', 'EFT', 'UPI',
+  'Flouci Wallet', 'Cash App', 'Venmo',
+];
 
 export default function Home() {
   const { user } = useAuth();
@@ -405,8 +319,6 @@ export default function Home() {
       {/* ── HERO ── */}
       <section style={{ background: 'linear-gradient(155deg,#FFFAF5 0%,#F7F8FC 65%)', borderBottom: '1px solid #EBEBEB' }}>
         <div className="pp-hero-grid" style={{ maxWidth: 1200, margin: '0 auto', padding: '118px 32px 90px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
-
-          {/* LEFT */}
           <div className="pp-ani">
             <h1 style={{ fontSize: 'clamp(38px,4.8vw,64px)', fontWeight: 900, lineHeight: 1.07, letterSpacing: '-.03em', marginBottom: 22, color: '#0A0A0A' }}>
               Acceptez les paiements<br />
@@ -433,7 +345,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* RIGHT */}
           <div className="pp-hero-visual" style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', height: 460 }}>
             <FloatingBadge style={{ top: 28, right: 0 }} icon={CheckCircle} iconColor="#00A550">
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00A550', display: 'inline-block' }} />
@@ -454,10 +365,10 @@ export default function Home() {
       <div style={{ background: '#fff', borderBottom: '1px solid #EBEBEB' }}>
         <div className="pp-stats-inner" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)' }}>
           {[
-            { icon: Globe, val: '40+', lbl: 'Pays supportés' },
-            { icon: Zap, val: '15+', lbl: 'Providers intégrés' },
-            { icon: TrendingUp, val: '99.9%', lbl: 'Disponibilité' },
-            { icon: CreditCard, val: '1%', lbl: 'Commission seulement' },
+            { icon: Globe,       val: '40+',  lbl: 'Pays supportés' },
+            { icon: Zap,         val: '29',   lbl: 'Providers intégrés' },
+            { icon: TrendingUp,  val: '99.9%',lbl: 'Disponibilité' },
+            { icon: CreditCard,  val: '1%',   lbl: 'Commission seulement' },
           ].map((s, i, arr) => (
             <div key={i} className={i === 1 ? 'pp-stat-2' : ''} style={{ padding: '30px 24px', borderRight: i < arr.length-1 ? '1px solid #EBEBEB' : 'none', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 42, height: 42, borderRadius: 12, background: '#FFF3EA', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -486,10 +397,10 @@ export default function Home() {
           </p>
           <div className="pp-feat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 18 }}>
             {[
-              { icon: Globe, title: 'Couverture Mondiale', desc: "40+ pays en Afrique, Europe, Amérique et Asie. Détection automatique du pays et de la devise avec conversion en temps réel.", pill: '40+ pays · Multi-devises', pillBg: '#FFF3EA', pillColor: '#FF6B00', iconBg: '#FFF3EA', iconColor: '#FF6B00' },
-              { icon: Smartphone, title: 'Mobile Money', desc: "MTN, Moov, Orange, Wave, M-Pesa et tous les opérateurs majeurs d'Afrique. Paiement en 10 secondes depuis un téléphone.", pill: 'MTN · Wave · Orange · Moov', pillBg: '#EBF0FF', pillColor: '#0057FF', iconBg: '#EBF0FF', iconColor: '#0057FF' },
-              { icon: CreditCard, title: 'Cartes & PayPal', desc: "Visa, Mastercard, American Express, PayPal et toutes les cartes internationales. Acceptez vos clients européens et américains sans friction.", pill: 'Visa · Mastercard · PayPal', pillBg: '#EDFAF3', pillColor: '#00A550', iconBg: '#EDFAF3', iconColor: '#00A550' },
-              { icon: Shield, title: 'Sécurité Maximale', desc: "Certification PCI DSS, chiffrement TLS, authentification 3D Secure et détection anti-fraude en temps réel sur chaque transaction.", pill: 'PCI DSS · 3DS · Anti-fraude', pillBg: '#F4EBFF', pillColor: '#9B00E8', iconBg: '#F4EBFF', iconColor: '#9B00E8' },
+              { icon: Globe,       title: 'Couverture Mondiale',  desc: "40+ pays en Afrique, Europe, Amérique et Asie. Détection automatique du pays et de la devise avec conversion en temps réel.",                              pill: '40+ pays · Multi-devises',       pillBg: '#FFF3EA', pillColor: '#FF6B00', iconBg: '#FFF3EA', iconColor: '#FF6B00' },
+              { icon: Smartphone,  title: 'Mobile Money',         desc: "MTN, Moov, Orange, Wave, M-Pesa et tous les opérateurs majeurs d'Afrique. Paiement en 10 secondes depuis un téléphone.",                                   pill: 'MTN · Wave · Orange · Moov',     pillBg: '#EBF0FF', pillColor: '#0057FF', iconBg: '#EBF0FF', iconColor: '#0057FF' },
+              { icon: CreditCard,  title: 'Cartes & PayPal',      desc: "Visa, Mastercard, American Express, PayPal et toutes les cartes internationales. Acceptez vos clients européens et américains sans friction.",             pill: 'Visa · Mastercard · PayPal',     pillBg: '#EDFAF3', pillColor: '#00A550', iconBg: '#EDFAF3', iconColor: '#00A550' },
+              { icon: Shield,      title: 'Sécurité Maximale',    desc: "Certification PCI DSS, chiffrement TLS, authentification 3D Secure et détection anti-fraude en temps réel sur chaque transaction.",                       pill: 'PCI DSS · 3DS · Anti-fraude',    pillBg: '#F4EBFF', pillColor: '#9B00E8', iconBg: '#F4EBFF', iconColor: '#9B00E8' },
             ].map((f, i) => (
               <div key={i} className="pp-card" style={{ background: '#fff', border: '1px solid #EBEBEB', borderRadius: 20, padding: '32px', transition: 'all .3s' }}>
                 <div style={{ width: 48, height: 48, borderRadius: 14, background: f.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
@@ -517,10 +428,21 @@ export default function Home() {
               Une intégration,<br />tous les moyens de paiement
             </h2>
             <p style={{ fontSize: 16, color: '#777', lineHeight: 1.65, maxWidth: 500 }}>
-              15 providers déjà intégrés, des dizaines de méthodes supplémentaires disponibles via notre documentation. Africains, européens, américains et bien plus.
+              29 providers intégrés — Afrique, Europe, Amériques et Asie. Mobile Money, cartes bancaires, wallets digitaux et virements bancaires, tout en un.
             </p>
           </div>
 
+          {/* Légende régions */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+            {Object.entries(REGION_COLORS).map(([region, rc]) => (
+              <span key={region} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, background: rc.bg, color: rc.color, padding: '4px 12px', borderRadius: 100 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: rc.color }} />
+                {region}
+              </span>
+            ))}
+          </div>
+
+          {/* Grille providers */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             {PROVIDERS.map((p) => {
               const rc = REGION_COLORS[p.region] || REGION_COLORS['Global'];
@@ -531,16 +453,19 @@ export default function Home() {
                 </div>
               );
             })}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#F0F0F0', border: '1.5px dashed #DDD', borderRadius: 12, padding: '10px 18px' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#999' }}>+ et bien d'autres…</span>
-            </div>
           </div>
 
-          <div style={{ marginTop: 28, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {['MTN Mobile Money','Orange Money','Moov Money','Wave','M-Pesa','Visa','Mastercard','American Express','PayPal','Virement SEPA','Apple Pay','Google Pay','USSD'].map((m) => (
-              <span key={m} style={{ fontSize: 12, fontWeight: 500, color: '#666', background: '#fff', border: '1px solid #E8E8E8', padding: '5px 12px', borderRadius: 100 }}>{m}</span>
-            ))}
-            <span style={{ fontSize: 12, fontWeight: 500, color: '#aaa', background: '#F8F8F8', border: '1px dashed #E0E0E0', padding: '5px 12px', borderRadius: 100 }}>+ dizaines de méthodes</span>
+          {/* Méthodes de paiement */}
+          <div style={{ marginTop: 36 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 14 }}>
+              Méthodes acceptées
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {ALL_METHODS.map((m) => (
+                <span key={m} style={{ fontSize: 12, fontWeight: 500, color: '#666', background: '#fff', border: '1px solid #E8E8E8', padding: '5px 12px', borderRadius: 100 }}>{m}</span>
+              ))}
+              <span style={{ fontSize: 12, fontWeight: 500, color: '#aaa', background: '#F8F8F8', border: '1px dashed #E0E0E0', padding: '5px 12px', borderRadius: 100 }}>+ bien d'autres</span>
+            </div>
           </div>
         </div>
       </section>
@@ -581,10 +506,10 @@ export default function Home() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {[
-                { icon: Code2, title: 'Clé API unique', desc: 'Une seule clé pour tous les providers. Pas de configuration par provider.', color: '#FF6B00', bg: '#FFF3EA' },
-                { icon: Webhook, title: 'Webhooks temps réel', desc: "Recevez les événements de paiement instantanément sur votre endpoint.", color: '#0057FF', bg: '#EBF0FF' },
-                { icon: BarChart3, title: 'Dashboard complet', desc: 'Statistiques, transactions, exports CSV. Tout en un seul endroit.', color: '#00A550', bg: '#EDFAF3' },
-                { icon: Lock, title: 'Support 24/7', desc: 'Équipe technique disponible à tout moment pour vous accompagner.', color: '#9B00E8', bg: '#F4EBFF' },
+                { icon: Code2,    title: 'Clé API unique',       desc: 'Une seule clé pour tous les providers. Pas de configuration par provider.',               color: '#FF6B00', bg: '#FFF3EA' },
+                { icon: Webhook,  title: 'Webhooks temps réel',  desc: "Recevez les événements de paiement instantanément sur votre endpoint.",                    color: '#0057FF', bg: '#EBF0FF' },
+                { icon: BarChart3,title: 'Dashboard complet',    desc: 'Statistiques, transactions, exports CSV. Tout en un seul endroit.',                       color: '#00A550', bg: '#EDFAF3' },
+                { icon: Lock,     title: 'Support 24/7',         desc: 'Équipe technique disponible à tout moment pour vous accompagner.',                        color: '#9B00E8', bg: '#F4EBFF' },
               ].map((f, i) => (
                 <div key={i} className="pp-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 14, background: '#fff', border: '1px solid #EBEBEB', borderRadius: 16, padding: '18px 20px', transition: 'all .3s' }}>
                   <div style={{ width: 40, height: 40, borderRadius: 12, background: f.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -640,11 +565,10 @@ export default function Home() {
                 ))}
               </div>
             </div>
-
             {[
-              { title: 'Produit', links: [['/#features','Fonctionnalités'],['/#api','API'],['/#providers','Providers'],['/#screenshots','Aperçu']] },
+              { title: 'Produit',     links: [['/#features','Fonctionnalités'],['/#api','API'],['/#providers','Providers'],['/#screenshots','Aperçu']] },
               { title: 'Ressources', links: [['/api-documentation','Documentation API'],['/help','Aide & Support'],['/contact','Contact']] },
-              { title: 'Légal', links: [['/privacy','Confidentialité'],['/terms','CGU'],['/cookies','Cookies'],['/legal','Mentions légales']] },
+              { title: 'Légal',      links: [['/privacy','Confidentialité'],['/terms','CGU'],['/cookies','Cookies'],['/legal','Mentions légales']] },
             ].map((col, ci) => (
               <div key={ci}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 18 }}>{col.title}</div>
@@ -658,7 +582,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Disclaimer légal */}
           <div style={{ borderTop: '1px solid rgba(255,255,255,.07)', paddingTop: 20, marginBottom: 16 }}>
             <p style={{ fontSize: 11, color: 'rgba(255,255,255,.35)', textAlign: 'center', lineHeight: 1.7, maxWidth: 860, margin: '0 auto' }}>
               Payment Gateway est une plateforme de passerelle de paiement technique. Nous ne sommes ni un agrégateur de paiement, ni un établissement de paiement, ni un organisme financier. Nous ne collectons, ne détenons ni ne transférons de fonds. Toutes les transactions sont traitées directement par les prestataires de services de paiement agréés intégrés à notre plateforme.
