@@ -157,7 +157,7 @@ function ScreenshotsSection() {
   );
 }
 
-/* ── 29 providers complets (sans Chipper Cash) ── */
+/* ── 30 providers complets (sans Chipper Cash) ── */
 const PROVIDERS = [
   /* ── Agrégateurs Afrique de l'Ouest ── */
   { name: 'FeexPay',      region: 'Afrique' },
@@ -170,7 +170,7 @@ const PROVIDERS = [
   { name: 'Lygos',        region: 'Afrique' },
   { name: 'MbiyoPay',     region: 'Afrique' },
   { name: 'Bizao',        region: 'Afrique' },
-  { name: 'GeniusPay', region: 'Afrique' },
+  { name: 'GeniusPay',    region: 'Afrique' },
 
   /* ── Mobile Money direct ── */
   { name: 'Wave',         region: 'Afrique' },
@@ -368,7 +368,7 @@ export default function Home() {
         <div className="pp-stats-inner" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)' }}>
           {[
             { icon: Globe,       val: '40+',  lbl: 'Pays supportés' },
-            { icon: Zap,         val: '29',   lbl: 'Providers intégrés' },
+            { icon: Zap,         val: '30',   lbl: 'Providers intégrés' },
             { icon: TrendingUp,  val: '99.9%',lbl: 'Disponibilité' },
             { icon: CreditCard,  val: '1%',   lbl: 'Commission seulement' },
           ].map((s, i, arr) => (
@@ -430,7 +430,7 @@ export default function Home() {
               Une intégration,<br />tous les moyens de paiement
             </h2>
             <p style={{ fontSize: 16, color: '#777', lineHeight: 1.65, maxWidth: 500 }}>
-              29 providers intégrés — Afrique, Europe, Amériques et Asie. Mobile Money, cartes bancaires, wallets digitaux et virements bancaires, tout en un.
+              30 providers intégrés — Afrique, Europe, Amériques et Asie. Mobile Money, cartes bancaires, wallets digitaux et virements bancaires, tout en un.
             </p>
           </div>
 
