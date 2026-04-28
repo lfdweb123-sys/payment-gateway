@@ -403,7 +403,6 @@ export default function GatewayPay() {
   const [countryData, setCountryData]             = useState(null);
   const [selectedMethod, setSelectedMethod]       = useState(null);
   const [phoneSuffix, setPhoneSuffix]             = useState('');
-  const [amount]                                  = useState(amountParam || '5000');
   const [loading, setLoading]                     = useState(false);
   const [merchant, setMerchant]                   = useState(null);
   const [countries, setCountries]                 = useState([]);
