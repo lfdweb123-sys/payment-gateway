@@ -6,6 +6,13 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+/* ─── URL de base depuis la variable d'environnement Vite ────────────────────
+   En développement  : VITE_APP_URL=http://localhost:5173
+   En production     : VITE_APP_URL=https://votre-domaine.vercel.app
+   Toutes les URLs dans les exemples de code utilisent cette constante.
+──────────────────────────────────────────────────────────────────────────────*/
+const BASE_URL = import.meta.env.VITE_APP_URL || 'https://votre-domaine.vercel.app';
+
 const TABS = [
   { id: 'quickstart',  label: 'Démarrage',   icon: Zap,        color: '#FF6B00' },
   { id: 'html',        label: 'HTML',         icon: Monitor,    color: '#0057FF' },
@@ -28,7 +35,7 @@ const METHODS = {
         name: 'Redirection simple (GET)',
         desc: 'Un formulaire HTML basique. Idéal pour commencer en 2 minutes.',
         lang: 'html',
-        code: `<form action="https://payment-gateway.vercel.app/pay" method="GET">
+        code: `<form action="${BASE_URL}/pay" method="GET">
   <input type="hidden" name="token" value="VOTRE_CLE_API" />
   <input type="hidden" name="amount" value="5000" />
   <input type="hidden" name="desc" value="Facture #123" />
@@ -45,7 +52,7 @@ const METHODS = {
 <script>
 function startPayment() {
   window.open(
-    'https://payment-gateway.vercel.app/pay?token=VOTRE_CLE_API&amount=5000&desc=Facture',
+    '${BASE_URL}/pay?token=VOTRE_CLE_API&amount=5000&desc=Facture',
     'payment', 'width=480,height=700'
   );
 }
@@ -60,7 +67,7 @@ function startPayment() {
 <script>
 function pay() {
   const amount = document.getElementById('amount').value;
-  window.open('https://payment-gateway.vercel.app/pay?token=VOTRE_CLE_API&amount='+amount, 'payment', 'width=480,height=700');
+  window.open('${BASE_URL}/pay?token=VOTRE_CLE_API&amount='+amount, 'payment', 'width=480,height=700');
 }
 </script>`,
       },
@@ -68,7 +75,7 @@ function pay() {
         name: 'Lien de paiement (Email / SMS)',
         desc: 'Envoyez ce lien directement par email ou SMS à votre client.',
         lang: 'text',
-        code: `https://payment-gateway.vercel.app/pay?token=VOTRE_CLE_API&amount=5000&desc=Facture%20%23123`,
+        code: `${BASE_URL}/pay?token=VOTRE_CLE_API&amount=5000&desc=Facture%20%23123`,
       },
     ],
   },
@@ -80,7 +87,7 @@ function pay() {
         name: 'Bouton stylisé complet',
         desc: 'Bouton professionnel avec icône SVG incluse.',
         lang: 'html',
-        code: `<form action="https://payment-gateway.vercel.app/pay" method="GET" style="display:inline-block">
+        code: `<form action="${BASE_URL}/pay" method="GET" style="display:inline-block">
   <input type="hidden" name="token" value="VOTRE_CLE_API" />
   <input type="hidden" name="amount" value="5000" />
   <input type="hidden" name="desc" value="Facture #INV-2026-001" />
@@ -104,7 +111,7 @@ function pay() {
 <script>
 function pay(amount, desc) {
   window.open(
-    'https://payment-gateway.vercel.app/pay?token=VOTRE_CLE_API&amount='+amount+'&desc='+encodeURIComponent(desc),
+    '${BASE_URL}/pay?token=VOTRE_CLE_API&amount='+amount+'&desc='+encodeURIComponent(desc),
     'payment', 'width=480,height=700'
   );
 }
@@ -120,7 +127,7 @@ function pay(amount, desc) {
         name: 'Fetch API (navigateur)',
         lang: 'javascript',
         code: `async function payer(amount, description) {
-  const res = await fetch('https://payment-gateway.vercel.app/api/pay', {
+  const res = await fetch('${BASE_URL}/api/gateway/pay', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -138,7 +145,7 @@ payer(5000, 'Facture #123');`,
         name: 'Popup + vérification de statut',
         lang: 'javascript',
         code: `async function payerEtSuivre(amount, description) {
-  const res = await fetch('https://payment-gateway.vercel.app/api/pay', {
+  const res = await fetch('${BASE_URL}/api/gateway/pay', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': 'VOTRE_CLE_API' },
     body: JSON.stringify({ amount, description })
@@ -147,11 +154,11 @@ payer(5000, 'Facture #123');`,
   const popup = window.open(data.url, 'payment', 'width=480,height=700');
 
   const interval = setInterval(async () => {
-    const s = await fetch('https://payment-gateway.vercel.app/api/verify/' + data.reference, {
+    const s = await fetch('${BASE_URL}/api/gateway/verify/' + data.transactionId, {
       headers: { 'x-api-key': 'VOTRE_CLE_API' }
     });
     const status = await s.json();
-    if (status.status === 'SUCCESSFUL') {
+    if (status.status === 'completed') {
       clearInterval(interval);
       popup?.close();
       alert('✅ Paiement réussi !');
@@ -165,7 +172,7 @@ payer(5000, 'Facture #123');`,
         code: `const fetch = require('node-fetch');
 
 app.post('/creer-paiement', async (req, res) => {
-  const response = await fetch('https://payment-gateway.vercel.app/api/pay', {
+  const response = await fetch('${BASE_URL}/api/gateway/pay', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -193,7 +200,7 @@ export default function PayButton({ amount, description, country, method, phone 
 
   const pay = async () => {
     setLoading(true);
-    const res = await fetch('https://payment-gateway.vercel.app/api/pay', {
+    const res = await fetch('${BASE_URL}/api/gateway/pay', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': 'VOTRE_CLE_API' },
       body: JSON.stringify({ amount, description, country, method, phone })
@@ -220,8 +227,10 @@ export default function PayButton({ amount, description, country, method, phone 
         name: 'cURL simple',
         lang: 'php',
         code: `<?php
+define('GATEWAY_URL', '${BASE_URL}');
+
 function initierPaiement($amount, $description, $country = 'bj', $method = 'mtn_money', $phone = '') {
-  $ch = curl_init('https://payment-gateway.vercel.app/api/pay');
+  $ch = curl_init(GATEWAY_URL . '/api/gateway/pay');
   curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_HTTPHEADER => [
@@ -250,7 +259,7 @@ exit;`,
         name: 'Webhook callback',
         lang: 'php',
         code: `<?php
-// webhook.php — À configurer dans votre dashboard Vercel
+// webhook.php — Configurez l'URL dans votre dashboard marchand
 $payload = file_get_contents('php://input');
 $data = json_decode($payload, true);
 
@@ -280,9 +289,11 @@ echo json_encode(['received' => true]);`,
         lang: 'python',
         code: `import requests
 
+GATEWAY_URL = '${BASE_URL}'
+
 def initier_paiement(amount, description, country='bj', method='mtn_money', phone=''):
     response = requests.post(
-        'https://payment-gateway.vercel.app/api/pay',
+        f'{GATEWAY_URL}/api/gateway/pay',
         headers={
             'Content-Type': 'application/json',
             'x-api-key': 'VOTRE_CLE_API'
@@ -331,10 +342,11 @@ def webhook():
         lang: 'php',
         code: `// Dans functions.php de votre thème
 define('GATEWAY_API_KEY', 'VOTRE_CLE_API');
+define('GATEWAY_URL',     '${BASE_URL}');
 
 add_shortcode('bouton_paiement', function($atts) {
   $atts = shortcode_atts(['montant' => '5000', 'desc' => 'Paiement'], $atts);
-  $url  = 'https://payment-gateway.vercel.app/pay?token=' . GATEWAY_API_KEY
+  $url  = GATEWAY_URL . '/pay?token=' . GATEWAY_API_KEY
         . '&amount=' . $atts['montant']
         . '&desc='   . urlencode($atts['desc']);
   return '<a href="' . esc_url($url) . '" target="_blank" class="btn-paiement">'
@@ -362,9 +374,9 @@ function ajouter_gateway_personnalisee($gateways) {
     sub: 'Référence complète des endpoints disponibles.',
     items: [
       {
-        name: 'POST /api/pay — Initier un paiement',
+        name: 'POST /api/gateway/pay — Initier un paiement',
         lang: 'bash',
-        code: `curl -X POST https://payment-gateway.vercel.app/api/pay \\
+        code: `curl -X POST ${BASE_URL}/api/gateway/pay \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: VOTRE_CLE_API" \\
   -d '{
@@ -388,24 +400,24 @@ function ajouter_gateway_personnalisee($gateways) {
 }`,
       },
       {
-        name: 'GET /api/verify/:reference — Vérifier un paiement',
+        name: 'GET /api/gateway/verify/:id — Vérifier un paiement',
         lang: 'bash',
-        code: `curl https://payment-gateway.vercel.app/api/verify/GW-1714000000000 \\
+        code: `curl ${BASE_URL}/api/gateway/verify/abc123 \\
   -H "x-api-key: VOTRE_CLE_API"
 
 # Réponse
 {
   "success": true,
-  "status": "SUCCESSFUL",
+  "status": "completed",
   "reference": "GW-1714000000000",
   "amount": 5000,
   "provider": "feexpay"
 }`,
       },
       {
-        name: 'GET /api/methods/:country — Méthodes par pays',
+        name: 'GET /api/gateway/methods/:country — Méthodes par pays',
         lang: 'bash',
-        code: `curl https://payment-gateway.vercel.app/api/methods/bj
+        code: `curl ${BASE_URL}/api/gateway/methods/bj
 
 # Réponse
 {
@@ -421,9 +433,9 @@ function ajouter_gateway_personnalisee($gateways) {
 }`,
       },
       {
-        name: 'GET /api/balance — Solde du compte',
+        name: 'GET /api/gateway/balance — Solde du compte',
         lang: 'bash',
-        code: `curl https://payment-gateway.vercel.app/api/balance \\
+        code: `curl ${BASE_URL}/api/gateway/balance \\
   -H "x-api-key: VOTRE_CLE_API"
 
 # Réponse
@@ -517,9 +529,11 @@ echo json_encode(['received' => true]);`,
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 
+const gatewayUrl = '${BASE_URL}';
+
 Future<void> payer(double amount, String description, String country, String method, String phone) async {
   final res = await http.post(
-    Uri.parse('https://payment-gateway.vercel.app/api/pay'),
+    Uri.parse('$gatewayUrl/api/gateway/pay'),
     headers: {
       'Content-Type': 'application/json',
       'x-api-key': 'VOTRE_CLE_API'
@@ -543,8 +557,10 @@ Future<void> payer(double amount, String description, String country, String met
         lang: 'jsx',
         code: `import { Linking } from 'react-native';
 
+const GATEWAY_URL = '${BASE_URL}';
+
 async function payer(amount, description, country, method, phone) {
-  const res = await fetch('https://payment-gateway.vercel.app/api/pay', {
+  const res = await fetch(\`\${GATEWAY_URL}/api/gateway/pay\`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -567,7 +583,7 @@ async function payer(amount, description, country, method, phone) {
         lang: 'html',
         code: `<img id="qrcode" />
 <script>
-const url = 'https://payment-gateway.vercel.app/pay?token=VOTRE_CLE_API&amount=5000';
+const url = '${BASE_URL}/pay?token=VOTRE_CLE_API&amount=5000';
 document.getElementById('qrcode').src =
   'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(url);
 </script>`,
@@ -582,7 +598,7 @@ document.getElementById('qrcode').src =
 <script>
 function generateQR() {
   const amount = document.getElementById('qrAmount').value;
-  const url = 'https://payment-gateway.vercel.app/pay?token=VOTRE_CLE_API&amount=' + amount;
+  const url = '${BASE_URL}/pay?token=VOTRE_CLE_API&amount=' + amount;
   document.getElementById('qrcode').src =
     'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(url);
 }
@@ -594,18 +610,16 @@ function generateQR() {
 
 const LANG_COLORS = {
   html:       { bg: '#FFF3EA', color: '#FF6B00', label: 'HTML' },
-  javascript: { bg: '#FFFBEB', color: '#D97706', label: 'JS' },
-  jsx:        { bg: '#EBF0FF', color: '#0057FF', label: 'JSX' },
-  php:        { bg: '#F4EBFF', color: '#9B00E8', label: 'PHP' },
-  python:     { bg: '#EDFAF3', color: '#00A550', label: 'PY' },
+  javascript: { bg: '#FFFBEB', color: '#D97706', label: 'JS'   },
+  jsx:        { bg: '#EBF0FF', color: '#0057FF', label: 'JSX'  },
+  php:        { bg: '#F4EBFF', color: '#9B00E8', label: 'PHP'  },
+  python:     { bg: '#EDFAF3', color: '#00A550', label: 'PY'   },
   bash:       { bg: '#F7F8FC', color: '#555',    label: 'cURL' },
   dart:       { bg: '#E0F7FA', color: '#0097A7', label: 'Dart' },
   text:       { bg: '#F7F8FC', color: '#888',    label: 'TEXT' },
 };
 
-// ─── Liste complète des providers ─────────────────────────────────────────────
 const PROVIDERS = [
-  // Agrégateurs Afrique de l'Ouest
   { name: 'FeexPay',       zone: 'BJ · CI · TG · SN · BF',   color: '#FF6B00', section: 'Agrégateurs' },
   { name: 'KKiaPay',       zone: 'UEMOA + CEMAC · 11 pays',   color: '#6366F1', section: 'Agrégateurs' },
   { name: 'CinetPay',      zone: '11 pays Afrique',            color: '#14B8A6', section: 'Agrégateurs' },
@@ -616,55 +630,38 @@ const PROVIDERS = [
   { name: 'Bizao',         zone: '11 pays Afrique',            color: '#00A550', section: 'Agrégateurs' },
   { name: 'PayDunya',      zone: 'UEMOA · 8 pays',             color: '#0EA5E9', section: 'Agrégateurs' },
   { name: 'MbiyoPay',      zone: '11 pays Afrique',            color: '#FF6B00', section: 'Agrégateurs' },
-  // Mobile Money direct
+  { name: 'GeniusPay',     zone: "CI · SN · BJ · CM · 12 pays",color: '#00A550', section: 'Agrégateurs' },
   { name: 'Wave',          zone: 'SN · CI · ML · UG · CM',    color: '#00A550', section: 'Mobile Money' },
   { name: 'MTN MoMo',      zone: '12 pays africains',          color: '#F59E0B', section: 'Mobile Money' },
   { name: 'M-Pesa Daraja', zone: 'KE · TZ · MZ',              color: '#00A550', section: 'Mobile Money' },
   { name: 'Orange Money',  zone: 'CI · SN · ML · CM · GN',    color: '#FF6B00', section: 'Mobile Money' },
   { name: 'Airtel Money',  zone: '14 pays Afrique',            color: '#EF4444', section: 'Mobile Money' },
-  // Afrique anglophone
-  { name: 'Paystack',      zone: 'NG · GH · KE · ZA',         color: '#00A550', section: 'Anglophone' },
-  { name: 'Flutterwave',   zone: '11 pays africains',          color: '#F59E0B', section: 'Anglophone' },
-  // Tunisie
-  { name: 'Flouci',        zone: 'Tunisie',                    color: '#0EA5E9', section: 'Tunisie' },
-  { name: 'Paymee',        zone: 'Tunisie',                    color: '#6366F1', section: 'Tunisie' },
-  // Afrique du Sud
-  { name: 'Yoco',          zone: 'Afrique du Sud · ZAR',       color: '#0057FF', section: 'Afrique du Sud' },
-  // International
+  { name: 'Paystack',      zone: 'NG · GH · KE · ZA',         color: '#00A550', section: 'Anglophone'   },
+  { name: 'Flutterwave',   zone: '11 pays africains',          color: '#F59E0B', section: 'Anglophone'   },
+  { name: 'Flouci',        zone: 'Tunisie',                    color: '#0EA5E9', section: 'Tunisie'      },
+  { name: 'Paymee',        zone: 'Tunisie',                    color: '#6366F1', section: 'Tunisie'      },
+  { name: 'Yoco',          zone: 'Afrique du Sud · ZAR',       color: '#0057FF', section: 'Afrique du Sud'},
   { name: 'PayPal',        zone: '200+ pays',                  color: '#0057FF', section: 'International' },
   { name: 'Stripe',        zone: 'Europe · USA · Canada',      color: '#6366F1', section: 'International' },
   { name: 'Mollie',        zone: 'Europe · 15 pays',           color: '#0057FF', section: 'International' },
   { name: 'Adyen',         zone: 'Mondial · 50+ pays',         color: '#14B8A6', section: 'International' },
   { name: 'Checkout.com',  zone: 'Mondial · 60+ pays',         color: '#0A0A0A', section: 'International' },
   { name: 'Braintree',     zone: 'USA · Europe · AU',          color: '#0057FF', section: 'International' },
-  // Inde
-  { name: 'Razorpay',      zone: 'Inde',                       color: '#0057FF', section: 'Inde' },
-  // USA / Canada
-  { name: 'Square',        zone: 'USA · CA · UK · AU',         color: '#0A0A0A', section: 'USA / Canada' },
-  { name: 'Authorize.net', zone: 'USA · Canada',               color: '#0057FF', section: 'USA / Canada' },
+  { name: 'Razorpay',      zone: 'Inde',                       color: '#0057FF', section: 'Inde'         },
+  { name: 'Square',        zone: 'USA · CA · UK · AU',         color: '#0A0A0A', section: 'USA / Canada'  },
+  { name: 'Authorize.net', zone: 'USA · Canada',               color: '#0057FF', section: 'USA / Canada'  },
 ];
 
-// Sections pour regrouper les providers
-const PROVIDER_SECTIONS = [
-  'Agrégateurs',
-  'Mobile Money',
-  'Anglophone',
-  'Tunisie',
-  'Afrique du Sud',
-  'International',
-  'Inde',
-  'USA / Canada',
-];
-
+const PROVIDER_SECTIONS = ['Agrégateurs','Mobile Money','Anglophone','Tunisie','Afrique du Sud','International','Inde','USA / Canada'];
 const SECTION_LABELS = {
-  'Agrégateurs':   'Agrégateurs Afrique de l\'Ouest',
-  'Mobile Money':  'Mobile Money direct (opérateurs)',
-  'Anglophone':    'Afrique anglophone',
-  'Tunisie':       'Tunisie',
-  'Afrique du Sud':'Afrique du Sud',
-  'International': 'International',
-  'Inde':          'Inde',
-  'USA / Canada':  'USA / Canada',
+  'Agrégateurs':    "Agrégateurs Afrique de l'Ouest",
+  'Mobile Money':   'Mobile Money direct (opérateurs)',
+  'Anglophone':     'Afrique anglophone',
+  'Tunisie':        'Tunisie',
+  'Afrique du Sud': 'Afrique du Sud',
+  'International':  'International',
+  'Inde':           'Inde',
+  'USA / Canada':   'USA / Canada',
 };
 
 /* ── Code Block ── */
@@ -681,135 +678,98 @@ function CodeBlock({ code, lang }) {
 
   return (
     <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid #1E2433' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: '#161B27', padding: '10px 16px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 5 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#161B27', padding:'10px 16px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ display:'flex', gap:5 }}>
             {['#FF5F56','#FFBD2E','#27C93F'].map((c,i) => (
-              <div key={i} style={{ width: 9, height: 9, borderRadius: '50%', background: c }} />
+              <div key={i} style={{ width:9, height:9, borderRadius:'50%', background:c }}/>
             ))}
           </div>
-          <span style={{
-            fontSize: 10, fontWeight: 800, letterSpacing: '.06em',
-            background: lc.bg, color: lc.color,
-            padding: '2px 8px', borderRadius: 5,
-          }}>{lc.label}</span>
+          <span style={{ fontSize:10, fontWeight:800, letterSpacing:'.06em', background:lc.bg, color:lc.color, padding:'2px 8px', borderRadius:5 }}>{lc.label}</span>
         </div>
         <button onClick={copy} style={{
-          display: 'flex', alignItems: 'center', gap: 5,
+          display:'flex', alignItems:'center', gap:5,
           background: copied ? 'rgba(0,165,80,.15)' : 'rgba(255,255,255,.06)',
           border: `1px solid ${copied ? 'rgba(0,165,80,.3)' : 'rgba(255,255,255,.08)'}`,
-          borderRadius: 7, padding: '5px 11px',
-          fontSize: 11, fontWeight: 600,
-          color: copied ? '#00A550' : '#8899AA',
-          cursor: 'pointer', transition: 'all .2s',
+          borderRadius:7, padding:'5px 11px', fontSize:11, fontWeight:600,
+          color: copied ? '#00A550' : '#8899AA', cursor:'pointer', transition:'all .2s',
         }}>
-          {copied ? <CheckCircle size={12} /> : <Copy size={12} />}
+          {copied ? <CheckCircle size={12}/> : <Copy size={12}/>}
           {copied ? 'Copié !' : 'Copier'}
         </button>
       </div>
-      <div style={{
-        background: '#0D1117', padding: '16px 20px',
-        overflowX: 'auto', maxHeight: 340, overflowY: 'auto',
-      }}>
-        <pre style={{
-          fontFamily: "'Fira Code','Cascadia Code','Courier New',monospace",
-          fontSize: 12, lineHeight: 1.8, color: '#E6EDF3',
-          margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-        }}>{code}</pre>
+      <div style={{ background:'#0D1117', padding:'16px 20px', overflowX:'auto', maxHeight:340, overflowY:'auto' }}>
+        <pre style={{ fontFamily:"'Fira Code','Cascadia Code','Courier New',monospace", fontSize:12, lineHeight:1.8, color:'#E6EDF3', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+          {code}
+        </pre>
       </div>
     </div>
   );
 }
 
-/* ── Item card ── */
-function ItemCard({ item, tabId, idx }) {
+function ItemCard({ item }) {
   return (
-    <div style={{ border: '1px solid #EBEBEB', borderRadius: 18, overflow: 'hidden', background: '#fff' }}>
-      <div style={{
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-        gap: 10, padding: '16px 20px',
-        background: '#FAFAFA', borderBottom: '1px solid #F0F0F0', flexWrap: 'wrap',
-      }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#111' }}>{item.name}</div>
-          {item.desc && <div style={{ fontSize: 12, color: '#AAA', marginTop: 3, lineHeight: 1.5 }}>{item.desc}</div>}
+    <div style={{ border:'1px solid #EBEBEB', borderRadius:18, overflow:'hidden', background:'#fff' }}>
+      <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10, padding:'16px 20px', background:'#FAFAFA', borderBottom:'1px solid #F0F0F0', flexWrap:'wrap' }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:14, fontWeight:800, color:'#111' }}>{item.name}</div>
+          {item.desc && <div style={{ fontSize:12, color:'#AAA', marginTop:3, lineHeight:1.5 }}>{item.desc}</div>}
         </div>
       </div>
-      <div style={{ padding: '14px' }}>
-        <CodeBlock code={item.code} lang={item.lang} />
+      <div style={{ padding:'14px' }}>
+        <CodeBlock code={item.code} lang={item.lang}/>
       </div>
     </div>
   );
 }
 
-/* ── MAIN ── */
 export default function GatewayApiDocs() {
   const [activeTab, setActiveTab] = useState('quickstart');
   const active        = METHODS[activeTab];
   const activeTabMeta = TABS.find(t => t.id === activeTab);
 
   return (
-    <div style={{
-      maxWidth: 900, margin: '0 auto',
-      padding: '20px 16px 48px',
-      fontFamily: "'Plus Jakarta Sans','DM Sans',sans-serif",
-    }}>
+    <div style={{ maxWidth:900, margin:'0 auto', padding:'20px 16px 48px', fontFamily:"'Plus Jakarta Sans','DM Sans',sans-serif" }}>
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        .doc-tab::-webkit-scrollbar { display: none; }
-        .doc-tab { scrollbar-width: none; }
-        .provider-card:hover { border-color: var(--hc) !important; background: var(--hb) !important; }
-        .provider-section-title {
-          font-size: 10px; font-weight: 700; color: #94a3b8;
-          text-transform: uppercase; letter-spacing: .08em;
-          margin: 18px 0 8px;
-        }
-        .provider-section-title:first-child { margin-top: 0; }
+        .doc-tab::-webkit-scrollbar { display:none; }
+        .doc-tab { scrollbar-width:none; }
+        .provider-card:hover { border-color:var(--hc) !important; background:var(--hb) !important; }
+        .provider-section-title { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin:18px 0 8px; }
+        .provider-section-title:first-child { margin-top:0; }
       `}</style>
 
-      {/* ── Hero header ── */}
-      <div style={{
-        background: 'linear-gradient(135deg,#0A0A0F 0%,#1A1A2E 100%)',
-        borderRadius: 22, padding: '32px 28px', marginBottom: 24,
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,107,0,.07)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -60, right: 80, width: 140, height: 140, borderRadius: '50%', background: 'rgba(0,87,255,.07)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 12,
-              background: 'linear-gradient(135deg,#FF6B00,#FFAA00)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 4px 16px rgba(255,107,0,.4)',
-            }}>
-              <BookOpen size={18} color="#fff" />
+      {/* Hero */}
+      <div style={{ background:'linear-gradient(135deg,#0A0A0F 0%,#1A1A2E 100%)', borderRadius:22, padding:'32px 28px', marginBottom:24, position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:-40, right:-40, width:200, height:200, borderRadius:'50%', background:'rgba(255,107,0,.07)', pointerEvents:'none' }}/>
+        <div style={{ position:'absolute', bottom:-60, right:80, width:140, height:140, borderRadius:'50%', background:'rgba(0,87,255,.07)', pointerEvents:'none' }}/>
+        <div style={{ position:'relative' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+            <div style={{ width:40, height:40, borderRadius:12, background:'linear-gradient(135deg,#FF6B00,#FFAA00)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 16px rgba(255,107,0,.4)' }}>
+              <BookOpen size={18} color="#fff"/>
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.4)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Référence</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-.02em', lineHeight: 1 }}>Documentation API</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.1em' }}>Référence</div>
+              <div style={{ fontSize:18, fontWeight:900, color:'#fff', letterSpacing:'-.02em', lineHeight:1 }}>Documentation API</div>
             </div>
           </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', maxWidth: 480, lineHeight: 1.6, marginBottom: 20 }}>
+          <p style={{ fontSize:13, color:'rgba(255,255,255,.5)', maxWidth:480, lineHeight:1.6, marginBottom:20 }}>
             Toutes les méthodes pour intégrer la passerelle de paiement — HTML, JavaScript, PHP, Python, Flutter et plus encore.
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {/* Afficher l'URL de l'API depuis la variable d'environnement */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16, padding:'8px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, width:'fit-content' }}>
+            <Key size={12} color="#FF6B00"/>
+            <span style={{ fontSize:12, color:'rgba(255,255,255,.5)', fontFamily:"'DM Mono',monospace" }}>Base URL :</span>
+            <span style={{ fontSize:12, color:'#FF6B00', fontFamily:"'DM Mono',monospace", fontWeight:700 }}>{BASE_URL}</span>
+          </div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
             {[
-              { label: '10 langages',    icon: Layers },
-              { label: '29 providers',   icon: Globe  },
-              { label: 'REST + Webhooks',icon: Shield },
-            ].map((b, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'rgba(255,255,255,.07)',
-                border: '1px solid rgba(255,255,255,.1)',
-                borderRadius: 8, padding: '6px 12px',
-                fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,.7)',
-              }}>
-                <b.icon size={12} color="rgba(255,107,0,.8)" />
+              { label:'10 langages',     icon:Layers },
+              { label:`${PROVIDERS.length} providers`, icon:Globe  },
+              { label:'REST + Webhooks', icon:Shield },
+            ].map((b,i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:600, color:'rgba(255,255,255,.7)' }}>
+                <b.icon size={12} color="rgba(255,107,0,.8)"/>
                 {b.label}
               </div>
             ))}
@@ -817,103 +777,69 @@ export default function GatewayApiDocs() {
         </div>
       </div>
 
-      {/* ── Layout : tabs + contenu ── */}
-      <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-
-          {/* Tabs scroll horizontal */}
-          <div className="doc-tab" style={{
-            display: 'flex', gap: 4, overflowX: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            background: '#F3F4F6', borderRadius: 14, padding: 4,
-            marginBottom: 20,
-          }}>
+      {/* Tabs + contenu */}
+      <div style={{ display:'flex', gap:18, alignItems:'flex-start' }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div className="doc-tab" style={{ display:'flex', gap:4, overflowX:'auto', WebkitOverflowScrolling:'touch', background:'#F3F4F6', borderRadius:14, padding:4, marginBottom:20 }}>
             {TABS.map(t => {
               const on = activeTab === t.id;
               return (
                 <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-                  flex: '0 0 auto',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 14px', borderRadius: 10, border: 'none',
+                  flex:'0 0 auto', display:'flex', alignItems:'center', gap:6,
+                  padding:'8px 14px', borderRadius:10, border:'none',
                   background: on ? '#fff' : 'transparent',
                   color: on ? '#111' : '#888',
-                  fontWeight: on ? 700 : 500, fontSize: 12,
-                  cursor: 'pointer', transition: 'all .18s', whiteSpace: 'nowrap',
+                  fontWeight: on ? 700 : 500, fontSize:12,
+                  cursor:'pointer', transition:'all .18s', whiteSpace:'nowrap',
                   boxShadow: on ? '0 1px 6px rgba(0,0,0,.08)' : 'none',
-                  fontFamily: 'inherit',
+                  fontFamily:'inherit',
                 }}>
-                  <t.icon size={13} color={on ? t.color : '#CCC'} />
+                  <t.icon size={13} color={on ? t.color : '#CCC'}/>
                   {t.label}
                 </button>
               );
             })}
           </div>
 
-          {/* Section header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            marginBottom: 18, animation: 'fadeUp .3s ease',
-          }}>
-            <div style={{
-              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-              background: `${activeTabMeta?.color}18`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {activeTabMeta && <activeTabMeta.icon size={18} color={activeTabMeta.color} />}
+          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18, animation:'fadeUp .3s ease' }}>
+            <div style={{ width:42, height:42, borderRadius:12, flexShrink:0, background:`${activeTabMeta?.color}18`, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {activeTabMeta && <activeTabMeta.icon size={18} color={activeTabMeta.color}/>}
             </div>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.015em' }}>{active.title}</div>
-              <div style={{ fontSize: 12, color: '#AAA', marginTop: 2 }}>{active.sub}</div>
+              <div style={{ fontSize:17, fontWeight:900, color:'#0A0A0A', letterSpacing:'-.015em' }}>{active.title}</div>
+              <div style={{ fontSize:12, color:'#AAA', marginTop:2 }}>{active.sub}</div>
             </div>
           </div>
 
-          {/* Items */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, animation: 'fadeUp .35s ease' }}>
-            {active.items.map((item, idx) => (
-              <ItemCard key={idx} item={item} tabId={activeTab} idx={idx} />
-            ))}
+          <div style={{ display:'flex', flexDirection:'column', gap:14, animation:'fadeUp .35s ease' }}>
+            {active.items.map((item, idx) => <ItemCard key={idx} item={item}/>)}
           </div>
         </div>
       </div>
 
-      {/* ── Providers ── */}
-      <div style={{
-        marginTop: 28,
-        background: '#fff', border: '1px solid #EBEBEB',
-        borderRadius: 20, padding: '24px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 11, background: '#FFF3EA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Globe size={16} color="#FF6B00" />
+      {/* Providers */}
+      <div style={{ marginTop:28, background:'#fff', border:'1px solid #EBEBEB', borderRadius:20, padding:'24px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+          <div style={{ width:38, height:38, borderRadius:11, background:'#FFF3EA', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <Globe size={16} color="#FF6B00"/>
           </div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: '#111' }}>Providers supportés</div>
-            <div style={{ fontSize: 12, color: '#AAA', marginTop: 1 }}>{PROVIDERS.length} intégrations disponibles</div>
+            <div style={{ fontSize:15, fontWeight:800, color:'#111' }}>Providers supportés</div>
+            <div style={{ fontSize:12, color:'#AAA', marginTop:1 }}>{PROVIDERS.length} intégrations disponibles</div>
           </div>
         </div>
-
-        {/* Rendu par section */}
         {PROVIDER_SECTIONS.map(section => {
           const list = PROVIDERS.filter(p => p.section === section);
           if (!list.length) return null;
           return (
             <div key={section}>
               <div className="provider-section-title">{SECTION_LABELS[section]}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8, marginBottom: 4 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:8, marginBottom:4 }}>
                 {list.map(p => (
-                  <div
-                    key={p.name}
-                    className="provider-card"
-                    style={{
-                      '--hc': p.color,
-                      '--hb': `${p.color}0D`,
-                      border: '1.5px solid #EBEBEB',
-                      borderRadius: 12, padding: '10px 12px',
-                      transition: 'all .2s', cursor: 'default',
-                    }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#222', marginBottom: 2 }}>{p.name}</div>
-                    <div style={{ fontSize: 10, color: '#AAA', fontWeight: 500 }}>{p.zone}</div>
+                  <div key={p.name} className="provider-card"
+                    style={{ '--hc':p.color, '--hb':`${p.color}0D`, border:'1.5px solid #EBEBEB', borderRadius:12, padding:'10px 12px', transition:'all .2s', cursor:'default' }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#222', marginBottom:2 }}>{p.name}</div>
+                    <div style={{ fontSize:10, color:'#AAA', fontWeight:500 }}>{p.zone}</div>
                   </div>
                 ))}
               </div>
@@ -922,29 +848,14 @@ export default function GatewayApiDocs() {
         })}
       </div>
 
-      {/* ── Support ── */}
-      <div style={{
-        marginTop: 20,
-        background: 'linear-gradient(135deg,#FF6B00,#FFAA00)',
-        borderRadius: 20, padding: '24px 28px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 16,
-      }}>
+      {/* Support */}
+      <div style={{ marginTop:20, background:'linear-gradient(135deg,#FF6B00,#FFAA00)', borderRadius:20, padding:'24px 28px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
         <div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 4 }}>Besoin d'aide pour intégrer ?</div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)' }}>Notre équipe technique est disponible 24/7.</div>
+          <div style={{ fontSize:16, fontWeight:900, color:'#fff', marginBottom:4 }}>Besoin d'aide pour intégrer ?</div>
+          <div style={{ fontSize:13, color:'rgba(255,255,255,.75)' }}>Notre équipe technique est disponible 24/7.</div>
         </div>
-        <a
-          href="mailto:support@paymentgateway.com"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: '#fff', color: '#FF6B00',
-            padding: '11px 22px', borderRadius: 12,
-            fontSize: 13, fontWeight: 800, textDecoration: 'none',
-            boxShadow: '0 4px 16px rgba(0,0,0,.12)', flexShrink: 0,
-          }}
-        >
-          <Mail size={15} /> Contacter le support
+        <a href="mailto:support@paymentgateway.com" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'#fff', color:'#FF6B00', padding:'11px 22px', borderRadius:12, fontSize:13, fontWeight:800, textDecoration:'none', boxShadow:'0 4px 16px rgba(0,0,0,.12)', flexShrink:0 }}>
+          <Mail size={15}/> Contacter le support
         </a>
       </div>
     </div>
