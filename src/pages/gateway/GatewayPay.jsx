@@ -439,7 +439,7 @@ export default function GatewayPay() {
       .then(snap => { if (snap.exists()) setGatewaySettings(p => ({ ...p, ...snap.data() })); })
       .catch(()=>{});
 
-    fetch(`/api/gateway/merchant?token=${encodeURIComponent(rawToken)}`)
+    fetch(`/api/gateway/merchant/${encodeURIComponent(rawToken)}`)
       .then(r => r.json())
       .then(data => {
         if (data.success) {
