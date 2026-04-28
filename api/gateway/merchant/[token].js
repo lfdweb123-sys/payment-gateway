@@ -14,10 +14,22 @@
  * MODE 2 — token simple base64 (ancien format, rétrocompatibilité) :
  *   URL : /pay?token=Z3dfeHh4...  (btoa('gw_xxx'))
  *   → on décode et on charge directement le marchand
- *   → utilisé quand le marchand encode juste sa clé en base64
- *   → l'apiKey EST récupérable depuis ce token (base64 non sécurisé)
  *   → à déprécier progressivement
  *
+ * ── RATE LIMITING ─────────────────────────────────────────────────────────
+ *
+ * Deux niveaux de protection contre le brute-force de PIDs :
+ *
+ * 1. Par IP — 20 requêtes/min par adresse IP
+ *    Un attaquant ne peut pas tester plus de 20 UUID/min depuis la même IP.
+ *
+ * 2. Par PID manqué — si une IP fait X "not found" consécutifs → bannissement
+ *    Détecte les tentatives de brute-force même depuis des IPs différentes.
+ *
+ * Note : En production sur Vercel, les fonctions sont stateless (reset entre
+ * les invocations cold-start). Pour un rate limiting persistant, utiliser
+ * Upstash Redis ou Vercel KV. La solution ci-dessous est efficace pour les
+ * attaques intra-instance (même worker Vercel).
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -34,6 +46,90 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+/* ─── Rate limiting en mémoire ───────────────────────────────────────────
+   Deux Maps :
+   - requestCounts  : nb de requêtes par IP dans la fenêtre de temps
+   - failCounts     : nb de PIDs introuvables par IP (détection brute-force)
+──────────────────────────────────────────────────────────────────────────*/
+const requestCounts = new Map(); // { ip → [timestamps] }
+const failCounts    = new Map(); // { ip → { count, bannedUntil } }
+
+const RATE_LIMIT = {
+  MAX_REQUESTS_PER_MIN:  20,    // max 20 requêtes/min par IP
+  WINDOW_MS:             60_000, // fenêtre de 1 minute
+  MAX_FAILS_BEFORE_BAN:  5,     // 5 PIDs "not found" → ban temporaire
+  BAN_DURATION_MS:       5 * 60_000, // ban de 5 minutes
+};
+
+/**
+ * Vérifie si l'IP est autorisée à faire une requête.
+ * Retourne { allowed: false, reason } si bloquée.
+ */
+function checkRateLimit(ip) {
+  const now = Date.now();
+
+  // ── Vérifier si l'IP est bannie (trop de PIDs manqués) ─────────────────
+  if (failCounts.has(ip)) {
+    const fc = failCounts.get(ip);
+    if (fc.bannedUntil && now < fc.bannedUntil) {
+      const remaining = Math.ceil((fc.bannedUntil - now) / 1000);
+      return { allowed: false, reason: `Trop de tentatives. Réessayez dans ${remaining}s.`, status: 429 };
+    }
+    // Ban expiré — réinitialiser
+    if (fc.bannedUntil && now >= fc.bannedUntil) {
+      failCounts.delete(ip);
+    }
+  }
+
+  // ── Vérifier le rate limit général (requêtes/min) ───────────────────────
+  if (!requestCounts.has(ip)) requestCounts.set(ip, []);
+  const timestamps = requestCounts.get(ip).filter(t => now - t < RATE_LIMIT.WINDOW_MS);
+  if (timestamps.length >= RATE_LIMIT.MAX_REQUESTS_PER_MIN) {
+    return { allowed: false, reason: 'Trop de requêtes. Réessayez dans 1 minute.', status: 429 };
+  }
+  timestamps.push(now);
+  requestCounts.set(ip, timestamps);
+
+  return { allowed: true };
+}
+
+/**
+ * Enregistre un échec "PID not found" pour une IP.
+ * Si le seuil est atteint, bannit l'IP temporairement.
+ */
+function recordFail(ip) {
+  const now = Date.now();
+  if (!failCounts.has(ip)) failCounts.set(ip, { count: 0, bannedUntil: null });
+  const fc = failCounts.get(ip);
+  fc.count += 1;
+  if (fc.count >= RATE_LIMIT.MAX_FAILS_BEFORE_BAN) {
+    fc.bannedUntil = now + RATE_LIMIT.BAN_DURATION_MS;
+    fc.count = 0; // reset le compteur — le ban prend le relais
+    console.warn(`[merchant] IP ${ip} bannie pour ${RATE_LIMIT.BAN_DURATION_MS / 1000}s (brute-force PID détecté)`);
+  }
+  failCounts.set(ip, fc);
+}
+
+/**
+ * Réinitialise le compteur d'échecs pour une IP (après un succès).
+ */
+function recordSuccess(ip) {
+  failCounts.delete(ip);
+}
+
+/**
+ * Extrait l'IP réelle du client depuis les headers Vercel/proxy.
+ */
+function getClientIp(req) {
+  return (
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.headers['x-real-ip'] ||
+    req.socket?.remoteAddress ||
+    'unknown'
+  );
+}
+
+/* ─── Handler principal ──────────────────────────────────────────────────*/
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin',  '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -43,19 +139,28 @@ export default async function handler(req, res) {
   const { token: rawToken } = req.query;
   if (!rawToken) return res.status(400).json({ error: 'Token requis' });
 
+  // ── Rate limiting ───────────────────────────────────────────────────────
+  const clientIp = getClientIp(req);
+  const rl = checkRateLimit(clientIp);
+  if (!rl.allowed) {
+    res.setHeader('Retry-After', '60');
+    return res.status(rl.status || 429).json({ error: rl.reason });
+  }
+
   try {
 
     /* ══════════════════════════════════════════════════════════════════════
        MODE 1 — PID (UUID Firestore) — format sécurisé
-       Détection : UUID v4 → xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     ══════════════════════════════════════════════════════════════════════ */
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     if (UUID_REGEX.test(rawToken)) {
-      // Charger le payment link depuis Firestore
       const linkDoc = await db.collection('payment_links').doc(rawToken).get();
 
       if (!linkDoc.exists) {
+        // ← enregistrer l'échec — potentiel brute-force
+        recordFail(clientIp);
+        // Réponse volontairement vague — ne pas indiquer si le PID existe ou non
         return res.status(404).json({ error: 'Lien de paiement introuvable ou expiré.' });
       }
 
@@ -63,16 +168,15 @@ export default async function handler(req, res) {
 
       // Vérifier expiration
       if (link.expiresAt && new Date() > new Date(link.expiresAt)) {
+        recordFail(clientIp);
         return res.status(400).json({ error: 'Lien de paiement expiré. Veuillez en générer un nouveau.' });
       }
-
-      // Vérifier que le lien n'a pas déjà été utilisé (optionnel)
-      // if (link.used) return res.status(400).json({ error: 'Lien déjà utilisé.' });
 
       // Charger le marchand
       const merchantDoc = await db.collection('gateway_merchants').doc(link.merchantId).get();
 
       if (!merchantDoc.exists) {
+        recordFail(clientIp);
         return res.status(404).json({ error: 'Marchand introuvable.' });
       }
 
@@ -81,6 +185,9 @@ export default async function handler(req, res) {
       if (!merchant.active || merchant.verificationStatus !== 'approved') {
         return res.status(403).json({ error: 'Compte marchand non activé.' });
       }
+
+      // ← succès : réinitialiser le compteur d'échecs pour cette IP
+      recordSuccess(clientIp);
 
       const providers       = merchant.providers || {};
       const activeProviders = Object.entries(providers)
@@ -91,8 +198,6 @@ export default async function handler(req, res) {
         ? (providers.kkiapay?.KKIAPAY_PUBLIC_KEY || null)
         : null;
 
-      // L'apiKey est retournée UNIQUEMENT pour que pay.js puisse l'utiliser
-      // dans le header x-api-key — elle ne s'affiche PAS dans l'URL
       return res.status(200).json({
         success:            true,
         id:                 link.merchantId,
@@ -101,9 +206,7 @@ export default async function handler(req, res) {
         verificationStatus: merchant.verificationStatus,
         activeProviders,
         kkiapayPublicKey,
-        // ← apiKey retournée pour le header, pas pour l'URL
         apiKey:             link.apiKey,
-        // Données du paiement préremplies
         amount:             link.amount      || null,
         description:        link.description || 'Paiement en ligne',
         country:            link.country     || null,
@@ -113,48 +216,45 @@ export default async function handler(req, res) {
 
     /* ══════════════════════════════════════════════════════════════════════
        MODE 2 — TOKEN BASE64 SIMPLE (rétrocompatibilité)
-       btoa('gw_xxx') → décodage direct
-       ⚠️  La clé est techniquement récupérable depuis le token
-       mais ce mode reste utilisable pour les intégrations existantes.
     ══════════════════════════════════════════════════════════════════════ */
     let apiKey = null;
 
-    // Cas A : rawToken est déjà la clé brute
     if (rawToken.startsWith('gw_')) {
       apiKey = rawToken;
-    }
-    // Cas B : rawToken est du base64 simple de la clé
-    else {
+    } else {
       try {
         const decoded = Buffer.from(rawToken, 'base64').toString('utf8');
         if (decoded.startsWith('gw_')) {
           apiKey = decoded;
         } else {
-          return res.status(400).json({
-            error: 'Format de token non reconnu. Utilisez pid= pour les nouveaux liens.',
-          });
+          recordFail(clientIp);
+          return res.status(400).json({ error: 'Format de token non reconnu.' });
         }
       } catch {
+        recordFail(clientIp);
         return res.status(400).json({ error: 'Token invalide.' });
       }
     }
 
     if (!apiKey) {
+      recordFail(clientIp);
       return res.status(400).json({ error: 'Impossible d\'extraire la clé API.' });
     }
 
-    // Charger le marchand depuis l'apiKey
     const merchantSnap = await db.collection('gateway_merchants')
       .where('apiKey', '==', apiKey)
       .limit(1)
       .get();
 
     if (merchantSnap.empty) {
+      recordFail(clientIp);
       return res.status(404).json({ error: 'Marchand introuvable.' });
     }
 
     const merchantDoc = merchantSnap.docs[0];
     const merchant    = merchantDoc.data();
+
+    recordSuccess(clientIp);
 
     const providers       = merchant.providers || {};
     const activeProviders = Object.entries(providers)
