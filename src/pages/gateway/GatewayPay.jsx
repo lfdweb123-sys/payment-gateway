@@ -41,10 +41,6 @@ const COUNTRY_TARGET_CURRENCY = {
   fr:'EUR', be:'EUR', de:'EUR', nl:'EUR', gb:'GBP', us:'USD',
 };
 
-/* ─── Taux de conversion XOF → autres devises ──────────────
-   Affichage côté client uniquement — la conversion réelle
-   est faite côté serveur dans pay.js avec les mêmes taux.
-──────────────────────────────────────────────────────────── */
 const XOF_DISPLAY_RATES = {
   EUR: 1 / 655.957,
   USD: 1 / 600,
@@ -57,7 +53,7 @@ const XOF_DISPLAY_RATES = {
   GHS: 1 / 45,
   KES: 1 / 4.5,
   TND: 1 / 195,
-  XAF: 1,       // parité fixe XOF/XAF
+  XAF: 1,
   GNF: 1 / 0.072,
   CDF: 1 / 0.3,
   UGX: 1 / 0.16,
@@ -65,7 +61,6 @@ const XOF_DISPLAY_RATES = {
   RWF: 1 / 0.55,
 };
 
-/* Providers qui nécessitent une conversion (pas XOF natif) */
 const PROVIDERS_EUR = new Set(['stripe','adyen','mollie','checkout','braintree','paypal','square','authnet','razorpay','yoco']);
 const PROVIDER_DISPLAY_CURRENCY = {
   stripe:'EUR', adyen:'EUR', mollie:'EUR', checkout:'EUR',
@@ -73,41 +68,25 @@ const PROVIDER_DISPLAY_CURRENCY = {
   razorpay:'INR', yoco:'ZAR', paystack:'NGN', flutterwave:'NGN',
 };
 
-/**
- * Retourne { amount, currency } à afficher.
- * Priorité : devise du pays > devise du provider.
- * Si merchantCurrency === XOF et targetCurrency est différent → convertit.
- */
 function getDisplayAmount(amount, merchantCurrency, targetCurrency, providerId) {
   const mc = (merchantCurrency || 'XOF').toUpperCase();
   const tc = (targetCurrency || mc).toUpperCase();
-
-  // Si même devise, pas de conversion
   if (mc === tc) return { amount, currency: mc };
-
-  // Conversion XOF → devise cible
   if (mc === 'XOF' && XOF_DISPLAY_RATES[tc]) {
     const converted = amount * XOF_DISPLAY_RATES[tc];
     const noDecimal = new Set(['NGN','KES','GHS','INR','UGX','TZS','RWF','GNF','CDF','XAF']);
-    const rounded = noDecimal.has(tc)
-      ? Math.round(converted)
-      : Math.round(converted * 100) / 100;
+    const rounded = noDecimal.has(tc) ? Math.round(converted) : Math.round(converted * 100) / 100;
     return { amount: rounded, currency: tc };
   }
-
-  // Fallback : logique provider si pas de taux pays
   if (providerId && PROVIDERS_EUR.has(providerId)) {
     const providerCurrency = PROVIDER_DISPLAY_CURRENCY[providerId] || 'EUR';
     if (mc === 'XOF' && XOF_DISPLAY_RATES[providerCurrency]) {
       const converted = amount * XOF_DISPLAY_RATES[providerCurrency];
       const noDecimal = new Set(['NGN','KES','GHS','INR']);
-      const rounded = noDecimal.has(providerCurrency)
-        ? Math.round(converted)
-        : Math.round(converted * 100) / 100;
+      const rounded = noDecimal.has(providerCurrency) ? Math.round(converted) : Math.round(converted * 100) / 100;
       return { amount: rounded, currency: providerCurrency };
     }
   }
-
   return { amount, currency: mc };
 }
 
@@ -177,10 +156,7 @@ function Stepper({ current, primaryColor }) {
   );
 }
 
-/* ─── CountrySelector ──────────────────────────────────────
-   ≤ 12 pays  → grille de boutons (comportement original)
-   > 12 pays  → champ custom avec recherche + dropdown pro
-──────────────────────────────────────────────────────────── */
+/* ─── CountrySelector ── */
 function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch, setCountrySearch, themeVars, primaryColor, design }) {
   const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState('');
@@ -218,12 +194,11 @@ function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch,
     </div>
   );
 
-  /* ══ ≤ 12 PAYS → grille originale ══ */
+  /* ≤ 12 PAYS → grille */
   if (countries.length <= 12) return (
     <>
       <div className="gw-search-wrap">
-        <svg className="gw-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg className="gw-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="text" className="gw-search-input" value={countrySearch}
@@ -252,10 +227,9 @@ function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch,
     </>
   );
 
-  /* ══ > 12 PAYS → select pro avec dropdown ══ */
+  /* > 12 PAYS → dropdown */
   return (
     <div ref={dropRef} style={{ position:'relative' }}>
-      {/* Déclencheur */}
       <button type="button" onClick={() => setOpen(v => !v)} style={{
         width:'100%', display:'flex', alignItems:'center', gap:12,
         padding:'14px 16px',
@@ -266,70 +240,38 @@ function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch,
         boxShadow: open ? `0 0 0 3px ${primaryColor}18` : 'none',
         outline:'none',
       }}>
-        <div style={{
-          width:38, height:38, borderRadius:10, flexShrink:0,
-          background:`${primaryColor}15`, border:`1px solid ${primaryColor}25`,
-          display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
+        <div style={{ width:38, height:38, borderRadius:10, flexShrink:0, background:`${primaryColor}15`, border:`1px solid ${primaryColor}25`, display:'flex', alignItems:'center', justifyContent:'center' }}>
           <Globe size={16} color={primaryColor}/>
         </div>
         <div style={{ flex:1, textAlign:'left' }}>
-          <div style={{ fontSize:10, fontWeight:700, color:themeVars.textMuted, textTransform:'uppercase', letterSpacing:'.1em', marginBottom:2 }}>
-            Sélectionner un pays
-          </div>
-          <div style={{ fontSize:13, fontWeight:600, color:themeVars.textSecondary }}>
-            {countries.length} pays disponibles
-          </div>
+          <div style={{ fontSize:10, fontWeight:700, color:themeVars.textMuted, textTransform:'uppercase', letterSpacing:'.1em', marginBottom:2 }}>Sélectionner un pays</div>
+          <div style={{ fontSize:13, fontWeight:600, color:themeVars.textSecondary }}>{countries.length} pays disponibles</div>
         </div>
-        <ChevronDown size={16} color={themeVars.textMuted}
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s', flexShrink:0 }}/>
+        <ChevronDown size={16} color={themeVars.textMuted} style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s', flexShrink:0 }}/>
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div style={{
           position:'absolute', top:'calc(100% + 8px)', left:0, right:0, zIndex:1000,
           background: design === 'bold' ? '#1a1a1a' : '#fff',
           border: `1px solid ${design === 'bold' ? '#333' : '#e2e8f0'}`,
           borderRadius:16,
-          boxShadow: design === 'bold'
-            ? '0 8px 32px rgba(0,0,0,.6)'
-            : '0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06)',
-          overflow:'hidden',
-          animation:'gw-fadeUp .18s ease both',
+          boxShadow: design === 'bold' ? '0 8px 32px rgba(0,0,0,.6)' : '0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06)',
+          overflow:'hidden', animation:'gw-fadeUp .18s ease both',
         }}>
-          {/* Barre de recherche dans le dropdown */}
-          <div style={{
-            padding:'12px 12px 8px',
-            borderBottom:`1px solid ${design === 'bold' ? '#2a2a2a' : '#f0f0f0'}`,
-            position:'sticky', top:0,
-            background: design === 'bold' ? '#1a1a1a' : '#fff',
-            zIndex:1,
-          }}>
+          <div style={{ padding:'12px 12px 8px', borderBottom:`1px solid ${design === 'bold' ? '#2a2a2a' : '#f0f0f0'}`, position:'sticky', top:0, background: design === 'bold' ? '#1a1a1a' : '#fff', zIndex:1 }}>
             <div style={{ position:'relative' }}>
               <svg style={{ position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:themeVars.textMuted,pointerEvents:'none' }}
                 width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
-                placeholder="Rechercher un pays…"
-                style={{
-                  width:'100%', padding:'9px 34px 9px 32px',
-                  background: design === 'bold' ? '#242424' : '#f8fafc',
-                  border:`1px solid ${design === 'bold' ? '#333' : '#e2e8f0'}`,
-                  borderRadius:10, fontSize:13, fontFamily: themeVars.fontFamily,
-                  color: themeVars.textPrimary, outline:'none', boxSizing:'border-box',
-                  transition:'border-color .15s',
-                }}
+              <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Rechercher un pays…"
+                style={{ width:'100%', padding:'9px 34px 9px 32px', background: design === 'bold' ? '#242424' : '#f8fafc', border:`1px solid ${design === 'bold' ? '#333' : '#e2e8f0'}`, borderRadius:10, fontSize:13, fontFamily: themeVars.fontFamily, color: themeVars.textPrimary, outline:'none', boxSizing:'border-box', transition:'border-color .15s' }}
                 onFocus={e => e.target.style.borderColor = primaryColor}
                 onBlur={e => e.target.style.borderColor = design === 'bold' ? '#333' : '#e2e8f0'}
               />
               {query && (
-                <button onClick={() => setQuery('')} style={{
-                  position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',
-                  background:'none',border:'none',cursor:'pointer',
-                  color:themeVars.textMuted,display:'flex',padding:2,
-                }}>
+                <button onClick={() => setQuery('')} style={{ position:'absolute',right:8,top:'50%',transform:'translateY(-50%)', background:'none',border:'none',cursor:'pointer', color:themeVars.textMuted,display:'flex',padding:2 }}>
                   <X size={11}/>
                 </button>
               )}
@@ -338,42 +280,24 @@ function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch,
               {filteredDrop.length} résultat{filteredDrop.length !== 1 ? 's' : ''}
             </div>
           </div>
-
-          {/* Liste des pays */}
           <div style={{ maxHeight:280, overflowY:'auto', padding:'6px' }}>
             {filteredDrop.length === 0 ? (
-              <div style={{ padding:'20px', textAlign:'center', fontSize:13, color:themeVars.textMuted }}>
-                Aucun pays trouvé pour « {query} »
-              </div>
+              <div style={{ padding:'20px', textAlign:'center', fontSize:13, color:themeVars.textMuted }}>Aucun pays trouvé pour « {query} »</div>
             ) : filteredDrop.map(c => (
               <button key={c.code} type="button"
                 onClick={() => { onSelect(c.code); setOpen(false); setQuery(''); }}
-                style={{
-                  width:'100%', display:'flex', alignItems:'center', gap:12,
-                  padding:'10px 12px', background:'transparent', border:'none',
-                  borderRadius:10, cursor:'pointer', fontFamily:themeVars.fontFamily,
-                  transition:'background .12s', textAlign:'left',
-                }}
+                style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'10px 12px', background:'transparent', border:'none', borderRadius:10, cursor:'pointer', fontFamily:themeVars.fontFamily, transition:'background .12s', textAlign:'left' }}
                 onMouseEnter={e => e.currentTarget.style.background = design === 'bold' ? '#2a2a2a' : `${primaryColor}0d`}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
-                <div style={{
-                  width:36, height:36, borderRadius:10, flexShrink:0,
-                  background: design === 'bold' ? '#2a2a2a' : '#f8fafc',
-                  border:`1px solid ${design === 'bold' ? '#333' : '#e2e8f0'}`,
-                  display:'flex', alignItems:'center', justifyContent:'center', fontSize:18,
-                }}>
+                <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, background: design === 'bold' ? '#2a2a2a' : '#f8fafc', border:`1px solid ${design === 'bold' ? '#333' : '#e2e8f0'}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>
                   {c.flag}
                 </div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:700, color:themeVars.textPrimary, lineHeight:1.3 }}>{c.name}</div>
                   <div style={{ fontSize:11, color:themeVars.textSecondary, marginTop:1 }}>{c.currency}</div>
                 </div>
-                <div style={{
-                  fontSize:10, fontWeight:700, color:themeVars.textMuted,
-                  background: design === 'bold' ? '#333' : '#f1f5f9',
-                  padding:'2px 7px', borderRadius:6, letterSpacing:'.06em',
-                }}>
+                <div style={{ fontSize:10, fontWeight:700, color:themeVars.textMuted, background: design === 'bold' ? '#333' : '#f1f5f9', padding:'2px 7px', borderRadius:6, letterSpacing:'.06em' }}>
                   {c.code.toUpperCase()}
                 </div>
               </button>
@@ -385,18 +309,36 @@ function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch,
   );
 }
 
+/* ─── Helper formatage montant ── */
+const NO_DECIMAL_CURRENCIES = new Set(['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF']);
+function fmtAmount(amount, currency) {
+  return amount.toLocaleString('fr-FR', {
+    minimumFractionDigits: NO_DECIMAL_CURRENCIES.has(currency) ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 /* ─── Main ─────────────────────────────────────────────── */
 export default function GatewayPay() {
   const [searchParams] = useSearchParams();
-  const rawToken = searchParams.get('token') || searchParams.get('t');
-  console.log('rawToken:', rawToken);
-  const token = (() => {
-    if (!rawToken) return null;
-    if (rawToken.startsWith('gw_')) return rawToken;
-    try { return atob(rawToken); } catch { return rawToken; }
-  })();
 
-  const [amount, setAmount] = useState('5000');
+  /* ── CORRECTION 1 : supporter pid (sécurisé) ET token (rétrocompat) ──────
+     pid  = UUID Firestore → aucune donnée sensible dans l'URL (nouveau)
+     token = base64(gw_xxx) → ancien format, encore supporté
+  ─────────────────────────────────────────────────────────────────────────── */
+  const pid      = searchParams.get('pid');
+  const rawToken = searchParams.get('token') || searchParams.get('t');
+  // Le paramètre à envoyer au serveur : pid en priorité, sinon rawToken
+  const lookupParam = pid || rawToken;
+
+  /* ── CORRECTION 2 : apiKey stockée en state, jamais lue depuis l'URL ──────
+     Le serveur retourne l'apiKey dans la réponse JSON.
+     On la stocke ici pour l'utiliser dans les headers des appels API.
+     Elle n'est jamais lue depuis l'URL ni exposée dans le DOM.
+  ─────────────────────────────────────────────────────────────────────────── */
+  const [apiKey, setApiKey] = useState(null);
+
+  const [amount, setAmount]       = useState('5000');
   const [description, setDescription] = useState('Paiement en ligne');
 
   const [step, setStep]                           = useState(1);
@@ -416,7 +358,6 @@ export default function GatewayPay() {
   const [kkiapayPublicKey, setKkiapayPublicKey]   = useState(null);
   const [countrySearch, setCountrySearch]         = useState('');
 
-  /* Champs carte */
   const [customerFirstName, setCustomerFirstName] = useState('');
   const [customerLastName, setCustomerLastName]   = useState('');
   const [customerEmail, setCustomerEmail]         = useState('');
@@ -431,24 +372,33 @@ export default function GatewayPay() {
     }
   }, []);
 
-  /* Init */
+  /* ── Init ── */
   useEffect(() => {
-    if (!token) { setFetchingMerchant(false); return; }
+    if (!lookupParam) { setFetchingMerchant(false); return; }
 
     getDoc(doc(db,'gateway_settings','config'))
       .then(snap => { if (snap.exists()) setGatewaySettings(p => ({ ...p, ...snap.data() })); })
       .catch(()=>{});
 
-    fetch(`/api/gateway/merchant/${encodeURIComponent(rawToken)}`)
+    /* ── CORRECTION 3 : utiliser lookupParam (pid ou rawToken) ─────────────
+       Le serveur reçoit soit un UUID (pid), soit un token base64 (ancien).
+       Il retourne l'apiKey dans la réponse — on la stocke dans le state.
+       On supprime aussi le console.log('rawToken') qui exposait la clé.
+    ─────────────────────────────────────────────────────────────────────── */
+    fetch(`/api/gateway/merchant/${encodeURIComponent(lookupParam)}`)
       .then(r => r.json())
       .then(data => {
         if (data.success) {
           setMerchant(data);
           setCountries(getCountriesForProviders(data.activeProviders || []));
           if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
-          if (data.amount) setAmount(String(data.amount));
+          if (data.amount)      setAmount(String(data.amount));
           if (data.description) setDescription(data.description);
-          if (data.country) handleSelectCountry(data.country);
+          if (data.country)     handleSelectCountry(data.country);
+
+          // ← stocker l'apiKey retournée par le serveur dans le state
+          // Elle sera utilisée dans x-api-key pour les appels /pay et /verify
+          if (data.apiKey) setApiKey(data.apiKey);
         }
       })
       .catch(() => toast.error('Impossible de charger le marchand'))
@@ -464,7 +414,8 @@ export default function GatewayPay() {
         localStorage.setItem('gw_saved_phones', JSON.stringify(deduped));
       }
     } catch {}
-  }, [token]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookupParam]);
 
   /* defaultCountry */
   useEffect(() => {
@@ -506,7 +457,8 @@ export default function GatewayPay() {
       attempts++;
       if (attempts > 24) { clearInterval(iv); clearInterval(mi_); setStatus('failed'); return; }
       try {
-        const r = await fetch(`/api/gateway/verify/${id}`, { headers:{'x-api-key':token} });
+        /* ── apiKey depuis le state — jamais depuis l'URL ── */
+        const r = await fetch(`/api/gateway/verify/${id}`, { headers:{'x-api-key': apiKey} });
         const d = await r.json();
         if (d.status === 'completed') { clearInterval(iv); clearInterval(mi_); setStatus('completed'); }
         else if (d.status === 'failed') { clearInterval(iv); clearInterval(mi_); setStatus('failed'); }
@@ -535,9 +487,10 @@ export default function GatewayPay() {
         if (!phoneCheck.valid) { toast.error(phoneCheck.error); setLoading(false); return; }
       }
 
+      /* ── apiKey depuis le state — jamais depuis l'URL ── */
       const res = await fetch('/api/gateway/pay', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json', 'x-api-key':token },
+        headers: { 'Content-Type':'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({
           amount:          parseFloat(amount),
           country,
@@ -572,8 +525,9 @@ export default function GatewayPay() {
     window.addSuccessListener(async (response) => {
       setStatus('pending'); setPollMsg('Vérification du paiement…');
       try {
+        /* ── apiKey depuis le state ── */
         const res = await fetch('/api/gateway/kkiapay-verify', {
-          method:'POST', headers:{'Content-Type':'application/json','x-api-key':token},
+          method:'POST', headers:{'Content-Type':'application/json','x-api-key': apiKey},
           body: JSON.stringify({ transactionId: response.transactionId }),
         });
         const data = await res.json();
@@ -600,13 +554,6 @@ export default function GatewayPay() {
   const primaryColor     = gatewaySettings.primaryColor || '#C8931A';
   const design           = gatewaySettings.paymentDesign || 'modern';
 
-  /*
-   * ── CONVERSION AU NIVEAU DU PAYS ──────────────────────────
-   * Dès qu'un pays est sélectionné, on calcule la devise cible
-   * du pays (ex: France → EUR, Nigeria → NGN).
-   * Cette conversion s'affiche partout dès le step 2.
-   * ──────────────────────────────────────────────────────────
-   */
   const countryTargetCurrency = country ? (COUNTRY_TARGET_CURRENCY[country] || merchantCurrency) : merchantCurrency;
   const { amount: displayAmount, currency: displayCurrency } = getDisplayAmount(
     parseFloat(amount || 0),
@@ -615,7 +562,6 @@ export default function GatewayPay() {
     selectedMethod?.provider || null
   );
 
-  /* Pour le panneau résumé — devise marchand d'origine */
   const summaryAmount   = parseFloat(amount || 0);
   const summaryCurrency = merchantCurrency;
 
@@ -660,7 +606,6 @@ export default function GatewayPay() {
   const isMobileMethod      = MOBILE_METHODS.includes(selectedMethod?.id);
   const isCardMethod        = CARD_METHODS.includes(selectedMethod?.id);
 
-  /* ─── CSS dynamique ── */
   const css = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
     @keyframes gw-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -776,9 +721,8 @@ export default function GatewayPay() {
         <div className="gw-amount-card">
           <p className="gw-amount-label">Total à payer</p>
           {showConversion ? (
-            /* Après sélection d'un pays avec devise différente : afficher la devise convertie */
             <div>
-              <span className="gw-amount-val">{displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })}</span>
+              <span className="gw-amount-val">{fmtAmount(displayAmount, displayCurrency)}</span>
               <span className="gw-amount-curr">{displayCurrency}</span>
               <p style={{fontSize:11,color:themeVars.textMuted,marginTop:6}}>
                 ≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}
@@ -818,7 +762,7 @@ export default function GatewayPay() {
           <span className="gw-total-key">Total</span>
           <span className="gw-total-val" style={{color:primaryColor}}>
             {showConversion
-              ? `${displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} ${displayCurrency}`
+              ? `${fmtAmount(displayAmount, displayCurrency)} ${displayCurrency}`
               : `${summaryAmount.toLocaleString('fr-FR')} ${summaryCurrency}`
             }
           </span>
@@ -843,7 +787,7 @@ export default function GatewayPay() {
         <div className="gw-status-amount">
           <p style={{fontSize:11,color:themeVars.textMuted,marginBottom:4}}>{description}</p>
           <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
-            {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
+            {fmtAmount(displayAmount, displayCurrency)} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
           </p>
         </div>
         <p style={{fontSize:11,color:themeVars.textMuted,marginTop:16}}>Ne fermez pas cette page</p>
@@ -864,7 +808,7 @@ export default function GatewayPay() {
         <div className="gw-status-amount" style={{background:'#ECFDF5',border:'1px solid rgba(16,185,129,.15)'}}>
           <p style={{fontSize:11,color:'#6EE7B7',marginBottom:4}}>{description}</p>
           <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
-            {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
+            {fmtAmount(displayAmount, displayCurrency)} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
           </p>
         </div>
         {gatewaySettings.redirectUrl && <p style={{fontSize:11,color:themeVars.textMuted,marginTop:14}}>Redirection en cours…</p>}
@@ -909,11 +853,10 @@ export default function GatewayPay() {
               )}
             </div>
             <div style={{textAlign:'right'}}>
-              {/* Dès qu'un pays est sélectionné, afficher le montant converti dans le header */}
               {country && displayCurrency !== summaryCurrency ? (
                 <>
                   <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
-                    {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
+                    {fmtAmount(displayAmount, displayCurrency)} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
                   </div>
                   <div style={{fontSize:10,color:themeVars.textMuted}}>≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}</div>
                 </>
@@ -933,7 +876,7 @@ export default function GatewayPay() {
             <Stepper current={step} primaryColor={primaryColor}/>
           </div>
 
-          {/* ── STEP 1 — Pays ── */}
+          {/* STEP 1 */}
           {step === 1 && (
             <div className="gw-fade" style={{flex:1}}>
               <span className="gw-section-lbl">Sélectionnez votre pays</span>
@@ -950,7 +893,7 @@ export default function GatewayPay() {
             </div>
           )}
 
-          {/* ── STEP 2 — Méthode ── */}
+          {/* STEP 2 */}
           {step === 2 && countryData && (
             <div className="gw-fade" style={{flex:1}}>
               <button className="gw-back" onClick={() => { setStep(1); setCountryData(null); setCountry(null); }}>
@@ -960,23 +903,21 @@ export default function GatewayPay() {
                 <div className="gw-pill-icon"><span style={{fontSize:20}}>{countryData.flag}</span></div>
                 <div>
                   <div className="gw-pill-name">{countryData.name}</div>
-                  {/* Afficher la devise convertie dès le step 2 */}
                   <div className="gw-pill-sub">
                     {displayCurrency !== summaryCurrency
-                      ? `${displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} ${displayCurrency}`
+                      ? `${fmtAmount(displayAmount, displayCurrency)} ${displayCurrency}`
                       : countryData.currency
                     }
                   </div>
                 </div>
               </div>
 
-              {/* Note de conversion au niveau du pays dès le step 2 */}
               {displayCurrency !== summaryCurrency && (
                 <div className="gw-conversion-note" style={{marginBottom:16}}>
                   <span style={{fontSize:14}}>💱</span>
                   <span>
                     {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} → <strong style={{color:themeVars.textPrimary}}>
-                      {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                      {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
                     </strong> (taux appliqué automatiquement)
                   </span>
                 </div>
@@ -992,10 +933,9 @@ export default function GatewayPay() {
                   <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
                   <div style={{flex:1}}>
                     <span className="gw-method-name">{method.name}</span>
-                    {/* Montant converti déjà calculé au niveau pays, pas besoin de recalculer par provider */}
                     {displayCurrency !== summaryCurrency && (
                       <div style={{fontSize:10,color:themeVars.textMuted,marginTop:2}}>
-                        {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                        {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
                       </div>
                     )}
                   </div>
@@ -1007,7 +947,7 @@ export default function GatewayPay() {
             </div>
           )}
 
-          {/* ── STEP 3 — Paiement ── */}
+          {/* STEP 3 */}
           {step === 3 && selectedMethod && (
             <div className="gw-fade" style={{flex:1}}>
               <button className="gw-back" onClick={() => { setStep(2); setSelectedMethod(null); setPhoneSuffix(''); }}>
@@ -1021,13 +961,12 @@ export default function GatewayPay() {
                 </div>
               </div>
 
-              {/* Note de conversion */}
               {displayCurrency !== summaryCurrency && (
                 <div className="gw-conversion-note">
                   <span style={{fontSize:14}}>💱</span>
                   <span>
                     {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} → <strong style={{color:themeVars.textPrimary}}>
-                      {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                      {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
                     </strong> (taux appliqué automatiquement)
                   </span>
                 </div>
@@ -1046,13 +985,11 @@ export default function GatewayPay() {
                   </div>
                   <button className="gw-submit" style={{marginTop:0}} onClick={handleKkiapayPayment}>
                     <Zap size={16}/>
-                    Payer {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                    Payer {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit}>
-
-                  {/* Champs MOBILE */}
                   {isMobileMethod && (
                     <>
                       <div style={{marginBottom:6}}>
@@ -1092,7 +1029,6 @@ export default function GatewayPay() {
                     </>
                   )}
 
-                  {/* Champs CARTE */}
                   {isCardMethod && !isKkiapayMethod && (
                     <>
                       <div className="gw-card-notice">
@@ -1134,7 +1070,7 @@ export default function GatewayPay() {
                         Traitement en cours…
                       </>
                     ) : (
-                      <><Zap size={16}/> Payer {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}</>
+                      <><Zap size={16}/> Payer {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}</>
                     )}
                   </button>
                 </form>
