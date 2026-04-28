@@ -394,8 +394,9 @@ export default function GatewayPay() {
     if (rawToken.startsWith('gw_')) return rawToken;
     try { return atob(rawToken); } catch { return rawToken; }
   })();
-  const amountParam = searchParams.get('amount');
-  const description = searchParams.get('desc') || 'Paiement en ligne';
+
+  const [amount, setAmount] = useState('5000');
+  const [description, setDescription] = useState('Paiement en ligne');
 
   const [step, setStep]                           = useState(1);
   const [country, setCountry]                     = useState(null);
@@ -438,15 +439,18 @@ export default function GatewayPay() {
       .then(snap => { if (snap.exists()) setGatewaySettings(p => ({ ...p, ...snap.data() })); })
       .catch(()=>{});
 
-    fetch(`/api/gateway/merchant/${token}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.success) {
-          setMerchant(data);
-          setCountries(getCountriesForProviders(data.activeProviders || []));
-          if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
-        }
-      })
+  // ✅ Dans le useEffect, AJOUTER juste ces 2 lignes
+  fetch(`/api/gateway/merchant/${token}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        setMerchant(data);
+        setCountries(getCountriesForProviders(data.activeProviders || []));
+        if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
+        if (data.amount) setAmount(String(data.amount));           // ✅ AJOUTER
+        if (data.description) setDescription(data.description);   // ✅ AJOUTER
+      }
+    })
       .catch(() => toast.error('Impossible de charger le marchand'))
       .finally(() => setFetchingMerchant(false));
 

@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import crypto from 'crypto'; // ✅ AJOUTER
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -20,12 +21,47 @@ export default async function handler(req, res) {
   const { token: rawToken } = req.query;
   if (!rawToken) return res.status(400).json({ error: 'Token requis' });
 
-  // Décoder le token si encodé en base64
+  // ✅ Décoder le token avec signature HMAC
+  let decoded;
+  try {
+    decoded = JSON.parse(Buffer.from(rawToken, 'base64').toString('utf8'));
+  } catch {
+    return res.status(400).json({ error: 'Token invalide' });
+  }
+
+  const { amount, description, timestamp, sig, apiKey: tokenApiKey } = decoded;
+  
+  // ✅ Vérifier expiration (15 minutes)
+  if (timestamp && Date.now() - timestamp > 15 * 60 * 1000) {
+    return res.status(400).json({ error: 'Token expiré' });
+  }
+
+  // ✅ Vérifier signature HMAC si présente (token signé)
+  if (sig) {
+    const payloadToVerify = { amount, description, timestamp };
+    
+    const expectedSig = crypto
+      .createHmac('sha256', process.env.GATEWAY_SECRET)
+      .update(JSON.stringify(payloadToVerify))
+      .digest('hex');
+
+    if (sig !== expectedSig) {
+      return res.status(403).json({ error: 'Token falsifié' });
+    }
+  }
+
+  // Token simple (ancien format) ou token signé avec apiKey
   let token = rawToken;
-  if (!rawToken.startsWith('gw_')) {
+  
+  // Si c'est un token signé avec apiKey
+  if (tokenApiKey && tokenApiKey.startsWith('gw_')) {
+    token = tokenApiKey;
+  }
+  // Si c'est l'ancien format (base64 simple contenant l'apiKey)
+  else if (!rawToken.startsWith('gw_')) {
     try {
-      const decoded = Buffer.from(rawToken, 'base64').toString('utf8');
-      if (decoded.startsWith('gw_')) token = decoded;
+      const simpleDecoded = Buffer.from(rawToken, 'base64').toString('utf8');
+      if (simpleDecoded.startsWith('gw_')) token = simpleDecoded;
     } catch {}
   }
 
@@ -45,7 +81,6 @@ export default async function handler(req, res) {
       .filter(([, config]) => config.active)
       .map(([key]) => key);
 
-    // Exposer uniquement la PUBLIC KEY de KKiaPay (jamais private/secret)
     const kkiapayPublicKey = providers.kkiapay?.active
       ? providers.kkiapay?.KKIAPAY_PUBLIC_KEY || null
       : null;
@@ -58,6 +93,8 @@ export default async function handler(req, res) {
       verificationStatus: merchant.verificationStatus,
       activeProviders,
       kkiapayPublicKey,
+      amount: amount || null,           // ✅ Depuis le token
+      description: description || 'Paiement en ligne', // ✅ Depuis le token
     });
   } catch (error) {
     return res.status(500).json({ error: error.message });
