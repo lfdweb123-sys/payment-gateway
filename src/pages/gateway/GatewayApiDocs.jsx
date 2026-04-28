@@ -666,7 +666,7 @@ Future<void> payer(double amount, String description, String country, String met
 // Générer un lien avec token encodé (pour QR code, email...)
 String genererLien(double amount, String desc) {
   final tokenB64 = base64Encode(utf8.encode(apiKey));
-  return '$gatewayUrl/pay?token=$tokenB64&amount=$amount&desc=${Uri.encodeComponent(desc)}';
+  return '$gatewayUrl/pay?token=$tokenB64&amount=$amount&desc=\${Uri.encodeComponent(desc)}';
 }`,
       },
       {
