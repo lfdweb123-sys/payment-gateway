@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     const token = Buffer.from(JSON.stringify(tokenData)).toString('base64');
 
     const baseUrl = process.env.VITE_APP_URL || 'https://payment-gateway-iota-bay.vercel.app';
-    const url = `${baseUrl}/pay?token=${encodeURIComponent(token)}`;
+    const url = `${baseUrl}/pay?token=${token}`;
 
     return res.status(200).json({ success: true, url, token });
   } catch (error) {

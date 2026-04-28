@@ -389,6 +389,7 @@ function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch,
 export default function GatewayPay() {
   const [searchParams] = useSearchParams();
   const rawToken = searchParams.get('token') || searchParams.get('t');
+  console.log('rawToken:', rawToken);
   const token = (() => {
     if (!rawToken) return null;
     if (rawToken.startsWith('gw_')) return rawToken;
