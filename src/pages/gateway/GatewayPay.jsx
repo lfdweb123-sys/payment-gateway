@@ -19,7 +19,7 @@ const DEFAULT_SETTINGS = {
 const COUNTRY_PREFIXES = {
   bj:'229',ci:'225',tg:'228',sn:'221',bf:'226',ml:'223',ne:'227',gn:'224',
   cm:'237',ga:'241',cd:'243',cg:'242',ng:'234',gh:'233',ke:'254',ug:'256',
-  tz:'255',rw:'250',za:'27',fr:'33',be:'32',de:'49',nl:'31',gb:'44',us:'1',
+  tz:'255',rw:'250',za:'27',fr:'33',be:'32',de:'49',nl:'31',gb:'44',us:'1'
 };
 
 const MOBILE_METHODS = [
@@ -41,7 +41,10 @@ const COUNTRY_TARGET_CURRENCY = {
   fr:'EUR', be:'EUR', de:'EUR', nl:'EUR', gb:'GBP', us:'USD',
 };
 
-/* ─── Taux d'affichage XOF → autres devises ─────────────── */
+/* ─── Taux de conversion XOF → autres devises ──────────────
+   Affichage côté client uniquement — la conversion réelle
+   est faite côté serveur dans pay.js avec les mêmes taux.
+──────────────────────────────────────────────────────────── */
 const XOF_DISPLAY_RATES = {
   EUR: 1 / 655.957,
   USD: 1 / 600,
@@ -54,7 +57,7 @@ const XOF_DISPLAY_RATES = {
   GHS: 1 / 45,
   KES: 1 / 4.5,
   TND: 1 / 195,
-  XAF: 1,
+  XAF: 1,       // parité fixe XOF/XAF
   GNF: 1 / 0.072,
   CDF: 1 / 0.3,
   UGX: 1 / 0.16,
@@ -62,41 +65,49 @@ const XOF_DISPLAY_RATES = {
   RWF: 1 / 0.55,
 };
 
-const NO_DECIMAL_CURRENCIES = new Set([
-  'XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF',
-]);
-
-const PROVIDERS_EUR = new Set([
-  'stripe','adyen','mollie','checkout','braintree','paypal',
-  'square','authnet','razorpay','yoco',
-]);
+/* Providers qui nécessitent une conversion (pas XOF natif) */
+const PROVIDERS_EUR = new Set(['stripe','adyen','mollie','checkout','braintree','paypal','square','authnet','razorpay','yoco']);
 const PROVIDER_DISPLAY_CURRENCY = {
   stripe:'EUR', adyen:'EUR', mollie:'EUR', checkout:'EUR',
   braintree:'USD', paypal:'EUR', square:'USD', authnet:'USD',
   razorpay:'INR', yoco:'ZAR', paystack:'NGN', flutterwave:'NGN',
 };
 
+/**
+ * Retourne { amount, currency } à afficher.
+ * Priorité : devise du pays > devise du provider.
+ * Si merchantCurrency === XOF et targetCurrency est différent → convertit.
+ */
 function getDisplayAmount(amount, merchantCurrency, targetCurrency, providerId) {
   const mc = (merchantCurrency || 'XOF').toUpperCase();
-  const tc = (targetCurrency   || mc).toUpperCase();
+  const tc = (targetCurrency || mc).toUpperCase();
+
+  // Si même devise, pas de conversion
   if (mc === tc) return { amount, currency: mc };
+
+  // Conversion XOF → devise cible
   if (mc === 'XOF' && XOF_DISPLAY_RATES[tc]) {
     const converted = amount * XOF_DISPLAY_RATES[tc];
-    const rounded   = NO_DECIMAL_CURRENCIES.has(tc)
+    const noDecimal = new Set(['NGN','KES','GHS','INR','UGX','TZS','RWF','GNF','CDF','XAF']);
+    const rounded = noDecimal.has(tc)
       ? Math.round(converted)
       : Math.round(converted * 100) / 100;
     return { amount: rounded, currency: tc };
   }
+
+  // Fallback : logique provider si pas de taux pays
   if (providerId && PROVIDERS_EUR.has(providerId)) {
-    const pc = PROVIDER_DISPLAY_CURRENCY[providerId] || 'EUR';
-    if (mc === 'XOF' && XOF_DISPLAY_RATES[pc]) {
-      const converted = amount * XOF_DISPLAY_RATES[pc];
-      const rounded   = NO_DECIMAL_CURRENCIES.has(pc)
+    const providerCurrency = PROVIDER_DISPLAY_CURRENCY[providerId] || 'EUR';
+    if (mc === 'XOF' && XOF_DISPLAY_RATES[providerCurrency]) {
+      const converted = amount * XOF_DISPLAY_RATES[providerCurrency];
+      const noDecimal = new Set(['NGN','KES','GHS','INR']);
+      const rounded = noDecimal.has(providerCurrency)
         ? Math.round(converted)
         : Math.round(converted * 100) / 100;
-      return { amount: rounded, currency: pc };
+      return { amount: rounded, currency: providerCurrency };
     }
   }
+
   return { amount, currency: mc };
 }
 
@@ -104,36 +115,34 @@ function getDisplayAmount(amount, merchantCurrency, targetCurrency, providerId) 
 function TopLoadingBar({ visible, color = '#C8931A' }) {
   if (!visible) return null;
   return (
-    <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:9999, height:3 }}>
+    <div style={{ position:'fixed',top:0,left:0,right:0,zIndex:9999,height:3 }}>
       <div style={{
-        height: '100%',
-        background: `linear-gradient(90deg,${color},${color}aa,${color})`,
-        backgroundSize: '200% 100%',
-        animation: 'gw-shimmer 1.4s ease infinite',
+        height:'100%',
+        background:`linear-gradient(90deg,${color},${color}aa,${color})`,
+        backgroundSize:'200% 100%',
+        animation:'gw-shimmer 1.4s ease infinite',
       }}/>
     </div>
   );
 }
 
-function getMethodIcon(methodId, size = 18) {
-  return CARD_METHODS.includes(methodId)
-    ? <CreditCard size={size}/>
-    : <Smartphone size={size}/>;
+function getMethodIcon(methodId, size=18) {
+  return CARD_METHODS.includes(methodId) ? <CreditCard size={size}/> : <Smartphone size={size}/>;
 }
 
 function maskPhone(phone) {
   if (!phone || phone.length < 8) return phone;
-  return phone.substring(0, 3) + '••••' + phone.substring(phone.length - 3);
+  return phone.substring(0,3) + '••••' + phone.substring(phone.length-3);
 }
 
 /* ─── Stepper ──────────────────────────────────────────── */
 function Stepper({ current, primaryColor }) {
-  const steps = ['Pays', 'Méthode', 'Paiement'];
+  const steps = ['Pays','Méthode','Paiement'];
   return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0 }}>
       {steps.map((s, i) => {
-        const n      = i + 1;
-        const done   = n < current;
+        const n = i + 1;
+        const done = n < current;
         const active = n === current;
         return (
           <div key={s} style={{ display:'flex', alignItems:'center' }}>
@@ -144,27 +153,20 @@ function Stepper({ current, primaryColor }) {
                 fontSize:11, fontWeight:800,
                 background: done ? primaryColor : active ? '#fff' : 'rgba(255,255,255,.15)',
                 color: done ? '#fff' : active ? primaryColor : 'rgba(255,255,255,.4)',
-                border: active
-                  ? `2.5px solid ${primaryColor}`
-                  : done
-                    ? `2.5px solid ${primaryColor}`
-                    : '2px solid rgba(255,255,255,.15)',
-                transition: 'all .3s',
+                border: active ? `2.5px solid ${primaryColor}` : done ? `2.5px solid ${primaryColor}` : '2px solid rgba(255,255,255,.15)',
+                transition:'all .3s',
               }}>
                 {done ? '✓' : n}
               </div>
               <span style={{
-                fontSize:9, fontWeight:700, textTransform:'uppercase',
-                letterSpacing:'.07em', whiteSpace:'nowrap',
+                fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'.07em', whiteSpace:'nowrap',
                 color: active ? primaryColor : done ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.3)',
               }}>{s}</span>
             </div>
-            {i < steps.length - 1 && (
+            {i < steps.length-1 && (
               <div style={{
                 width:44, height:2, margin:'0 4px', marginBottom:18,
-                background: done
-                  ? `linear-gradient(90deg,${primaryColor},${primaryColor}88)`
-                  : 'rgba(255,255,255,.1)',
+                background: done ? `linear-gradient(90deg,${primaryColor},${primaryColor}88)` : 'rgba(255,255,255,.1)',
                 borderRadius:1, transition:'background .3s',
               }}/>
             )}
@@ -175,21 +177,20 @@ function Stepper({ current, primaryColor }) {
   );
 }
 
-/* ─── CountrySelector ──────────────────────────────────── */
-function CountrySelector({
-  countries, onSelect, fetchingMerchant,
-  countrySearch, setCountrySearch,
-  themeVars, primaryColor, design,
-}) {
-  const [open, setOpen] = useState(false);
+/* ─── CountrySelector ──────────────────────────────────────
+   ≤ 12 pays  → grille de boutons (comportement original)
+   > 12 pays  → champ custom avec recherche + dropdown pro
+──────────────────────────────────────────────────────────── */
+function CountrySelector({ countries, onSelect, fetchingMerchant, countrySearch, setCountrySearch, themeVars, primaryColor, design }) {
+  const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState('');
-  const dropRef  = useRef(null);
-  const inputRef = useRef(null);
+  const dropRef           = useRef(null);
+  const inputRef          = useRef(null);
 
   useEffect(() => {
-    const h = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
+    const handler = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   useEffect(() => { if (open && inputRef.current) inputRef.current.focus(); }, [open]);
@@ -198,44 +199,38 @@ function CountrySelector({
     c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
     c.code.toLowerCase().includes(countrySearch.toLowerCase())
   );
+
   const filteredDrop = countries.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||
     c.code.toLowerCase().includes(query.toLowerCase())
   );
 
   if (fetchingMerchant) return (
-    <div style={{ display:'flex', justifyContent:'center', padding:'28px 0' }}>
-      <div style={{
-        width:28, height:28, borderRadius:'50%',
-        border:`3px solid ${design === 'bold' ? '#333' : '#EDE9E3'}`,
-        borderTopColor: primaryColor,
-        animation: 'gw-spin .8s linear infinite',
-      }}/>
+    <div style={{display:'flex',justifyContent:'center',padding:'28px 0'}}>
+      <div style={{width:28,height:28,borderRadius:'50%',border:`3px solid ${design==='bold'?'#333':'#EDE9E3'}`,borderTopColor:primaryColor,animation:'gw-spin .8s linear infinite'}}/>
     </div>
   );
 
   if (countries.length === 0) return (
-    <div style={{ textAlign:'center', padding:'28px 0', color:themeVars.textMuted }}>
-      <Globe size={32} style={{ margin:'0 auto 10px', display:'block', opacity:.4 }}/>
-      <p style={{ fontSize:13, fontWeight:600 }}>Aucun moyen de paiement disponible</p>
+    <div style={{textAlign:'center',padding:'28px 0',color:themeVars.textMuted}}>
+      <Globe size={32} style={{margin:'0 auto 10px',display:'block',opacity:.4}}/>
+      <p style={{fontSize:13,fontWeight:600}}>Aucun moyen de paiement disponible</p>
     </div>
   );
 
-  /* ≤ 12 pays → grille */
+  /* ══ ≤ 12 PAYS → grille originale ══ */
   if (countries.length <= 12) return (
     <>
       <div className="gw-search-wrap">
-        <svg className="gw-search-icon" width="14" height="14" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg className="gw-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="text" className="gw-search-input" value={countrySearch}
-          onChange={e => setCountrySearch(e.target.value)}
-          placeholder="Rechercher un pays…" autoComplete="off"/>
+          onChange={e => setCountrySearch(e.target.value)} placeholder="Rechercher un pays…" autoComplete="off"/>
         {countrySearch && (
           <button className="gw-search-clear" onClick={() => setCountrySearch('')}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
@@ -257,9 +252,10 @@ function CountrySelector({
     </>
   );
 
-  /* > 12 pays → dropdown */
+  /* ══ > 12 PAYS → select pro avec dropdown ══ */
   return (
     <div ref={dropRef} style={{ position:'relative' }}>
+      {/* Déclencheur */}
       <button type="button" onClick={() => setOpen(v => !v)} style={{
         width:'100%', display:'flex', alignItems:'center', gap:12,
         padding:'14px 16px',
@@ -289,6 +285,7 @@ function CountrySelector({
           style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform .2s', flexShrink:0 }}/>
       </button>
 
+      {/* Dropdown */}
       {open && (
         <div style={{
           position:'absolute', top:'calc(100% + 8px)', left:0, right:0, zIndex:1000,
@@ -301,6 +298,7 @@ function CountrySelector({
           overflow:'hidden',
           animation:'gw-fadeUp .18s ease both',
         }}>
+          {/* Barre de recherche dans le dropdown */}
           <div style={{
             padding:'12px 12px 8px',
             borderBottom:`1px solid ${design === 'bold' ? '#2a2a2a' : '#f0f0f0'}`,
@@ -310,12 +308,10 @@ function CountrySelector({
           }}>
             <div style={{ position:'relative' }}>
               <svg style={{ position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:themeVars.textMuted,pointerEvents:'none' }}
-                width="13" height="13" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <input ref={inputRef} type="text" value={query}
-                onChange={e => setQuery(e.target.value)}
+              <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)}
                 placeholder="Rechercher un pays…"
                 style={{
                   width:'100%', padding:'9px 34px 9px 32px',
@@ -343,6 +339,7 @@ function CountrySelector({
             </div>
           </div>
 
+          {/* Liste des pays */}
           <div style={{ maxHeight:280, overflowY:'auto', padding:'6px' }}>
             {filteredDrop.length === 0 ? (
               <div style={{ padding:'20px', textAlign:'center', fontSize:13, color:themeVars.textMuted }}>
@@ -391,33 +388,21 @@ function CountrySelector({
 /* ─── Main ─────────────────────────────────────────────── */
 export default function GatewayPay() {
   const [searchParams] = useSearchParams();
+  const rawToken = searchParams.get('token') || searchParams.get('t');
+  const token = (() => {
+    if (!rawToken) return null;
+    if (rawToken.startsWith('gw_')) return rawToken;
+    try { return atob(rawToken); } catch { return rawToken; }
+  })();
+  const amountParam = searchParams.get('amount');
+  const description = searchParams.get('desc') || 'Paiement en ligne';
 
-  /*
-   * ── SÉCURITÉ TOKEN ──────────────────────────────────────
-   * Le token (base64 ou brut) est lu depuis l'URL UNE SEULE FOIS.
-   * Il est décodé ici pour récupérer l'apiKey, mais cette apiKey
-   * n'est JAMAIS exposée côté client — elle sert uniquement à
-   * identifier le marchand via /api/gateway/merchant.
-   * Pour les appels /pay et /verify, le frontend envoie
-   * uniquement le rawToken encodé en header — c'est le backend
-   * qui le décode et valide.
-   * ──────────────────────────────────────────────────────────
-   */
-  const rawToken = searchParams.get('token') || searchParams.get('t') || '';
-
-  /*
-   * ── SÉCURITÉ MONTANT ────────────────────────────────────
-   * amount et desc ne viennent PLUS de l'URL.
-   * Ils sont récupérés depuis le backend via /api/gateway/merchant
-   * qui lit le token et retourne les infos de la session de paiement.
-   * L'utilisateur ne peut donc pas modifier le montant.
-   * ──────────────────────────────────────────────────────────
-   */
   const [step, setStep]                           = useState(1);
   const [country, setCountry]                     = useState(null);
   const [countryData, setCountryData]             = useState(null);
   const [selectedMethod, setSelectedMethod]       = useState(null);
   const [phoneSuffix, setPhoneSuffix]             = useState('');
+  const [amount]                                  = useState(amountParam || '5000');
   const [loading, setLoading]                     = useState(false);
   const [merchant, setMerchant]                   = useState(null);
   const [countries, setCountries]                 = useState([]);
@@ -430,10 +415,6 @@ export default function GatewayPay() {
   const [kkiapayPublicKey, setKkiapayPublicKey]   = useState(null);
   const [countrySearch, setCountrySearch]         = useState('');
 
-  /* Montant et description — viennent du backend, pas de l'URL */
-  const [amount, setAmount]           = useState(null);
-  const [description, setDescription] = useState('Paiement en ligne');
-
   /* Champs carte */
   const [customerFirstName, setCustomerFirstName] = useState('');
   const [customerLastName, setCustomerLastName]   = useState('');
@@ -442,36 +423,28 @@ export default function GatewayPay() {
   /* Script KKiaPay */
   useEffect(() => {
     if (!document.querySelector('script[src="https://cdn.kkiapay.me/k.js"]')) {
-      const script    = document.createElement('script');
-      script.src      = 'https://cdn.kkiapay.me/k.js';
-      script.async    = true;
+      const script = document.createElement('script');
+      script.src = 'https://cdn.kkiapay.me/k.js';
+      script.async = true;
       document.body.appendChild(script);
     }
   }, []);
 
-  /* ── Init : charger le marchand + la session de paiement ── */
+  /* Init */
   useEffect(() => {
-    if (!rawToken) { setFetchingMerchant(false); return; }
+    if (!token) { setFetchingMerchant(false); return; }
 
-    /* Paramètres de design depuis Firestore (public, pas sensible) */
-    getDoc(doc(db, 'gateway_settings', 'config'))
+    getDoc(doc(db,'gateway_settings','config'))
       .then(snap => { if (snap.exists()) setGatewaySettings(p => ({ ...p, ...snap.data() })); })
-      .catch(() => {});
+      .catch(()=>{});
 
-    /*
-     * On passe rawToken (base64) dans l'URL — le backend le décode.
-     * La clé brute ne transite jamais côté client.
-     */
-    fetch(`/api/gateway/merchant/${encodeURIComponent(rawToken)}`)
+    fetch(`/api/gateway/merchant/${token}`)
       .then(r => r.json())
       .then(data => {
         if (data.success) {
           setMerchant(data);
           setCountries(getCountriesForProviders(data.activeProviders || []));
           if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
-          /* Montant et description viennent du backend */
-          if (data.amount)      setAmount(data.amount);
-          if (data.description) setDescription(data.description);
         }
       })
       .catch(() => toast.error('Impossible de charger le marchand'))
@@ -481,17 +454,13 @@ export default function GatewayPay() {
       const s = localStorage.getItem('gw_saved_phones');
       if (s) {
         const parsed = JSON.parse(s);
-        const seen   = new Set();
-        const deduped = parsed.filter(p => {
-          if (seen.has(p.number)) return false;
-          seen.add(p.number);
-          return true;
-        });
+        const seen = new Set();
+        const deduped = parsed.filter(p => { if (seen.has(p.number)) return false; seen.add(p.number); return true; });
         setSavedPhones(deduped);
         localStorage.setItem('gw_saved_phones', JSON.stringify(deduped));
       }
     } catch {}
-  }, [rawToken]);
+  }, [token]);
 
   /* defaultCountry */
   useEffect(() => {
@@ -499,7 +468,7 @@ export default function GatewayPay() {
       const exists = countries.find(c => c.code === gatewaySettings.defaultCountry);
       if (exists) handleSelectCountry(gatewaySettings.defaultCountry);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchingMerchant, countries, gatewaySettings.defaultCountry]);
 
   const handleSelectCountry = (code) => {
@@ -512,15 +481,13 @@ export default function GatewayPay() {
 
   const getFullPhoneNumber = () => {
     const prefix = COUNTRY_PREFIXES[country] || '';
-    return prefix
-      ? `${prefix}${phoneSuffix.replace(/\s/g, '')}`
-      : phoneSuffix.replace(/\s/g, '');
+    return prefix ? `${prefix}${phoneSuffix.replace(/\s/g,'')}` : phoneSuffix.replace(/\s/g,'');
   };
 
   const savePhoneNumber = (phone) => {
     if (!phone) return;
     const filtered = savedPhones.filter(p => p.number !== phone);
-    const updated  = [{ number:phone, country }, ...filtered].slice(0, 5);
+    const updated = [{number:phone,country},...filtered].slice(0,5);
     setSavedPhones(updated);
     localStorage.setItem('gw_saved_phones', JSON.stringify(updated));
   };
@@ -529,19 +496,13 @@ export default function GatewayPay() {
     setStatus('pending');
     const msgs = ['Paiement en cours…','En attente de confirmation…','Vérification en cours…','Presque terminé…'];
     let mi = 0;
-    const mi_ = setInterval(() => { mi = (mi + 1) % msgs.length; setPollMsg(msgs[mi]); }, 3500);
+    const mi_ = setInterval(() => { mi=(mi+1)%msgs.length; setPollMsg(msgs[mi]); }, 3500);
     let attempts = 0;
     const iv = setInterval(async () => {
       attempts++;
       if (attempts > 24) { clearInterval(iv); clearInterval(mi_); setStatus('failed'); return; }
       try {
-        /*
-         * Le rawToken (base64) est envoyé en header — le backend le décode.
-         * Jamais la clé brute côté client.
-         */
-        const r = await fetch(`/api/gateway/verify/${id}`, {
-          headers: { 'x-gateway-token': rawToken },
-        });
+        const r = await fetch(`/api/gateway/verify/${id}`, { headers:{'x-api-key':token} });
         const d = await r.json();
         if (d.status === 'completed') { clearInterval(iv); clearInterval(mi_); setStatus('completed'); }
         else if (d.status === 'failed') { clearInterval(iv); clearInterval(mi_); setStatus('failed'); }
@@ -571,27 +532,17 @@ export default function GatewayPay() {
       }
 
       const res = await fetch('/api/gateway/pay', {
-        method:  'POST',
-        headers: {
-          'Content-Type':    'application/json',
-          /*
-           * rawToken encodé base64 — le backend décode et valide.
-           * On utilise un header personnalisé pour éviter toute
-           * confusion avec x-api-key qui pourrait être loggé.
-           */
-          'x-gateway-token': rawToken,
-        },
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'x-api-key':token },
         body: JSON.stringify({
+          amount:          parseFloat(amount),
           country,
           method:          selectedMethod?.id,
           phone:           isMobile ? fullPhone : null,
-          email:           customerEmail    || 'client@gateway.local',
+          email:           customerEmail || 'client@gateway.local',
           customerName:    customerFirstName || 'Client',
           customerSurname: customerLastName  || 'Paiement',
-          /*
-           * amount et description ne sont PAS envoyés par le client —
-           * le backend les lit depuis la session/token côté serveur.
-           */
+          description,
         }),
       });
       const data = await res.json();
@@ -612,18 +563,14 @@ export default function GatewayPay() {
 
   const handleKkiapayPayment = () => {
     if (!window.openKkiapayWidget) { toast.error('Widget KKiaPay non chargé'); return; }
-    if (window.removeKkiapayListener) {
-      window.removeKkiapayListener('success', () => {});
-      window.removeKkiapayListener('failed',  () => {});
-    }
+    if (window.removeKkiapayListener) { window.removeKkiapayListener('success',()=>{}); window.removeKkiapayListener('failed',()=>{}); }
 
     window.addSuccessListener(async (response) => {
       setStatus('pending'); setPollMsg('Vérification du paiement…');
       try {
         const res = await fetch('/api/gateway/kkiapay-verify', {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json', 'x-gateway-token': rawToken },
-          body:    JSON.stringify({ transactionId: response.transactionId }),
+          method:'POST', headers:{'Content-Type':'application/json','x-api-key':token},
+          body: JSON.stringify({ transactionId: response.transactionId }),
         });
         const data = await res.json();
         setStatus(data.success ? 'completed' : 'failed');
@@ -632,12 +579,8 @@ export default function GatewayPay() {
 
     window.addFailedListener(() => setStatus('failed'));
     window.openKkiapayWidget({
-      amount:   parseFloat(amount),
-      key:      kkiapayPublicKey,
-      sandbox:  false,
-      email:    '',
-      phone:    '',
-      callback: `${window.location.origin}/payment/success`,
+      amount:parseFloat(amount), key:kkiapayPublicKey, sandbox:false,
+      email:'', phone:'', callback:`${window.location.origin}/payment/success`,
     });
   };
 
@@ -653,17 +596,22 @@ export default function GatewayPay() {
   const primaryColor     = gatewaySettings.primaryColor || '#C8931A';
   const design           = gatewaySettings.paymentDesign || 'modern';
 
-  const countryTargetCurrency = country
-    ? (COUNTRY_TARGET_CURRENCY[country] || merchantCurrency)
-    : merchantCurrency;
-
+  /*
+   * ── CONVERSION AU NIVEAU DU PAYS ──────────────────────────
+   * Dès qu'un pays est sélectionné, on calcule la devise cible
+   * du pays (ex: France → EUR, Nigeria → NGN).
+   * Cette conversion s'affiche partout dès le step 2.
+   * ──────────────────────────────────────────────────────────
+   */
+  const countryTargetCurrency = country ? (COUNTRY_TARGET_CURRENCY[country] || merchantCurrency) : merchantCurrency;
   const { amount: displayAmount, currency: displayCurrency } = getDisplayAmount(
     parseFloat(amount || 0),
     merchantCurrency,
     countryTargetCurrency,
-    selectedMethod?.provider || null,
+    selectedMethod?.provider || null
   );
 
+  /* Pour le panneau résumé — devise marchand d'origine */
   const summaryAmount   = parseFloat(amount || 0);
   const summaryCurrency = merchantCurrency;
 
@@ -699,12 +647,9 @@ export default function GatewayPay() {
 
   const hexL = (hex) => {
     if (!hex.startsWith('#') || hex.length < 7) return 0.5;
-    const r = parseInt(hex.slice(1,3),16)/255;
-    const g = parseInt(hex.slice(3,5),16)/255;
-    const b = parseInt(hex.slice(5,7),16)/255;
+    const r=parseInt(hex.slice(1,3),16)/255, g=parseInt(hex.slice(3,5),16)/255, b=parseInt(hex.slice(5,7),16)/255;
     return 0.2126*r + 0.7152*g + 0.0722*b;
   };
-
   const btnTextColor        = hexL(primaryColor) > 0.45 ? '#1a0f00' : '#fff';
   const filteredSuggestions = savedPhones.filter(p => p.country === country);
   const isKkiapayMethod     = selectedMethod?.provider === 'kkiapay' && kkiapayPublicKey;
@@ -804,154 +749,100 @@ export default function GatewayPay() {
     }
   `;
 
-  /* ── Helpers affichage ── */
-  const fmtAmount = (amt, curr) => amt.toLocaleString('fr-FR', {
-    minimumFractionDigits: NO_DECIMAL_CURRENCIES.has(curr) ? 0 : 2,
-    maximumFractionDigits: 2,
-  });
-
-  const showConversion = country && displayCurrency !== summaryCurrency;
-
   /* ── Summary panel ── */
-  const SummaryPanel = () => (
-    <div className="gw-right">
-      <div className="gw-right-header">
-        <div className="gw-logo-row">
-          {gatewaySettings.logo
-            ? <img src={gatewaySettings.logo} alt="" style={{ height:28, objectFit:'contain' }}/>
-            : <div className="gw-logo-icon"><Shield size={14} style={{ color:'#fff' }}/></div>
-          }
-          {(gatewaySettings.companyName || merchant?.name) && (
-            <span className="gw-company">{gatewaySettings.companyName || merchant?.name}</span>
+  const SummaryPanel = () => {
+    const showConversion = country && displayCurrency !== summaryCurrency;
+    return (
+      <div className="gw-right">
+        <div className="gw-right-header">
+          <div className="gw-logo-row">
+            {gatewaySettings.logo
+              ? <img src={gatewaySettings.logo} alt="" style={{height:28,objectFit:'contain'}}/>
+              : <div className="gw-logo-icon"><Shield size={14} style={{color:'#fff'}}/></div>
+            }
+            {(gatewaySettings.companyName || merchant?.name) && (
+              <span className="gw-company">{gatewaySettings.companyName || merchant?.name}</span>
+            )}
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:5,fontSize:10,fontWeight:700,color:primaryColor,background:`${primaryColor}18`,padding:'4px 10px',borderRadius:50}}>
+            <Shield size={9}/> Sécurisé
+          </div>
+        </div>
+
+        <div className="gw-amount-card">
+          <p className="gw-amount-label">Total à payer</p>
+          {showConversion ? (
+            /* Après sélection d'un pays avec devise différente : afficher la devise convertie */
+            <div>
+              <span className="gw-amount-val">{displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })}</span>
+              <span className="gw-amount-curr">{displayCurrency}</span>
+              <p style={{fontSize:11,color:themeVars.textMuted,marginTop:6}}>
+                ≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <span className="gw-amount-val">{summaryAmount.toLocaleString('fr-FR')}</span>
+              <span className="gw-amount-curr">{summaryCurrency}</span>
+            </div>
           )}
+          {description && <p className="gw-amount-desc">{description}</p>}
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, fontWeight:700, color:primaryColor, background:`${primaryColor}18`, padding:'4px 10px', borderRadius:50 }}>
-          <Shield size={9}/> Sécurisé
-        </div>
-      </div>
 
-      <div className="gw-amount-card">
-        <p className="gw-amount-label">Total à payer</p>
-        {showConversion ? (
-          <div>
-            <span className="gw-amount-val">{fmtAmount(displayAmount, displayCurrency)}</span>
-            <span className="gw-amount-curr">{displayCurrency}</span>
-            <p style={{ fontSize:11, color:themeVars.textMuted, marginTop:6 }}>
-              ≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}
-            </p>
-          </div>
-        ) : (
-          <div>
-            <span className="gw-amount-val">{summaryAmount.toLocaleString('fr-FR')}</span>
-            <span className="gw-amount-curr">{summaryCurrency}</span>
-          </div>
-        )}
-        {description && <p className="gw-amount-desc">{description}</p>}
-      </div>
-
-      <div>
-        {country && countryData && (
+        <div>
+          {country && countryData && (
+            <div className="gw-summary-row">
+              <span className="gw-summary-key">Pays</span>
+              <span className="gw-summary-val">{countryData.flag} {countryData.name}</span>
+            </div>
+          )}
+          {selectedMethod && (
+            <div className="gw-summary-row">
+              <span className="gw-summary-key">Méthode</span>
+              <span className="gw-summary-val">{selectedMethod.name}</span>
+            </div>
+          )}
           <div className="gw-summary-row">
-            <span className="gw-summary-key">Pays</span>
-            <span className="gw-summary-val">{countryData.flag} {countryData.name}</span>
+            <span className="gw-summary-key">Devise</span>
+            <span className="gw-summary-val">{showConversion ? displayCurrency : summaryCurrency}</span>
           </div>
-        )}
-        {selectedMethod && (
-          <div className="gw-summary-row">
-            <span className="gw-summary-key">Méthode</span>
-            <span className="gw-summary-val">{selectedMethod.name}</span>
-          </div>
-        )}
-        <div className="gw-summary-row">
-          <span className="gw-summary-key">Devise</span>
-          <span className="gw-summary-val">{showConversion ? displayCurrency : summaryCurrency}</span>
         </div>
-      </div>
 
-      <div className="gw-divider"/>
+        <div className="gw-divider"/>
 
-      <div className="gw-total-row">
-        <span className="gw-total-key">Total</span>
-        <span className="gw-total-val" style={{ color:primaryColor }}>
-          {showConversion
-            ? `${fmtAmount(displayAmount, displayCurrency)} ${displayCurrency}`
-            : `${summaryAmount.toLocaleString('fr-FR')} ${summaryCurrency}`
-          }
-        </span>
-      </div>
-
-      <div className="gw-secure-row"><Lock size={9}/> Chiffrement SSL · PCI DSS</div>
-    </div>
-  );
-
-  /* ── Écran de chargement si amount pas encore reçu ── */
-  if (fetchingMerchant || amount === null) return (
-    <div style={{
-      minHeight:'100vh', background: themeVars.pageBackground,
-      display:'flex', alignItems:'center', justifyContent:'center',
-      fontFamily: themeVars.fontFamily,
-    }}>
-      <style>{css}</style>
-      <div style={{ textAlign:'center' }}>
-        <div style={{
-          width:40, height:40, borderRadius:'50%', margin:'0 auto 16px',
-          border:`3px solid ${design === 'bold' ? '#333' : '#EDE9E3'}`,
-          borderTopColor: primaryColor,
-          animation: 'gw-spin .8s linear infinite',
-        }}/>
-        <p style={{ fontSize:13, color: themeVars.textMuted, fontWeight:600 }}>
-          Chargement du paiement…
-        </p>
-      </div>
-    </div>
-  );
-
-  /* ── Écran token invalide ── */
-  if (!rawToken || !merchant) return (
-    <div style={{
-      minHeight:'100vh', background: themeVars.pageBackground,
-      display:'flex', alignItems:'center', justifyContent:'center',
-      fontFamily: themeVars.fontFamily,
-    }}>
-      <style>{css}</style>
-      <div style={{ textAlign:'center', maxWidth:320 }}>
-        <div style={{
-          width:56, height:56, borderRadius:'50%', margin:'0 auto 16px',
-          background:'#FEF2F2', border:'2px solid rgba(239,68,68,.2)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-        }}>
-          <Shield size={24} style={{ color:'#EF4444' }}/>
+        <div className="gw-total-row">
+          <span className="gw-total-key">Total</span>
+          <span className="gw-total-val" style={{color:primaryColor}}>
+            {showConversion
+              ? `${displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} ${displayCurrency}`
+              : `${summaryAmount.toLocaleString('fr-FR')} ${summaryCurrency}`
+            }
+          </span>
         </div>
-        <h2 style={{ fontSize:18, fontWeight:800, color:themeVars.textPrimary, marginBottom:8 }}>
-          Lien de paiement invalide
-        </h2>
-        <p style={{ fontSize:13, color:themeVars.textMuted }}>
-          Ce lien est expiré ou incorrect.
-        </p>
+
+        <div className="gw-secure-row"><Lock size={9}/> Chiffrement SSL · PCI DSS</div>
       </div>
-    </div>
-  );
+    );
+  };
 
   /* ── STATUS: PENDING ── */
   if (status === 'pending') return (
     <div className="gw-status-page"><style>{css}</style>
       <div className="gw-status-card">
-        <div className="gw-status-icon" style={{ background:`${primaryColor}18`, border:`2px solid ${primaryColor}33` }}>
-          <div style={{ width:32, height:32, borderRadius:'50%', border:`3px solid ${primaryColor}33`, borderTopColor:primaryColor }}
-            className="gw-spin"/>
+        <div className="gw-status-icon" style={{background:`${primaryColor}18`,border:`2px solid ${primaryColor}33`}}>
+          <div style={{width:32,height:32,borderRadius:'50%',border:`3px solid ${primaryColor}33`,borderTopColor:primaryColor}} className="gw-spin"/>
         </div>
-        <h2 style={{ fontSize:20, fontWeight:800, marginBottom:8, letterSpacing:'-.02em' }}>{pollMsg}</h2>
-        <p style={{ fontSize:13, color:themeVars.textSecondary, lineHeight:1.6 }}>
+        <h2 style={{fontSize:20,fontWeight:800,marginBottom:8,letterSpacing:'-.02em'}}>{pollMsg}</h2>
+        <p style={{fontSize:13,color:themeVars.textSecondary,lineHeight:1.6}}>
           {isKkiapayMethod ? 'Vérification de votre paiement KKiaPay en cours…' : 'Confirmez le paiement sur votre téléphone.'}
         </p>
         <div className="gw-status-amount">
-          <p style={{ fontSize:11, color:themeVars.textMuted, marginBottom:4 }}>{description}</p>
-          <p style={{ fontSize:28, fontWeight:900, color:themeVars.textPrimary, letterSpacing:'-.02em' }}>
-            {fmtAmount(displayAmount, displayCurrency)}{' '}
-            <span style={{ fontSize:13, color:themeVars.textSecondary, fontWeight:500 }}>{displayCurrency}</span>
+          <p style={{fontSize:11,color:themeVars.textMuted,marginBottom:4}}>{description}</p>
+          <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+            {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
           </p>
         </div>
-        <p style={{ fontSize:11, color:themeVars.textMuted, marginTop:16 }}>Ne fermez pas cette page</p>
+        <p style={{fontSize:11,color:themeVars.textMuted,marginTop:16}}>Ne fermez pas cette page</p>
       </div>
     </div>
   );
@@ -960,24 +851,19 @@ export default function GatewayPay() {
   if (status === 'completed') return (
     <div className="gw-status-page"><style>{css}</style>
       <div className="gw-status-card">
-        <div className="gw-status-icon" style={{ background:'#ECFDF5', border:'2px solid rgba(16,185,129,.25)' }}>
-          <CheckCircle2 size={32} style={{ color:'#10B981' }}/>
+        <div className="gw-status-icon" style={{background:'#ECFDF5',border:'2px solid rgba(16,185,129,.25)'}}>
+          <CheckCircle2 size={32} style={{color:'#10B981'}}/>
         </div>
-        {gatewaySettings.logo && (
-          <img src={gatewaySettings.logo} alt="" style={{ height:26, margin:'0 auto 14px', display:'block', objectFit:'contain' }}/>
-        )}
-        <h2 style={{ fontSize:22, fontWeight:900, marginBottom:8, letterSpacing:'-.02em' }}>Paiement réussi !</h2>
-        <p style={{ fontSize:13, color:themeVars.textSecondary }}>Votre transaction a été confirmée.</p>
-        <div className="gw-status-amount" style={{ background:'#ECFDF5', border:'1px solid rgba(16,185,129,.15)' }}>
-          <p style={{ fontSize:11, color:'#6EE7B7', marginBottom:4 }}>{description}</p>
-          <p style={{ fontSize:28, fontWeight:900, color:themeVars.textPrimary, letterSpacing:'-.02em' }}>
-            {fmtAmount(displayAmount, displayCurrency)}{' '}
-            <span style={{ fontSize:13, color:themeVars.textSecondary, fontWeight:500 }}>{displayCurrency}</span>
+        {gatewaySettings.logo && <img src={gatewaySettings.logo} alt="" style={{height:26,margin:'0 auto 14px',display:'block',objectFit:'contain'}}/>}
+        <h2 style={{fontSize:22,fontWeight:900,marginBottom:8,letterSpacing:'-.02em'}}>Paiement réussi !</h2>
+        <p style={{fontSize:13,color:themeVars.textSecondary}}>Votre transaction a été confirmée.</p>
+        <div className="gw-status-amount" style={{background:'#ECFDF5',border:'1px solid rgba(16,185,129,.15)'}}>
+          <p style={{fontSize:11,color:'#6EE7B7',marginBottom:4}}>{description}</p>
+          <p style={{fontSize:28,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+            {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:13,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
           </p>
         </div>
-        {gatewaySettings.redirectUrl && (
-          <p style={{ fontSize:11, color:themeVars.textMuted, marginTop:14 }}>Redirection en cours…</p>
-        )}
+        {gatewaySettings.redirectUrl && <p style={{fontSize:11,color:themeVars.textMuted,marginTop:14}}>Redirection en cours…</p>}
       </div>
     </div>
   );
@@ -986,20 +872,14 @@ export default function GatewayPay() {
   if (status === 'failed') return (
     <div className="gw-status-page"><style>{css}</style>
       <div className="gw-status-card">
-        <div className="gw-status-icon" style={{ background:'#FEF2F2', border:'2px solid rgba(239,68,68,.2)' }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-            stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        <div className="gw-status-icon" style={{background:'#FEF2F2',border:'2px solid rgba(239,68,68,.2)'}}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
           </svg>
         </div>
-        <h2 style={{ fontSize:22, fontWeight:900, marginBottom:8, letterSpacing:'-.02em' }}>Paiement échoué</h2>
-        <p style={{ fontSize:13, color:themeVars.textSecondary, marginBottom:28 }}>
-          La transaction n'a pas pu être finalisée.
-        </p>
-        <button onClick={() => { setStatus(null); setStep(3); }} className="gw-submit" style={{ marginTop:0 }}>
-          Réessayer
-        </button>
+        <h2 style={{fontSize:22,fontWeight:900,marginBottom:8,letterSpacing:'-.02em'}}>Paiement échoué</h2>
+        <p style={{fontSize:13,color:themeVars.textSecondary,marginBottom:28}}>La transaction n'a pas pu être finalisée.</p>
+        <button onClick={() => { setStatus(null); setStep(3); }} className="gw-submit" style={{marginTop:0}}>Réessayer</button>
       </div>
     </div>
   );
@@ -1014,56 +894,49 @@ export default function GatewayPay() {
         <div className="gw-left">
 
           {/* Header */}
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
               {gatewaySettings.logo
-                ? <img src={gatewaySettings.logo} alt="" style={{ height:24, objectFit:'contain' }}/>
-                : <div style={{ width:28, height:28, borderRadius:8, background:design==='bold'?primaryColor:'#1C0F00', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                    <Shield size={13} style={{ color:'#fff' }}/>
-                  </div>
+                ? <img src={gatewaySettings.logo} alt="" style={{height:24,objectFit:'contain'}}/>
+                : <div style={{width:28,height:28,borderRadius:8,background:design==='bold'?primaryColor:'#1C0F00',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={13} style={{color:'#fff'}}/></div>
               }
               {(gatewaySettings.companyName || merchant?.name) && (
-                <span style={{ fontSize:13, fontWeight:700, color:themeVars.textPrimary }}>
-                  {gatewaySettings.companyName || merchant?.name}
-                </span>
+                <span style={{fontSize:13,fontWeight:700,color:themeVars.textPrimary}}>{gatewaySettings.companyName || merchant?.name}</span>
               )}
             </div>
-            <div style={{ textAlign:'right' }}>
-              {showConversion ? (
+            <div style={{textAlign:'right'}}>
+              {/* Dès qu'un pays est sélectionné, afficher le montant converti dans le header */}
+              {country && displayCurrency !== summaryCurrency ? (
                 <>
-                  <div style={{ fontSize:18, fontWeight:900, color:themeVars.textPrimary, letterSpacing:'-.02em' }}>
-                    {fmtAmount(displayAmount, displayCurrency)}{' '}
-                    <span style={{ fontSize:11, color:themeVars.textSecondary, fontWeight:500 }}>{displayCurrency}</span>
+                  <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+                    {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{displayCurrency}</span>
                   </div>
-                  <div style={{ fontSize:10, color:themeVars.textMuted }}>
-                    ≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}
-                  </div>
+                  <div style={{fontSize:10,color:themeVars.textMuted}}>≈ {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency}</div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize:18, fontWeight:900, color:themeVars.textPrimary, letterSpacing:'-.02em' }}>
-                    {summaryAmount.toLocaleString('fr-FR')}{' '}
-                    <span style={{ fontSize:11, color:themeVars.textSecondary, fontWeight:500 }}>{summaryCurrency}</span>
+                  <div style={{fontSize:18,fontWeight:900,color:themeVars.textPrimary,letterSpacing:'-.02em'}}>
+                    {summaryAmount.toLocaleString('fr-FR')} <span style={{fontSize:11,color:themeVars.textSecondary,fontWeight:500}}>{summaryCurrency}</span>
                   </div>
-                  {description && <div style={{ fontSize:10, color:themeVars.textMuted }}>{description}</div>}
+                  {description && <div style={{fontSize:10,color:themeVars.textMuted}}>{description}</div>}
                 </>
               )}
             </div>
           </div>
 
           {/* Stepper */}
-          <div style={{ marginBottom:28 }}>
+          <div style={{marginBottom:28}}>
             <Stepper current={step} primaryColor={primaryColor}/>
           </div>
 
-          {/* ── STEP 1 ── */}
+          {/* ── STEP 1 — Pays ── */}
           {step === 1 && (
-            <div className="gw-fade" style={{ flex:1 }}>
+            <div className="gw-fade" style={{flex:1}}>
               <span className="gw-section-lbl">Sélectionnez votre pays</span>
               <CountrySelector
                 countries={countries}
                 onSelect={handleSelectCountry}
-                fetchingMerchant={false}
+                fetchingMerchant={fetchingMerchant}
                 countrySearch={countrySearch}
                 setCountrySearch={setCountrySearch}
                 themeVars={themeVars}
@@ -1073,33 +946,34 @@ export default function GatewayPay() {
             </div>
           )}
 
-          {/* ── STEP 2 ── */}
+          {/* ── STEP 2 — Méthode ── */}
           {step === 2 && countryData && (
-            <div className="gw-fade" style={{ flex:1 }}>
+            <div className="gw-fade" style={{flex:1}}>
               <button className="gw-back" onClick={() => { setStep(1); setCountryData(null); setCountry(null); }}>
                 <ArrowLeft size={13}/> Changer de pays
               </button>
               <div className="gw-pill">
-                <div className="gw-pill-icon"><span style={{ fontSize:20 }}>{countryData.flag}</span></div>
+                <div className="gw-pill-icon"><span style={{fontSize:20}}>{countryData.flag}</span></div>
                 <div>
                   <div className="gw-pill-name">{countryData.name}</div>
+                  {/* Afficher la devise convertie dès le step 2 */}
                   <div className="gw-pill-sub">
-                    {showConversion
-                      ? `${fmtAmount(displayAmount, displayCurrency)} ${displayCurrency}`
+                    {displayCurrency !== summaryCurrency
+                      ? `${displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} ${displayCurrency}`
                       : countryData.currency
                     }
                   </div>
                 </div>
               </div>
 
-              {showConversion && (
-                <div className="gw-conversion-note" style={{ marginBottom:16 }}>
-                  <span style={{ fontSize:14 }}>💱</span>
+              {/* Note de conversion au niveau du pays dès le step 2 */}
+              {displayCurrency !== summaryCurrency && (
+                <div className="gw-conversion-note" style={{marginBottom:16}}>
+                  <span style={{fontSize:14}}>💱</span>
                   <span>
-                    {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} →{' '}
-                    <strong style={{ color:themeVars.textPrimary }}>
-                      {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
-                    </strong>{' '}(taux appliqué automatiquement)
+                    {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} → <strong style={{color:themeVars.textPrimary}}>
+                      {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                    </strong> (taux appliqué automatiquement)
                   </span>
                 </div>
               )}
@@ -1112,27 +986,26 @@ export default function GatewayPay() {
                   setStep(3);
                 }} className="gw-method-btn">
                   <div className="gw-method-icon">{getMethodIcon(method.id)}</div>
-                  <div style={{ flex:1 }}>
+                  <div style={{flex:1}}>
                     <span className="gw-method-name">{method.name}</span>
-                    {showConversion && (
-                      <div style={{ fontSize:10, color:themeVars.textMuted, marginTop:2 }}>
-                        {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
+                    {/* Montant converti déjà calculé au niveau pays, pas besoin de recalculer par provider */}
+                    {displayCurrency !== summaryCurrency && (
+                      <div style={{fontSize:10,color:themeVars.textMuted,marginTop:2}}>
+                        {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
                       </div>
                     )}
                   </div>
-                  <ChevronRight size={14} style={{ color:themeVars.textMuted }}/>
+                  <ChevronRight size={14} style={{color:themeVars.textMuted}}/>
                 </button>
               )) : (
-                <p style={{ fontSize:13, color:themeVars.textMuted, textAlign:'center', padding:'20px 0' }}>
-                  Aucune méthode disponible
-                </p>
+                <p style={{fontSize:13,color:themeVars.textMuted,textAlign:'center',padding:'20px 0'}}>Aucune méthode disponible</p>
               )}
             </div>
           )}
 
-          {/* ── STEP 3 ── */}
+          {/* ── STEP 3 — Paiement ── */}
           {step === 3 && selectedMethod && (
-            <div className="gw-fade" style={{ flex:1 }}>
+            <div className="gw-fade" style={{flex:1}}>
               <button className="gw-back" onClick={() => { setStep(2); setSelectedMethod(null); setPhoneSuffix(''); }}>
                 <ArrowLeft size={13}/> Changer de méthode
               </button>
@@ -1144,14 +1017,14 @@ export default function GatewayPay() {
                 </div>
               </div>
 
-              {showConversion && (
+              {/* Note de conversion */}
+              {displayCurrency !== summaryCurrency && (
                 <div className="gw-conversion-note">
-                  <span style={{ fontSize:14 }}>💱</span>
+                  <span style={{fontSize:14}}>💱</span>
                   <span>
-                    {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} →{' '}
-                    <strong style={{ color:themeVars.textPrimary }}>
-                      {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
-                    </strong>{' '}(taux appliqué automatiquement)
+                    {summaryAmount.toLocaleString('fr-FR')} {summaryCurrency} → <strong style={{color:themeVars.textPrimary}}>
+                      {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
+                    </strong> (taux appliqué automatiquement)
                   </span>
                 </div>
               )}
@@ -1163,58 +1036,50 @@ export default function GatewayPay() {
                       <div className="gw-kkiapay-dot"/>
                       Paiement via KKiaPay
                     </div>
-                    <p style={{ margin:0, fontSize:12, color:themeVars.textSecondary }}>
+                    <p style={{margin:0,fontSize:12,color:themeVars.textSecondary}}>
                       Une fenêtre sécurisée KKiaPay s'ouvrira pour finaliser votre paiement.
                     </p>
                   </div>
-                  <button className="gw-submit" style={{ marginTop:0 }} onClick={handleKkiapayPayment}>
+                  <button className="gw-submit" style={{marginTop:0}} onClick={handleKkiapayPayment}>
                     <Zap size={16}/>
-                    Payer {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}
+                    Payer {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}
                   </button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit}>
+
+                  {/* Champs MOBILE */}
                   {isMobileMethod && (
                     <>
-                      <div style={{ marginBottom:6 }}>
+                      <div style={{marginBottom:6}}>
                         <label className="gw-input-label">Numéro de téléphone</label>
                         <input type="tel" className="gw-input"
-                          value={phoneSuffix
-                            ? `${COUNTRY_PREFIXES[country]||''} ${phoneSuffix}`
-                            : COUNTRY_PREFIXES[country]||''
-                          }
+                          value={phoneSuffix ? `${COUNTRY_PREFIXES[country]||''} ${phoneSuffix}` : COUNTRY_PREFIXES[country]||''}
                           onChange={e => {
                             const prefix = COUNTRY_PREFIXES[country] || '';
-                            const val    = e.target.value;
+                            const val = e.target.value;
                             if (prefix && !val.startsWith(prefix)) return;
                             const suffix = prefix ? val.slice(prefix.length).trim() : val;
                             setPhoneSuffix(suffix);
                             setShowSuggestions(suffix.length === 0);
                           }}
                           onFocus={() => setShowSuggestions(phoneSuffix.length === 0)}
-                          placeholder={COUNTRY_PREFIXES[country]
-                            ? `${COUNTRY_PREFIXES[country]} 97000000`
-                            : '97000000'
-                          }
+                          placeholder={COUNTRY_PREFIXES[country] ? `${COUNTRY_PREFIXES[country]} 97000000` : '97000000'}
                           required
                         />
                       </div>
                       {showSuggestions && filteredSuggestions.length > 0 && phoneSuffix.length === 0 && (
-                        <div style={{ marginTop:8, marginBottom:4 }}>
-                          <p style={{ fontSize:9, color:themeVars.textMuted, fontWeight:700, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6 }}>
-                            Numéros récents
-                          </p>
+                        <div style={{marginTop:8,marginBottom:4}}>
+                          <p style={{fontSize:9,color:themeVars.textMuted,fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Numéros récents</p>
                           {filteredSuggestions.map((p, i) => {
                             const prefix = COUNTRY_PREFIXES[country] || '';
-                            const suf    = prefix ? p.number.replace(prefix, '') : p.number;
+                            const suf = prefix ? p.number.replace(prefix,'') : p.number;
                             return (
                               <button key={i} type="button" className="gw-suggestion"
                                 onClick={() => { setPhoneSuffix(suf); setShowSuggestions(false); }}>
-                                <Smartphone size={12} style={{ color:themeVars.textMuted }}/>
-                                <span style={{ fontSize:12, color:themeVars.textPrimary, fontFamily:"'DM Mono',monospace" }}>
-                                  {maskPhone(p.number)}
-                                </span>
-                                <span style={{ fontSize:10, color:themeVars.textMuted, marginLeft:'auto' }}>Utiliser</span>
+                                <Smartphone size={12} style={{color:themeVars.textMuted}}/>
+                                <span style={{fontSize:12,color:themeVars.textPrimary,fontFamily:"'DM Mono',monospace"}}>{maskPhone(p.number)}</span>
+                                <span style={{fontSize:10,color:themeVars.textMuted,marginLeft:'auto'}}>Utiliser</span>
                               </button>
                             );
                           })}
@@ -1223,37 +1088,35 @@ export default function GatewayPay() {
                     </>
                   )}
 
+                  {/* Champs CARTE */}
                   {isCardMethod && !isKkiapayMethod && (
                     <>
                       <div className="gw-card-notice">
-                        <CreditCard size={13} style={{ color:primaryColor, flexShrink:0 }}/>
+                        <CreditCard size={13} style={{color:primaryColor,flexShrink:0}}/>
                         <span>Informations requises pour le paiement par carte sécurisé</span>
                       </div>
                       <div className="gw-input-row">
                         <div>
                           <label className="gw-input-label">Prénom</label>
-                          <div className="gw-input-wrap" style={{ marginBottom:0 }}>
+                          <div className="gw-input-wrap" style={{marginBottom:0}}>
                             <input type="text" className="gw-input-text" value={customerFirstName}
-                              onChange={e => setCustomerFirstName(e.target.value)}
-                              placeholder="Jean" autoComplete="given-name" required/>
+                              onChange={e => setCustomerFirstName(e.target.value)} placeholder="Jean" autoComplete="given-name" required/>
                           </div>
                         </div>
                         <div>
                           <label className="gw-input-label">Nom</label>
-                          <div className="gw-input-wrap" style={{ marginBottom:0 }}>
+                          <div className="gw-input-wrap" style={{marginBottom:0}}>
                             <input type="text" className="gw-input-text" value={customerLastName}
-                              onChange={e => setCustomerLastName(e.target.value)}
-                              placeholder="Dupont" autoComplete="family-name" required/>
+                              onChange={e => setCustomerLastName(e.target.value)} placeholder="Dupont" autoComplete="family-name" required/>
                           </div>
                         </div>
                       </div>
-                      <div style={{ marginTop:12, marginBottom:4 }}>
+                      <div style={{marginTop:12,marginBottom:4}}>
                         <label className="gw-input-label">Adresse email</label>
-                        <div style={{ position:'relative' }}>
+                        <div style={{position:'relative'}}>
                           <input type="email" className="gw-input-text" value={customerEmail}
-                            onChange={e => setCustomerEmail(e.target.value)}
-                            placeholder="jean.dupont@email.com"
-                            autoComplete="email" required style={{ paddingRight:42 }}/>
+                            onChange={e => setCustomerEmail(e.target.value)} placeholder="jean.dupont@email.com"
+                            autoComplete="email" required style={{paddingRight:42}}/>
                           <Mail size={14} className="gw-input-icon"/>
                         </div>
                       </div>
@@ -1263,18 +1126,17 @@ export default function GatewayPay() {
                   <button type="submit" disabled={loading} className="gw-submit">
                     {loading ? (
                       <>
-                        <div style={{ width:16, height:16, borderRadius:'50%', border:`2px solid ${btnTextColor}44`, borderTopColor:btnTextColor }}
-                          className="gw-spin"/>
+                        <div style={{width:16,height:16,borderRadius:'50%',border:`2px solid ${btnTextColor}44`,borderTopColor:btnTextColor}} className="gw-spin"/>
                         Traitement en cours…
                       </>
                     ) : (
-                      <><Zap size={16}/> Payer {fmtAmount(displayAmount, displayCurrency)} {displayCurrency}</>
+                      <><Zap size={16}/> Payer {displayAmount.toLocaleString('fr-FR', { minimumFractionDigits: ['XOF','XAF','NGN','GHS','KES','UGX','TZS','RWF','GNF','CDF'].includes(displayCurrency) ? 0 : 2, maximumFractionDigits: 2 })} {displayCurrency}</>
                     )}
                   </button>
                 </form>
               )}
 
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:5, marginTop:16, fontSize:10, color:themeVars.textMuted, fontWeight:600 }}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:5,marginTop:16,fontSize:10,color:themeVars.textMuted,fontWeight:600}}>
                 <Lock size={9}/> SSL · PCI DSS · Paiement sécurisé
               </div>
             </div>
