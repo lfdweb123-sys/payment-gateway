@@ -19,6 +19,7 @@ import Developer from './pages/gateway/Developer';
 import Verification from './pages/gateway/Verification';
 import MerchantPayouts from './pages/gateway/MerchantPayouts';
 import PaymentSuccess from './pages/gateway/PaymentSuccess';
+import PaymentLinks from './pages/gateway/PaymentLinks';
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -91,6 +92,7 @@ function AppContent() {
             <Route path="/developer"   element={<ProtectedRoute><Developer /></ProtectedRoute>} />
             <Route path="/settings"    element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             <Route path="/verification"element={<ProtectedRoute><Verification /></ProtectedRoute>} />
+            <Route path="/payment-links" element={<ProtectedRoute><PaymentLinks /></ProtectedRoute>} />
 
             {/* Pages Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
