@@ -6,7 +6,7 @@ import {
   Key, Copy, Eye, EyeOff, Plus, Trash2, Save, Loader,
   Code, Globe, CheckCircle, XCircle,
   Terminal, Webhook, RefreshCw,
-  Lock, Zap, BookOpen, ExternalLink
+  Lock, Zap, BookOpen, ExternalLink, Link, Banknote, FileText, Clock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -34,11 +34,9 @@ const CSS = `
     display: flex;
     flex-direction: column;
     gap: 14px;
-    /* les deux règles qui bloquent le débordement */
     width: 100%;
     overflow: hidden;
   }
-  /* row avec boutons copy — l'élément texte prend tout l'espace restant */
   .dev-keyrow {
     display: flex;
     align-items: center;
@@ -47,7 +45,7 @@ const CSS = `
     min-width: 0;
   }
   .dev-keyrow-text {
-    flex: 1 1 0%;     /* 0% = peut rétrécir en-dessous de son contenu naturel */
+    flex: 1 1 0%;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -60,12 +58,11 @@ const CSS = `
     font-size: 12px;
     color: #444;
   }
-  /* terminal block */
   .dev-terminal {
     background: #0D1117;
     border-radius: 11px;
     width: 100%;
-    overflow: hidden;   /* jamais de débordement latéral */
+    overflow: hidden;
   }
   .dev-terminal-dots {
     display: flex;
@@ -76,7 +73,6 @@ const CSS = `
   .dev-terminal-scroll {
     overflow-x: auto;
     padding: 0 13px 13px;
-    /* scrollbar fine */
     scrollbar-width: thin;
     scrollbar-color: #333 transparent;
   }
@@ -90,7 +86,6 @@ const CSS = `
     margin: 0;
     white-space: pre;
   }
-  /* tab bar */
   .dev-tabs {
     display: flex;
     gap: 3px;
@@ -117,7 +112,6 @@ const CSS = `
     font-family: inherit;
     transition: all .18s;
   }
-  /* provider row & webhook row */
   .dev-prow {
     display: flex;
     align-items: center;
@@ -144,7 +138,6 @@ const CSS = `
     display: block;
     font-family: 'Fira Code',monospace;
   }
-  /* webhook item row */
   .dev-wrow {
     display: flex;
     align-items: flex-start;
@@ -169,7 +162,6 @@ const CSS = `
     display: block;
     margin-bottom: 5px;
   }
-  /* warning box */
   .dev-warn {
     background: #FFFBEB;
     border: 1px solid #FDE68A;
@@ -181,7 +173,17 @@ const CSS = `
     gap: 7px;
     align-items: flex-start;
   }
-  /* btn copy */
+  .dev-info {
+    background: #EBF0FF;
+    border: 1px solid #C7D2FE;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 11px;
+    color: #3730A3;
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+  }
   .dev-copybtn {
     display: flex;
     align-items: center;
@@ -195,7 +197,6 @@ const CSS = `
     cursor: pointer;
     transition: all .2s;
   }
-  /* eye btn */
   .dev-eyebtn {
     width: 34px;
     height: 34px;
@@ -210,7 +211,6 @@ const CSS = `
     justify-content: center;
     flex-shrink: 0;
   }
-  /* gradient btn */
   .dev-btn-primary {
     display: inline-flex;
     align-items: center;
@@ -263,7 +263,21 @@ const CSS = `
     font-family: inherit;
     padding: 9px 8px;
   }
-  /* input */
+  .dev-btn-green {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg,#00A550,#00C060);
+    color: #fff;
+    border: none;
+    padding: 9px 15px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 3px 10px rgba(0,165,80,.25);
+  }
   .dev-input {
     width: 100%;
     padding: 9px 12px;
@@ -280,12 +294,31 @@ const CSS = `
     border-color: #FF6B00;
     box-shadow: 0 0 0 3px rgba(255,107,0,.08);
   }
+  .dev-link-generator {
+    background: #F7F8FC;
+    border: 1px solid #E8E8E8;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dev-link-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #D1FAE5;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
   @keyframes dev-spin { to { transform: rotate(360deg); } }
   .dev-spin { animation: dev-spin .7s linear infinite; }
 `;
 
 const TABS = [
   { id: 'api',      label: 'Clé API',       icon: Key },
+  { id: 'links',    label: 'Lien de paiement', icon: Link },
   { id: 'webhooks', label: 'Webhooks',      icon: Webhook },
   { id: 'docs',     label: 'Documentation', icon: BookOpen },
 ];
@@ -384,8 +417,7 @@ function TabApiKey({ apiKey, setApiKey }) {
   };
 
   const masked  = apiKey ? (show ? apiKey : apiKey.substring(0, 10) + '••••••••••••••') : null;
-  const payLink = `${APP_URL}/pay?token=${apiKey}`;
-  const curl    = `curl -X POST ${APP_URL}/api/gateway/pay \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: ${apiKey || 'YOUR_API_KEY'}" \\\n  -d '{"amount":5000,"currency":"XOF"}'`;
+  const curl    = `curl -X POST ${APP_URL}/api/gateway/pay \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: ${apiKey || 'YOUR_API_KEY'}" \\\n  -d '{"amount":5000,"currency":"XOF","description":"Facture #123"}'`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -397,7 +429,6 @@ function TabApiKey({ apiKey, setApiKey }) {
           right={apiKey && <span style={{ fontSize: 10, fontWeight: 700, background: '#EDFAF3', color: '#00A550', padding: '4px 9px', borderRadius: 100, whiteSpace: 'nowrap' }}>● Active</span>}
         />
 
-        {/* ligne clé */}
         <div className="dev-keyrow">
           <div className="dev-keyrow-text">
             {masked ?? <span style={{ color: '#CCC', fontStyle: 'italic' }}>Aucune clé générée</span>}
@@ -429,22 +460,236 @@ function TabApiKey({ apiKey, setApiKey }) {
         </div>
       </div>
 
-      {apiKey && <>
-        {/* Lien paiement */}
-        <div className="dev-card">
-          <CardHead iconBg="#EBF0FF" iconColor="#0057FF" icon={Globe} title="Lien de paiement" sub="Partagez ce lien à vos clients" />
-          <div className="dev-keyrow">
-            <code className="dev-keyrow-text" style={{ fontSize: 11, color: '#555' }}>{payLink}</code>
-            <CopyBtn text={payLink} />
-          </div>
-        </div>
-
-        {/* cURL */}
+      {apiKey && (
         <div className="dev-card">
           <CardHead iconBg="#1A1A2E" iconColor="#A0AEC0" icon={Terminal} title="Test cURL" sub="Testez depuis votre terminal" />
           <TerminalBlock code={curl} />
         </div>
-      </>}
+      )}
+    </div>
+  );
+}
+
+/* ─── TAB: LIEN DE PAIEMENT ─── */
+function TabPaymentLink({ apiKey }) {
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [generatedLink, setGeneratedLink] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const generateLink = async () => {
+    if (!apiKey) { toast.error('Générez d\'abord une clé API'); return; }
+    if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
+    if (!description.trim()) { toast.error('Description requise'); return; }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/gateway/generate-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          description: description.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setGeneratedLink(data.url);
+        toast.success('Lien généré !');
+      } else {
+        toast.error(data.error || 'Erreur lors de la génération');
+      }
+    } catch {
+      toast.error('Erreur de connexion');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(generatedLink);
+    setCopied(true);
+    toast.success('Lien copié !');
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const shareViaWhatsApp = () => {
+    const text = encodeURIComponent(
+      `💳 *Lien de paiement*\n\nMontant : *${parseFloat(amount).toLocaleString('fr-FR')}*\nDescription : ${description}\n\n👉 ${generatedLink}`
+    );
+    window.open(`https://wa.me/?text=${text}`, '_blank');
+  };
+
+  const shareViaEmail = () => {
+    const subject = encodeURIComponent('Lien de paiement');
+    const body = encodeURIComponent(
+      `Bonjour,\n\nVoici votre lien de paiement :\n\n${generatedLink}\n\nMontant : ${parseFloat(amount).toLocaleString('fr-FR')}\nDescription : ${description}\n\nMerci !`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {!apiKey && (
+        <div className="dev-warn">
+          <Lock size={13} style={{ marginTop: 1, flexShrink: 0, color: '#D97706' }} />
+          <span>Vous devez d'abord générer et enregistrer une clé API dans l'onglet "Clé API".</span>
+        </div>
+      )}
+
+      {/* Générateur */}
+      <div className="dev-card">
+        <CardHead iconBg="#EBF0FF" iconColor="#0057FF" icon={Link}
+          title="Générer un lien de paiement"
+          sub="Le montant est inclus dans un token signé HMAC — infalsifiable"
+        />
+
+        <div className="dev-link-generator">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 5 }}>
+                Montant
+              </label>
+              <input
+                className="dev-input"
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="5000"
+                min="100"
+                disabled={!apiKey}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 5 }}>
+                Description
+              </label>
+              <input
+                className="dev-input"
+                type="text"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Facture #INV-2026-001"
+                disabled={!apiKey}
+              />
+            </div>
+          </div>
+
+          <button
+            className="dev-btn-primary"
+            onClick={generateLink}
+            disabled={loading || !apiKey}
+            style={{ width: '100%', justifyContent: 'center', opacity: loading ? .7 : 1 }}
+          >
+            {loading ? (
+              <><Loader size={13} className="dev-spin" /> Génération…</>
+            ) : (
+              <><Zap size={13} /> Générer le lien de paiement</>
+            )}
+          </button>
+        </div>
+
+        {generatedLink && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div className="dev-link-result">
+              <Link size={14} color="#00A550" style={{ flexShrink: 0 }} />
+              <span style={{
+                flex: 1, fontSize: 11, fontFamily: "'Fira Code',monospace",
+                color: '#555', wordBreak: 'break-all', minWidth: 0,
+              }}>
+                {generatedLink}
+              </span>
+              <button
+                className="dev-copybtn"
+                style={{ background: copied ? '#F0FDF4' : '#FAFAFA', color: copied ? '#00A550' : '#888' }}
+                onClick={copyLink}
+              >
+                {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+
+            {/* Infos */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: '#888' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Banknote size={11} />
+                {parseFloat(amount).toLocaleString('fr-FR')} XOF
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <FileText size={11} />
+                {description}
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Clock size={11} />
+                Valide 15 min
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="dev-btn-green"
+                onClick={shareViaWhatsApp}
+                style={{ flex: 1, minWidth: 100, justifyContent: 'center' }}
+              >
+                WhatsApp
+              </button>
+              <button
+                className="dev-btn-secondary"
+                onClick={shareViaEmail}
+                style={{ flex: 1, minWidth: 100, justifyContent: 'center' }}
+              >
+                Email
+              </button>
+              <button
+                className="dev-btn-secondary"
+                onClick={() => { setAmount(''); setDescription(''); setGeneratedLink(''); }}
+                style={{ justifyContent: 'center' }}
+              >
+                Nouveau
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="dev-info">
+          <Lock size={13} style={{ marginTop: 1, flexShrink: 0, color: '#3730A3' }} />
+          <span>
+            <strong>Sécurisé :</strong> Le token est signé avec HMAC-SHA256. Le client ne peut pas modifier le montant. Le lien expire après 15 minutes.
+          </span>
+        </div>
+      </div>
+
+      {/* Code exemple */}
+      <div className="dev-card">
+        <CardHead iconBg="#0D1117" iconColor="#A0AEC0" icon={Code} title="Génération via API" sub="Exemple Node.js" />
+        <TerminalBlock code={`// Générer un lien de paiement depuis votre backend
+const crypto = require('crypto');
+
+const payload = {
+  amount: ${amount || 5000},
+  description: "${description || 'Facture #123'}",
+  timestamp: Date.now()
+};
+
+const sig = crypto
+  .createHmac('sha256', process.env.GATEWAY_SECRET)
+  .update(JSON.stringify(payload))
+  .digest('hex');
+
+const token = Buffer.from(
+  JSON.stringify({ ...payload, sig })
+).toString('base64');
+
+const url = \`${APP_URL}/pay?token=\${encodeURIComponent(token)}\`;
+// ${generatedLink || APP_URL + '/pay?token=eyJhbW91bnQiOjUwMDAs...'}`} />
+      </div>
     </div>
   );
 }
@@ -615,16 +860,15 @@ function TabDocs() {
 
   const steps = [
     { num: '01', title: 'Clé API',     desc: 'Générez et enregistrez votre clé dans l\'onglet Clé API.',          icon: Key,        color: '#FF6B00', bg: '#FFF3EA' },
-    { num: '02', title: 'Intégration', desc: 'Utilisez le lien de paiement ou l\'API REST depuis votre backend.',  icon: Globe,      color: '#0057FF', bg: '#EBF0FF' },
-    { num: '03', title: 'Webhooks',    desc: 'Recevez des notifications POST à chaque événement de paiement.',     icon: Webhook,    color: '#00A550', bg: '#EDFAF3' },
-    { num: '04', title: 'Dashboard',   desc: 'Suivez toutes vos transactions avec export CSV intégré.',            icon: CheckCircle,color: '#9B00E8', bg: '#F4EBFF' },
+    { num: '02', title: 'Token signé', desc: 'Générez un token HMAC avec amount + description côté backend.',     icon: Lock,       color: '#00A550', bg: '#EDFAF3' },
+    { num: '03', title: 'Intégration', desc: 'Utilisez le lien de paiement ou l\'API REST depuis votre backend.',  icon: Globe,      color: '#0057FF', bg: '#EBF0FF' },
+    { num: '04', title: 'Webhooks',    desc: 'Recevez des notifications POST à chaque événement de paiement.',     icon: Webhook,    color: '#9B00E8', bg: '#F4EBFF' },
   ];
 
   const endpoints = [
     { method: 'POST', path: '/api/gateway/pay',          desc: 'Initier' },
-    { method: 'GET',  path: '/api/gateway/status/:id',   desc: 'Statut' },
+    { method: 'GET',  path: '/api/gateway/verify/:id',   desc: 'Statut' },
     { method: 'GET',  path: '/api/gateway/transactions', desc: 'Lister' },
-    { method: 'POST', path: '/api/gateway/refund/:id',   desc: 'Rembourser' },
   ];
 
   const MC = { POST: '#FF6B00', GET: '#0057FF' };
@@ -731,7 +975,7 @@ export default function Developer() {
           <h1 style={{ fontSize: 19, fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.02em', marginBottom: 3 }}>
             Espace Développeur
           </h1>
-          <p style={{ fontSize: 12, color: '#AAA' }}>Gérez vos clés API, webhooks et consultez la documentation.</p>
+          <p style={{ fontSize: 12, color: '#AAA' }}>Gérez vos clés API, webhooks et générez des liens de paiement sécurisés.</p>
         </div>
 
         {/* Tab bar */}
@@ -755,8 +999,9 @@ export default function Developer() {
         </div>
 
         {/* Contenu */}
-        {tab === 'api'      && <TabApiKey   apiKey={apiKey} setApiKey={setApiKey} />}
-        {tab === 'webhooks' && <TabWebhooks merchant={merchant} webhooks={webhooks} setWebhooks={setWebhooks} />}
+        {tab === 'api'      && <TabApiKey      apiKey={apiKey} setApiKey={setApiKey} />}
+        {tab === 'links'    && <TabPaymentLink apiKey={apiKey} />}
+        {tab === 'webhooks' && <TabWebhooks    merchant={merchant} webhooks={webhooks} setWebhooks={setWebhooks} />}
         {tab === 'docs'     && <TabDocs />}
 
       </div>

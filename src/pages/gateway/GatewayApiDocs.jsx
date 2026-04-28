@@ -10,17 +10,25 @@ import toast from 'react-hot-toast';
 const BASE_URL = import.meta.env.VITE_APP_URL || 'https://votre-domaine.vercel.app';
 
 /*
-  ─── IMPORTANT — Encodage du token ──────────────────────────────────────────
-  La clé API (gw_xxx...) doit être encodée en base64 avant d'être passée
-  dans l'URL ou dans le header. Cela évite d'exposer la clé en clair.
-
-  Encodage :
-    JavaScript : btoa('gw_votre_cle_api')
-    PHP        : base64_encode('gw_votre_cle_api')
-    Python     : base64.b64encode(b'gw_votre_cle_api').decode()
-    bash       : echo -n 'gw_votre_cle_api' | base64
-
-  Le serveur décode automatiquement le token base64.
+  ─── GÉNÉRATION DU TOKEN SIGNÉ ──────────────────────────────────────────────
+  Le token contient amount + description + timestamp + signature HMAC.
+  Il est généré côté BACKEND avec la clé secrète GATEWAY_SECRET.
+  
+  La signature empêche toute modification du montant par le client.
+  
+  ⚠️ Le GATEWAY_SECRET doit être stocké en variable d'environnement.
+  ⚠️ Le token expire après 15 minutes (timestamp vérifié côté serveur).
+  
+  ─── DEUX MÉTHODES D'INTÉGRATION ────────────────────────────────────────────
+  
+  Méthode A — Signature côté marchand (recommandé) :
+    Le marchand possède le GATEWAY_SECRET et signe lui-même le token.
+    → Voir onglets JavaScript, PHP, Python.
+  
+  Méthode B — Délégation à la gateway :
+    Le marchand ne peut pas stocker le GATEWAY_SECRET (site externe).
+    Il appelle POST /api/gateway/generate-link avec sa clé API.
+    → Voir onglet API REST ou section "Intégration externe" ci-dessous.
   ─────────────────────────────────────────────────────────────────────────────
 */
 
@@ -40,104 +48,153 @@ const TABS = [
 const METHODS = {
   quickstart: {
     title: 'Démarrage rapide',
-    sub: "Le token doit être encodé en base64 — jamais en clair dans l'URL.",
+    sub: "Générez un token signé côté backend — amount et description ne sont plus dans l'URL.",
     items: [
       {
-        name: '① Encoder votre clé API (à faire une seule fois)',
-        desc: "Encodez votre clé API en base64. Le résultat est ce que vous utilisez partout dans les URLs.",
+        name: '① Générer le token signé (backend) — Méthode A',
+        desc: "Cette étape se fait côté serveur. Le token contient le montant, la description et une signature HMAC.",
         lang: 'javascript',
-        code: `// Dans votre navigateur (console JavaScript)
-const token = btoa('gw_votre_cle_api');
-console.log(token);
-// → "Z3dfdm90cmVfY2xlX2FwaQ=="  ← c'est ça que vous mettez dans les URLs
+        code: `// ⚠️ Ce code s'exécute côté BACKEND (Node.js)
+// JAMAIS côté client — le GATEWAY_SECRET ne doit pas être exposé !
 
-// En Node.js
-const token = Buffer.from('gw_votre_cle_api').toString('base64');`,
-      },
-      {
-        name: '② Redirection simple (GET)',
-        desc: "Le token encodé en base64 dans l'URL — la clé API n'est jamais visible en clair.",
-        lang: 'html',
-        code: `<!-- TOKEN_BASE64 = btoa('gw_votre_cle_api') -->
-<form action="${BASE_URL}/pay" method="GET">
-  <input type="hidden" name="token" value="TOKEN_BASE64" />
-  <input type="hidden" name="amount" value="5000" />
-  <input type="hidden" name="desc" value="Facture #123" />
-  <button type="submit">Payer 5 000 XOF</button>
-</form>
+const crypto = require('crypto');
 
-<!--
-  URL générée :
-  ${BASE_URL}/pay?token=Z3dfdm90cmVfY2xlX2FwaQ==&amount=5000&desc=Facture+%23123
-  La clé API n'apparaît JAMAIS en clair dans l'URL.
--->`,
-      },
-      {
-        name: '③ Bouton JavaScript (génération dynamique)',
-        desc: "Encodez le token côté client avant d'ouvrir la fenêtre de paiement.",
-        lang: 'html',
-        code: `<button onclick="startPayment()">💳 Payer 5 000 XOF</button>
+function genererToken(amount, description, country, method) {
+  const payload = {
+    amount: amount,
+    description: description,
+    timestamp: Date.now()
+  };
+  if (country) payload.country = country;
+  if (method) payload.method = method;
 
-<script>
-const RAW_TOKEN = 'gw_votre_cle_api'; // récupéré depuis votre backend
-const TOKEN     = btoa(RAW_TOKEN);    // encodé en base64
+  const signature = crypto
+    .createHmac('sha256', process.env.GATEWAY_SECRET)
+    .update(JSON.stringify(payload))
+    .digest('hex');
 
-function startPayment() {
-  const url = '${BASE_URL}/pay?token=' + TOKEN + '&amount=5000&desc=Facture';
-  window.open(url, 'payment', 'width=480,height=700');
+  const tokenData = { ...payload, sig: signature };
+  return Buffer.from(JSON.stringify(tokenData)).toString('base64');
 }
-</script>`,
+
+// Exemple d'utilisation dans une route Express
+app.get('/lien-paiement', (req, res) => {
+  const token = genererToken(5000, 'Facture #123', 'bj', 'mtn_money');
+  const link = \`${BASE_URL}/pay?token=\${encodeURIComponent(token)}\`;
+  res.json({ url: link });
+});`,
       },
       {
-        name: '④ Lien de paiement (Email / SMS)',
-        desc: 'Exemple de lien avec token encodé — prêt à envoyer.',
+        name: '② Lien de paiement (Email / SMS)',
+        desc: "L'URL ne contient que le token — pas de amount ni desc visibles.",
         lang: 'text',
-        code: `${BASE_URL}/pay?token=Z3dfdm90cmVfY2xlX2FwaQ==&amount=5000&desc=Facture%20%23123
+        code: `// URL générée — seul le token est présent
+${BASE_URL}/pay?token=eyJhbW91bnQiOjUwMDAsImRlc2NyaXB0aW9uIjoiRmFjdHVyZSAjMTIzIiwidGltZXN0YW1wIjoxNzE0MzI1Njc4OTAwLCJzaWciOiJhYmMxMjNkZWY0NTYifQ==
 
-// Générer ce lien en JavaScript :
-const link = \`${BASE_URL}/pay?token=\${btoa('gw_votre_cle')}&amount=5000&desc=\${encodeURIComponent('Facture #123')}\`;`,
+// Le client ne peut PAS modifier le montant — la signature empêche toute falsification.`,
+      },
+      {
+        name: '③ Redirection serveur',
+        desc: "Redirigez l'utilisateur vers la page de paiement avec le token signé.",
+        lang: 'javascript',
+        code: `// Route Express — le token est généré à la volée
+app.post('/payer', (req, res) => {
+  const { amount, description } = req.body;
+  const token = genererToken(amount, description);
+  res.redirect(\`${BASE_URL}/pay?token=\${encodeURIComponent(token)}\`);
+});`,
+      },
+      {
+        name: '④ Intégration externe — Méthode B (sans GATEWAY_SECRET)',
+        desc: "Si vous ne pouvez pas stocker le GATEWAY_SECRET (site déployé ailleurs), appelez l'endpoint de génération de la gateway.",
+        lang: 'javascript',
+        code: `// ⚠️ Cette méthode est pour les marchands qui ne peuvent PAS
+// stocker le GATEWAY_SECRET dans leurs variables d'environnement.
+// La gateway génère le token signé pour vous.
+
+const GATEWAY_URL = '${BASE_URL}';
+const API_KEY = process.env.GATEWAY_API_KEY; // votre clé API marchand
+
+async function creerPaiement(amount, description, country, method) {
+  // Appeler l'endpoint de génération de la gateway
+  const res = await fetch(\`\${GATEWAY_URL}/api/gateway/generate-link\`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': API_KEY
+    },
+    body: JSON.stringify({ amount, description, country, method })
+  });
+  
+  const data = await res.json();
+  
+  if (data.success) {
+    // data.url contient l'URL complète avec le token signé
+    return data.url;
+  }
+}
+
+// Exemple d'utilisation dans une API route Next.js
+export default async function handler(req, res) {
+  const { amount, credits } = req.body;
+  
+  const response = await fetch(\`\${GATEWAY_URL}/api/gateway/generate-link\`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.GATEWAY_API_KEY
+    },
+    body: JSON.stringify({
+      amount,
+      description: \`Déblocage — \${credits} crédits\`
+    })
+  });
+  
+  const data = await response.json();
+  res.json({ url: data.url });
+}`,
       },
     ],
   },
   html: {
     title: 'Intégration HTML',
-    sub: "Boutons et formulaires — token toujours encodé en base64.",
+    sub: "Le token signé est généré par votre backend et injecté dans la page.",
     items: [
       {
-        name: 'Bouton stylisé complet',
-        desc: 'Token encodé en base64 dans le champ hidden.',
+        name: 'Formulaire avec token signé',
+        desc: "Le token est généré côté serveur et passé au formulaire.",
         lang: 'html',
-        code: `<!-- Générer TOKEN_BASE64 avec : btoa('gw_votre_cle_api') -->
-<form action="${BASE_URL}/pay" method="GET" style="display:inline-block">
-  <input type="hidden" name="token" value="TOKEN_BASE64" />
-  <input type="hidden" name="amount" value="5000" />
-  <input type="hidden" name="desc" value="Facture #INV-2026-001" />
-  <button type="submit" style="background:#f97316;color:#fff;border:none;padding:12px 32px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="1" y="4" width="22" height="16" rx="2"/>
-      <line x1="1" y1="10" x2="23" y2="10"/>
-    </svg>
-    Payer 5 000 XOF
+        code: `<!-- Le token est généré par votre backend (PHP/Node.js/Python) -->
+<!-- et injecté dans la page. L'utilisateur ne voit qu'un token opaque. -->
+
+<form action="${BASE_URL}/pay" method="GET">
+  <input type="hidden" name="token" value="<?php echo $token; ?>" />
+  <button type="submit" style="background:#f97316;color:#fff;border:none;padding:12px 32px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;">
+    💳 Payer
   </button>
-</form>`,
+</form>
+
+<!-- URL générée : ${BASE_URL}/pay?token=eyJhbW91bnQiOjUwMDAs... -->`,
       },
       {
-        name: 'Plusieurs produits',
-        desc: 'Un bouton par produit — token encodé une seule fois.',
+        name: 'Bouton de paiement dynamique',
+        desc: 'Le token est généré par votre API avant affichage.',
         lang: 'html',
-        code: `<button onclick="pay(5000, 'Formation HTML')">Formation HTML — 5 000 XOF</button>
-<button onclick="pay(15000, 'Pack Complet')">Pack Complet — 15 000 XOF</button>
-<button onclick="pay(50000, 'Accompagnement')">Accompagnement — 50 000 XOF</button>
+        code: `<!-- La page appelle votre backend pour obtenir le token -->
+<button id="payBtn" onclick="startPayment()">Payer 5 000 XOF</button>
 
 <script>
-// Encodé une seule fois — jamais en clair dans les URLs
-const TOKEN = btoa('gw_votre_cle_api');
-
-function pay(amount, desc) {
-  window.open(
-    '${BASE_URL}/pay?token=' + TOKEN + '&amount=' + amount + '&desc=' + encodeURIComponent(desc),
-    'payment', 'width=480,height=700'
-  );
+async function startPayment() {
+  // Appel à VOTRE backend pour générer le token
+  const res = await fetch('/api/generer-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: 5000, description: 'Facture #123' })
+  });
+  const { token } = await res.json();
+  
+  // Redirection vers la gateway avec le token signé
+  window.location.href = '${BASE_URL}/pay?token=' + encodeURIComponent(token);
 }
 </script>`,
       },
@@ -145,172 +202,139 @@ function pay(amount, desc) {
   },
   javascript: {
     title: 'JavaScript / Node.js',
-    sub: 'Encodage base64 côté client ou transmission sécurisée via backend.',
+    sub: 'Token signé côté backend — sécurisé et infalsifiable.',
     items: [
       {
-        name: 'Fetch API avec token encodé',
+        name: 'Génération du token (Node.js) — Méthode A',
         lang: 'javascript',
-        code: `// Le token est passé en header x-api-key (jamais dans l'URL)
-// Le serveur accepte le token brut OU encodé en base64 dans le header
+        code: `const crypto = require('crypto');
 
-async function payer(amount, description) {
-  const res = await fetch('${BASE_URL}/api/gateway/pay', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': 'gw_votre_cle_api'  // en clair dans le header, c'est sécurisé (HTTPS)
-    },
-    body: JSON.stringify({ amount, description })
-  });
-  const data = await res.json();
-  window.location.href = data.url;
-}
-
-payer(5000, 'Facture #123');`,
-      },
-      {
-        name: 'Lien de paiement — token encodé base64',
-        desc: 'Pour les liens dans les emails, SMS, QR codes.',
-        lang: 'javascript',
-        code: `// Générer un lien de paiement sécurisé
-function genererLienPaiement(apiKey, amount, description) {
-  const tokenB64 = btoa(apiKey); // encoder en base64
-  const params   = new URLSearchParams({
-    token: tokenB64,
-    amount: String(amount),
-    desc: description,
-  });
-  return \`${BASE_URL}/pay?\${params.toString()}\`;
-}
-
-const lien = genererLienPaiement('gw_votre_cle_api', 5000, 'Facture #123');
-// → ${BASE_URL}/pay?token=Z3dfdm90cmVfY2xlX2FwaQ==&amount=5000&desc=Facture+%23123
-// La clé n'apparaît PAS en clair dans le lien`,
-      },
-      {
-        name: 'Popup + vérification de statut',
-        lang: 'javascript',
-        code: `async function payerEtSuivre(amount, description) {
-  // Token en clair dans le header — sécurisé via HTTPS
-  const res = await fetch('${BASE_URL}/api/gateway/pay', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': 'gw_votre_cle_api' },
-    body: JSON.stringify({ amount, description })
-  });
-  const data = await res.json();
-  const popup = window.open(data.url, 'payment', 'width=480,height=700');
-
-  const interval = setInterval(async () => {
-    const s = await fetch('${BASE_URL}/api/gateway/verify/' + data.transactionId, {
-      headers: { 'x-api-key': 'gw_votre_cle_api' }
-    });
-    const status = await s.json();
-    if (status.status === 'completed') {
-      clearInterval(interval);
-      popup?.close();
-      alert('✅ Paiement réussi !');
-    }
-  }, 5000);
+function genererToken(amount, description, country, method) {
+  const payload = { amount, description, timestamp: Date.now() };
+  if (country) payload.country = country;
+  if (method) payload.method = method;
+  
+  const sig = crypto.createHmac('sha256', process.env.GATEWAY_SECRET)
+                    .update(JSON.stringify(payload)).digest('hex');
+  return Buffer.from(JSON.stringify({...payload, sig})).toString('base64');
 }`,
       },
       {
-        name: 'Node.js (Express) — génération de lien côté serveur',
+        name: 'Route Express — lien de paiement (Méthode A)',
         lang: 'javascript',
-        code: `const fetch = require('node-fetch');
-
-// Générer un lien de paiement côté serveur
-app.post('/creer-lien-paiement', async (req, res) => {
-  const apiKey   = process.env.GATEWAY_API_KEY;          // gw_xxx
-  const tokenB64 = Buffer.from(apiKey).toString('base64'); // encodé base64
-
-  const params = new URLSearchParams({
-    token:  tokenB64,
-    amount: req.body.amount,
-    desc:   req.body.description,
-  });
-
-  // Ce lien peut être envoyé par email — clé jamais en clair
-  const lien = \`${BASE_URL}/pay?\${params.toString()}\`;
-  res.json({ url: lien });
-});
-
-// Initier un paiement via API (token en header)
-app.post('/payer', async (req, res) => {
-  const response = await fetch('${BASE_URL}/api/gateway/pay', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.GATEWAY_API_KEY  // jamais exposé au client
-    },
-    body: JSON.stringify({
-      amount:      req.body.amount,
-      description: req.body.description,
-      country:     req.body.country,
-      method:      req.body.method,
-      phone:       req.body.phone,
-    })
-  });
-  const data = await response.json();
-  res.json(data);
+        code: `app.post('/creer-paiement', async (req, res) => {
+  const { amount, description } = req.body;
+  
+  // Générer le token signé
+  const crypto = require('crypto');
+  const payload = { amount, description, timestamp: Date.now() };
+  const sig = crypto.createHmac('sha256', process.env.GATEWAY_SECRET)
+                    .update(JSON.stringify(payload)).digest('hex');
+  const token = Buffer.from(JSON.stringify({...payload, sig})).toString('base64');
+  
+  // Retourner l'URL complète
+  const url = \`${BASE_URL}/pay?token=\${encodeURIComponent(token)}\`;
+  res.json({ url });
 });`,
       },
       {
-        name: 'React / Next.js',
-        lang: 'jsx',
-        code: `import { useState } from 'react';
-
-// Le token est stocké côté serveur et jamais exposé dans le bundle client.
-// Utilisez une API route Next.js ou votre backend pour initier le paiement.
-
-export default function PayButton({ amount, description, country, method, phone }) {
-  const [loading, setLoading] = useState(false);
-
-  const pay = async () => {
-    setLoading(true);
-    // Appel à votre propre backend — pas directement à la gateway
-    const res = await fetch('/api/creer-paiement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, description, country, method, phone })
-    });
-    const data = await res.json();
-    if (data.url) window.open(data.url, 'payment', 'width=480,height=700');
-    setLoading(false);
-  };
-
-  return (
-    <button onClick={pay} disabled={loading}>
-      {loading ? 'Chargement...' : \`Payer \${amount.toLocaleString()} XOF\`}
-    </button>
-  );
+        name: 'Délégation à la gateway (Méthode B)',
+        desc: 'Pour les sites qui ne peuvent pas stocker le GATEWAY_SECRET.',
+        lang: 'javascript',
+        code: `// Appeler l'endpoint de la gateway pour obtenir un token signé
+app.post('/creer-paiement', async (req, res) => {
+  const { amount, description, country, method } = req.body;
+  
+  const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.GATEWAY_API_KEY
+    },
+    body: JSON.stringify({ amount, description, country, method })
+  });
+  
+  const data = await response.json();
+  res.json({ url: data.url });
+});`,
+      },
+      {
+        name: 'Initier un paiement via API (POST)',
+        desc: 'Alternative : appel direct à l\'API avec la clé API en header.',
+        lang: 'javascript',
+        code: `// Pour les paiements directs sans page intermédiaire
+async function payer(amount, description, country, method, phone) {
+  const res = await fetch('${BASE_URL}/api/gateway/pay', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.GATEWAY_API_KEY
+    },
+    body: JSON.stringify({ amount, description, country, method, phone })
+  });
+  const data = await res.json();
+  if (data.url) window.open(data.url, 'payment', 'width=480,height=700');
 }`,
       },
     ],
   },
   php: {
     title: 'PHP',
-    sub: 'Token encodé en base64 pour les URLs, en clair pour les headers cURL.',
+    sub: 'Token signé avec hash_hmac — sécurisé côté serveur.',
     items: [
       {
-        name: 'Générer un lien de paiement sécurisé',
+        name: 'Générer un token signé (Méthode A)',
         lang: 'php',
         code: `<?php
-define('GATEWAY_URL', '${BASE_URL}');
-define('GATEWAY_API_KEY', 'gw_votre_cle_api'); // en variable d'environnement
-
-function genererLienPaiement($amount, $description) {
-  // Encoder le token en base64 — clé jamais visible en clair dans l'URL
-  $tokenB64 = base64_encode(GATEWAY_API_KEY);
-  $params   = http_build_query([
-    'token'  => $tokenB64,
+function genererToken($amount, $description, $country = null, $method = null) {
+  $payload = [
     'amount' => $amount,
-    'desc'   => $description,
-  ]);
-  return GATEWAY_URL . '/pay?' . $params;
+    'description' => $description,
+    'timestamp' => round(microtime(true) * 1000)
+  ];
+  if ($country) $payload['country'] = $country;
+  if ($method) $payload['method'] = $method;
+  
+  $signature = hash_hmac('sha256', json_encode($payload), getenv('GATEWAY_SECRET'));
+  $tokenData = array_merge($payload, ['sig' => $signature]);
+  
+  return base64_encode(json_encode($tokenData));
 }
 
-$lien = genererLienPaiement(5000, 'Facture #123');
-// → ${BASE_URL}/pay?token=Z3dfdm90cmVfY2xlX2FwaQ==&amount=5000&desc=Facture+%23123`,
+// Utilisation
+$token = genererToken(5000, 'Facture #123', 'bj', 'mtn_money');
+$url   = '${BASE_URL}/pay?token=' . urlencode($token);
+// → ${BASE_URL}/pay?token=eyJhbW91bnQiOjUwMDAs...`,
+      },
+      {
+        name: 'Délégation à la gateway (Méthode B)',
+        lang: 'php',
+        code: `<?php
+function creerLienPaiement($amount, $description, $country = null, $method = null) {
+  $ch = curl_init('${BASE_URL}/api/gateway/generate-link');
+  curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      'x-api-key: ' . getenv('GATEWAY_API_KEY')
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+      'amount' => $amount,
+      'description' => $description,
+      'country' => $country,
+      'method' => $method
+    ]),
+    CURLOPT_RETURNTRANSFER => true
+  ]);
+  $response = curl_exec($ch);
+  curl_close($ch);
+  $data = json_decode($response, true);
+  return $data['url'] ?? null;
+}
+
+$url = creerLienPaiement(5000, 'Facture #123', 'bj', 'mtn_money');
+header('Location: ' . $url);
+exit;`,
       },
       {
         name: 'cURL — initier un paiement via API',
@@ -322,14 +346,14 @@ function initierPaiement($amount, $description, $country = 'bj', $method = 'mtn_
     CURLOPT_POST => true,
     CURLOPT_HTTPHEADER => [
       'Content-Type: application/json',
-      'x-api-key: ' . getenv('GATEWAY_API_KEY'), // depuis variable d'environnement
+      'x-api-key: ' . getenv('GATEWAY_API_KEY')
     ],
     CURLOPT_POSTFIELDS => json_encode([
       'amount'      => $amount,
       'description' => $description,
       'country'     => $country,
       'method'      => $method,
-      'phone'       => $phone,
+      'phone'       => $phone
     ]),
     CURLOPT_RETURNTRANSFER => true
   ]);
@@ -346,17 +370,12 @@ exit;`,
         name: 'Webhook callback',
         lang: 'php',
         code: `<?php
-$payload = file_get_contents('php://input');
-$data    = json_decode($payload, true);
+$payload = json_decode(file_get_contents('php://input'), true);
+$event   = $payload['event'] ?? '';
+$tx      = $payload['transaction'] ?? [];
 
-if ($data['event'] === 'payment.completed') {
-  $reference = $data['transaction']['reference'];
-  $amount    = $data['transaction']['amount'];
-
-  $pdo->prepare("UPDATE commandes SET statut='paye' WHERE reference=?")
-      ->execute([$reference]);
-
-  mail($data['transaction']['email'], 'Paiement confirmé', "Paiement de $amount XOF reçu.");
+if ($event === 'payment.completed') {
+  $db->query("UPDATE orders SET status='paid' WHERE ref='{$tx['reference']}'");
 }
 
 http_response_code(200);
@@ -366,118 +385,161 @@ echo json_encode(['received' => true]);`,
   },
   python: {
     title: 'Python',
-    sub: 'Token base64 pour les URLs, en clair pour les headers requests.',
+    sub: 'Token signé avec hmac — généré côté serveur.',
     items: [
       {
-        name: 'Générer un lien sécurisé',
+        name: 'Générer un token signé (Méthode A)',
         lang: 'python',
-        code: `import base64
-import os
-from urllib.parse import urlencode
+        code: `import json, hmac, hashlib, base64, os, time
 
-GATEWAY_URL = '${BASE_URL}'
-API_KEY     = os.environ.get('GATEWAY_API_KEY', 'gw_votre_cle_api')
+def generer_token(amount, description, country=None, method=None):
+    payload = {
+        'amount': amount,
+        'description': description,
+        'timestamp': int(time.time() * 1000)
+    }
+    if country:
+        payload['country'] = country
+    if method:
+        payload['method'] = method
+    
+    secret = os.environ.get('GATEWAY_SECRET')
+    payload_json = json.dumps(payload, separators=(',', ':'))
+    signature = hmac.new(
+        secret.encode(),
+        payload_json.encode(),
+        hashlib.sha256
+    ).hexdigest()
+    
+    token_data = {**payload, 'sig': signature}
+    token_json = json.dumps(token_data, separators=(',', ':'))
+    return base64.b64encode(token_json.encode()).decode()
 
-def generer_lien_paiement(amount, description):
-    # Encoder en base64 — jamais en clair dans l'URL
-    token_b64 = base64.b64encode(API_KEY.encode()).decode()
-    params    = urlencode({'token': token_b64, 'amount': amount, 'desc': description})
-    return f'{GATEWAY_URL}/pay?{params}'
-
-lien = generer_lien_paiement(5000, 'Facture #123')
-# → ${BASE_URL}/pay?token=Z3dfdm90cmVfY2xlX2FwaQ==&amount=5000&desc=Facture+%23123`,
+# Utilisation
+token = generer_token(5000, 'Facture #123', 'bj', 'mtn_money')
+url   = f'${BASE_URL}/pay?token={token}'`,
       },
       {
-        name: 'API requests (Flask / Django)',
+        name: 'Délégation à la gateway (Méthode B)',
         lang: 'python',
-        code: `import requests
-import os
+        code: `import requests, os
 
-GATEWAY_URL = '${BASE_URL}'
-
-def initier_paiement(amount, description, country='bj', method='mtn_money', phone=''):
+def creer_lien_paiement(amount, description, country=None, method=None):
     response = requests.post(
-        f'{GATEWAY_URL}/api/gateway/pay',
+        f'${BASE_URL}/api/gateway/generate-link',
         headers={
             'Content-Type': 'application/json',
-            'x-api-key': os.environ['GATEWAY_API_KEY']  # depuis variable d'env
+            'x-api-key': os.environ.get('GATEWAY_API_KEY')
         },
         json={
-            'amount':      amount,
+            'amount': amount,
             'description': description,
-            'country':     country,
-            'method':      method,
-            'phone':       phone,
+            'country': country,
+            'method': method
         }
     )
-    return response.json()
+    data = response.json()
+    return data.get('url') if data.get('success') else None
 
-# Vue Django
-def payer(request):
-    paiement = initier_paiement(5000, 'Facture #123', 'bj', 'mtn_money', '22961000000')
-    return redirect(paiement['url'])`,
-      },
-      {
-        name: 'Webhook receiver (Flask)',
-        lang: 'python',
-        code: `from flask import Flask, request, jsonify
-
-app = Flask(__name__)
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    data = request.json
-    if data.get('event') == 'payment.completed':
-        reference = data['transaction']['reference']
-        update_order(reference, 'paid')
-    elif data.get('event') == 'payment.failed':
-        reference = data['transaction']['reference']
-        update_order(reference, 'failed')
-    return jsonify({'received': True})`,
+# Utilisation
+url = creer_lien_paiement(5000, 'Facture #123', 'bj', 'mtn_money')`,
       },
     ],
   },
   wordpress: {
     title: 'WordPress',
-    sub: "Token encodé en base64 dans les shortcodes et liens.",
+    sub: "Token signé — amount et description ne sont plus dans l'URL.",
     items: [
       {
-        name: 'Shortcode avec encodage automatique',
+        name: 'Shortcode avec token signé (Méthode A)',
         lang: 'php',
         code: `// Dans functions.php de votre thème
-define('GATEWAY_API_KEY', 'gw_votre_cle_api'); // idéalement dans wp-config.php
-define('GATEWAY_URL',     '${BASE_URL}');
+define('GATEWAY_URL', '${BASE_URL}');
+
+function generer_token_gateway($amount, $description) {
+  $payload = [
+    'amount' => $amount,
+    'description' => $description,
+    'timestamp' => round(microtime(true) * 1000)
+  ];
+  $sig = hash_hmac('sha256', json_encode($payload), getenv('GATEWAY_SECRET'));
+  $tokenData = array_merge($payload, ['sig' => $sig]);
+  return base64_encode(json_encode($tokenData));
+}
 
 add_shortcode('bouton_paiement', function($atts) {
-  $atts     = shortcode_atts(['montant' => '5000', 'desc' => 'Paiement'], $atts);
-
-  // Encoder le token — clé jamais visible en clair dans la page
-  $tokenB64 = base64_encode(GATEWAY_API_KEY);
-
-  $url = GATEWAY_URL . '/pay?token=' . urlencode($tokenB64)
-       . '&amount=' . $atts['montant']
-       . '&desc='   . urlencode($atts['desc']);
-
+  $atts = shortcode_atts(['montant' => '5000', 'desc' => 'Paiement'], $atts);
+  $token = generer_token_gateway($atts['montant'], $atts['desc']);
+  $url = GATEWAY_URL . '/pay?token=' . urlencode($token);
+  
   return '<a href="' . esc_url($url) . '" target="_blank" class="btn-paiement">'
        . 'Payer ' . number_format($atts['montant']) . ' XOF</a>';
-});
+});`,
+      },
+      {
+        name: 'Shortcode avec délégation (Méthode B)',
+        lang: 'php',
+        code: `// Pour les sites WordPress qui ne peuvent pas stocker GATEWAY_SECRET
+function creer_lien_via_gateway($amount, $description) {
+  $ch = curl_init('${BASE_URL}/api/gateway/generate-link');
+  curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_HTTPHEADER => [
+      'Content-Type: application/json',
+      'x-api-key: ' . getenv('GATEWAY_API_KEY')
+    ],
+    CURLOPT_POSTFIELDS => json_encode([
+      'amount' => $amount,
+      'description' => $description
+    ]),
+    CURLOPT_RETURNTRANSFER => true
+  ]);
+  $data = json_decode(curl_exec($ch), true);
+  curl_close($ch);
+  return $data['url'] ?? '';
+}
 
-// Usage dans une page WordPress :
-// [bouton_paiement montant="10000" desc="Formation"]`,
+add_shortcode('bouton_paiement', function($atts) {
+  $atts = shortcode_atts(['montant' => '5000', 'desc' => 'Paiement'], $atts);
+  $url = creer_lien_via_gateway($atts['montant'], $atts['desc']);
+  return '<a href="' . esc_url($url) . '" target="_blank">Payer ' . number_format($atts['montant']) . ' XOF</a>';
+});`,
       },
     ],
   },
   api: {
     title: 'API REST',
-    sub: "Token en header x-api-key pour les appels API — jamais dans l'URL.",
+    sub: "Token signé pour les URLs, clé API en header pour les appels directs.",
     items: [
       {
-        name: 'POST /api/gateway/pay — Initier un paiement',
+        name: 'POST /api/gateway/generate-link — Générer un lien signé',
+        desc: "Pour les marchands qui ne peuvent pas signer eux-mêmes le token (pas d'accès au GATEWAY_SECRET).",
         lang: 'bash',
-        code: `# Le token est passé en header — jamais dans l'URL
+        code: `# Appelez cet endpoint avec votre clé API pour obtenir un lien signé
+curl -X POST ${BASE_URL}/api/gateway/generate-link \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: gw_live_votre_cle_api" \\
+  -d '{
+    "amount": 5000,
+    "description": "Facture #123",
+    "country": "bj",
+    "method": "mtn_money"
+  }'
+
+# Réponse
+{
+  "success": true,
+  "url": "${BASE_URL}/pay?token=eyJhbW91bnQiOjUwMDAs...",
+  "token": "eyJhbW91bnQiOjUwMDAs..."
+}`,
+      },
+      {
+        name: 'POST /api/gateway/pay — Initier un paiement direct',
+        lang: 'bash',
+        code: `# Appel direct avec clé API en header
 curl -X POST ${BASE_URL}/api/gateway/pay \\
   -H "Content-Type: application/json" \\
-  -H "x-api-key: gw_votre_cle_api" \\
+  -H "x-api-key: gw_live_votre_cle_api" \\
   -d '{
     "amount": 5000,
     "description": "Facture #123",
@@ -495,22 +557,21 @@ curl -X POST ${BASE_URL}/api/gateway/pay \\
   "url": "https://...",
   "status": "pending",
   "provider": "feexpay",
-  "message": "Paiement initié. Vérifiez votre téléphone."
+  "message": "Paiement initié."
 }`,
       },
       {
         name: 'GET /api/gateway/verify/:id — Vérifier un paiement',
         lang: 'bash',
         code: `curl ${BASE_URL}/api/gateway/verify/abc123 \\
-  -H "x-api-key: gw_votre_cle_api"
+  -H "x-api-key: gw_live_votre_cle_api"
 
 # Réponse
 {
   "success": true,
   "status": "completed",
   "reference": "GW-1714000000000",
-  "amount": 5000,
-  "provider": "feexpay"
+  "amount": 5000
 }`,
       },
       {
@@ -525,37 +586,11 @@ curl ${BASE_URL}/api/gateway/methods/bj
   "name": "Bénin",
   "currency": "XOF",
   "methods": [
-    {"id": "mtn_money",    "name": "MTN Mobile Money"},
-    {"id": "moov_money",   "name": "Moov Money"},
-    {"id": "celtiis_money","name": "CELTIIS Money"},
-    {"id": "card",         "name": "Carte Bancaire"}
+    {"id": "mtn_money", "name": "MTN Mobile Money"},
+    {"id": "moov_money", "name": "Moov Money"},
+    {"id": "card", "name": "Carte Bancaire"}
   ]
 }`,
-      },
-      {
-        name: 'GET /api/gateway/balance — Solde du compte',
-        lang: 'bash',
-        code: `curl ${BASE_URL}/api/gateway/balance \\
-  -H "x-api-key: gw_votre_cle_api"
-
-# Réponse
-{
-  "balance": 150000,
-  "currency": "XOF",
-  "pendingBalance": 25000
-}`,
-      },
-      {
-        name: 'Lien de paiement — token encodé base64',
-        desc: "Pour les liens dans les emails, SMS, QR codes — clé jamais en clair.",
-        lang: 'bash',
-        code: `# Encoder le token en base64
-TOKEN_B64=$(echo -n "gw_votre_cle_api" | base64)
-
-# Construire le lien
-LINK="${BASE_URL}/pay?token=$TOKEN_B64&amount=5000&desc=Facture%20%23123"
-echo $LINK
-# → ${BASE_URL}/pay?token=Z3dfdm90cmVfY2xlX2FwaQ==&amount=5000&desc=Facture+%23123`,
       },
     ],
   },
@@ -604,7 +639,6 @@ payment.refunded    → Paiement remboursé`,
       break;
     case 'payment.failed':
       updateOrder(transaction.reference, 'failed');
-      notifyCustomer(transaction.reference);
       break;
   }
 
@@ -630,94 +664,85 @@ echo json_encode(['received' => true]);`,
   },
   mobile: {
     title: 'Mobile — Flutter & React Native',
-    sub: 'Token stocké en variable d\'environnement, jamais dans le code source.',
+    sub: 'Token signé généré par votre backend, jamais exposé dans le code source.',
     items: [
       {
         name: 'Flutter (Dart)',
         lang: 'dart',
         code: `import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
 
 const gatewayUrl = '${BASE_URL}';
-// Stocker dans flutter_dotenv ou équivalent — jamais en dur dans le code
-const apiKey = String.fromEnvironment('GATEWAY_API_KEY');
 
-Future<void> payer(double amount, String description, String country, String method, String phone) async {
+// Le token est généré par VOTRE backend
+Future<String> getPaymentToken(double amount, String desc) async {
   final res = await http.post(
-    Uri.parse('$gatewayUrl/api/gateway/pay'),
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,  // en header — sécurisé
-    },
-    body: jsonEncode({
-      'amount':      amount,
-      'description': description,
-      'country':     country,
-      'method':      method,
-      'phone':       phone,
-    })
+    Uri.parse('https://votre-api.com/generer-token'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'amount': amount, 'description': desc})
   );
-  final data = jsonDecode(res.body);
-  if (data['url'] != null) await launchUrl(Uri.parse(data['url']));
+  return jsonDecode(res.body)['token'];
 }
 
-// Générer un lien avec token encodé (pour QR code, email...)
-String genererLien(double amount, String desc) {
-  final tokenB64 = base64Encode(utf8.encode(apiKey));
-  return '$gatewayUrl/pay?token=$tokenB64&amount=$amount&desc=\${Uri.encodeComponent(desc)}';
+Future<void> payer(double amount, String description) async {
+  final token = await getPaymentToken(amount, description);
+  final url = '$gatewayUrl/pay?token=\${Uri.encodeComponent(token)}';
+  await launchUrl(Uri.parse(url));
 }`,
       },
       {
         name: 'React Native',
         lang: 'jsx',
         code: `import { Linking } from 'react-native';
-// Utiliser react-native-config ou expo-constants pour les variables d'env
-import Config from 'react-native-config';
 
 const GATEWAY_URL = '${BASE_URL}';
 
-// Appel API — token en header
-async function payer(amount, description, country, method, phone) {
-  const res = await fetch(\`\${GATEWAY_URL}/api/gateway/pay\`, {
+// Le token est généré par votre backend
+async function getToken(amount, description) {
+  const res = await fetch('https://votre-api.com/generer-token', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': Config.GATEWAY_API_KEY,  // depuis .env
-    },
-    body: JSON.stringify({ amount, description, country, method, phone })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, description })
   });
   const data = await res.json();
-  if (data.url) Linking.openURL(data.url);
+  return data.token;
 }
 
-// Générer un lien avec token encodé (pour QR code, email...)
-function genererLien(amount, desc) {
-  const tokenB64 = btoa(Config.GATEWAY_API_KEY);
-  return \`\${GATEWAY_URL}/pay?token=\${tokenB64}&amount=\${amount}&desc=\${encodeURIComponent(desc)}\`;
+async function payer(amount, description) {
+  const token = await getToken(amount, description);
+  const url = \`\${GATEWAY_URL}/pay?token=\${encodeURIComponent(token)}\`;
+  Linking.openURL(url);
 }`,
       },
     ],
   },
   qrcode: {
     title: 'QR Code',
-    sub: "Token encodé en base64 dans les QR codes — clé jamais lisible.",
+    sub: "Token signé dans le QR code — montant infalsifiable.",
     items: [
       {
-        name: 'QR Code avec token encodé',
+        name: 'QR Code avec token signé',
         lang: 'html',
-        code: `<img id="qrcode" alt="QR Code de paiement" />
+        code: `<!-- Le token est généré par votre backend -->
+<img id="qrcode" alt="QR Code de paiement" />
 
 <script>
-// Encoder le token avant de le mettre dans le QR
-const apiKey  = 'gw_votre_cle_api';
-const tokenB64 = btoa(apiKey); // → "Z3dfdm90cmVfY2xlX2FwaQ=="
+// Appel à votre backend pour obtenir le token
+async function loadQR() {
+  const res = await fetch('/api/generer-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: 5000, description: 'Facture #123' })
+  });
+  const { token } = await res.json();
+  
+  const payUrl = '${BASE_URL}/pay?token=' + encodeURIComponent(token);
+  document.getElementById('qrcode').src =
+    'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(payUrl);
+}
 
-const payUrl = '${BASE_URL}/pay?token=' + tokenB64 + '&amount=5000';
-
-document.getElementById('qrcode').src =
-  'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(payUrl);
+loadQR();
 </script>`,
       },
       {
@@ -728,11 +753,18 @@ document.getElementById('qrcode').src =
 <img id="qrcode" style="margin-top:10px" />
 
 <script>
-const TOKEN_B64 = btoa('gw_votre_cle_api'); // encodé une seule fois
-
-function generateQR() {
+async function generateQR() {
   const amount = document.getElementById('qrAmount').value;
-  const url    = '${BASE_URL}/pay?token=' + TOKEN_B64 + '&amount=' + amount;
+  
+  // Token généré par votre backend
+  const res = await fetch('/api/generer-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: parseInt(amount), description: 'Paiement QR' })
+  });
+  const { token } = await res.json();
+  
+  const url = '${BASE_URL}/pay?token=' + encodeURIComponent(token);
   document.getElementById('qrcode').src =
     'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(url);
 }
@@ -874,8 +906,8 @@ export default function GatewayApiDocs() {
               <div style={{ fontSize:18, fontWeight:900, color:'#fff', letterSpacing:'-.02em', lineHeight:1 }}>Documentation API</div>
             </div>
           </div>
-          <p style={{ fontSize:13, color:'rgba(255,255,255,.5)', maxWidth:480, lineHeight:1.6, marginBottom:14 }}>
-            Toutes les méthodes pour intégrer la passerelle de paiement — HTML, JavaScript, PHP, Python, Flutter et plus encore.
+          <p style={{ fontSize:13, color:'rgba(255,255,255,.5)', maxWidth:520, lineHeight:1.6, marginBottom:14 }}>
+            Intégrez la passerelle de paiement avec un token signé HMAC-SHA256. Deux méthodes : signature directe ou délégation à la gateway.
           </p>
 
           {/* Base URL */}
@@ -886,20 +918,18 @@ export default function GatewayApiDocs() {
           </div>
 
           {/* Note sécurité token */}
-          <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:16, padding:'10px 14px', background:'rgba(0,165,80,.08)', border:'1px solid rgba(0,165,80,.2)', borderRadius:10, maxWidth:520 }}>
+          <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8, padding:'10px 14px', background:'rgba(0,165,80,.08)', border:'1px solid rgba(0,165,80,.2)', borderRadius:10, maxWidth:600 }}>
             <Lock size={13} color="#00A550" style={{ flexShrink:0, marginTop:1 }}/>
             <span style={{ fontSize:12, color:'rgba(255,255,255,.55)', lineHeight:1.5 }}>
-              Le token dans les URLs doit être <strong style={{ color:'#00A550' }}>encodé en base64</strong> — <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>btoa('gw_votre_cle')</code>. Dans les headers, passez-le en clair via HTTPS.
+              <strong style={{ color:'#00A550' }}>Méthode A — Signature directe :</strong> Stockez <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>GATEWAY_SECRET</code> et signez vos tokens avec HMAC-SHA256.
             </span>
           </div>
 
-          <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-            {[{label:'10 langages',icon:Layers},{label:`${PROVIDERS.length} providers`,icon:Globe},{label:'REST + Webhooks',icon:Shield}].map((b,i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, padding:'6px 12px', fontSize:12, fontWeight:600, color:'rgba(255,255,255,.7)' }}>
-                <b.icon size={12} color="rgba(255,107,0,.8)"/>
-                {b.label}
-              </div>
-            ))}
+          <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 14px', background:'rgba(255,107,0,.08)', border:'1px solid rgba(255,107,0,.2)', borderRadius:10, maxWidth:600 }}>
+            <Shield size={13} color="#FF6B00" style={{ flexShrink:0, marginTop:1 }}/>
+            <span style={{ fontSize:12, color:'rgba(255,255,255,.55)', lineHeight:1.5 }}>
+              <strong style={{ color:'#FF6B00' }}>Méthode B — Délégation :</strong> Appelez <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>POST /api/gateway/generate-link</code> avec votre clé API. La gateway signe le token pour vous.
+            </span>
           </div>
         </div>
       </div>
