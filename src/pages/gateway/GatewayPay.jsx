@@ -439,18 +439,18 @@ export default function GatewayPay() {
       .then(snap => { if (snap.exists()) setGatewaySettings(p => ({ ...p, ...snap.data() })); })
       .catch(()=>{});
 
-  // ✅ Dans le useEffect, AJOUTER juste ces 2 lignes
-  fetch(`/api/gateway/merchant/${token}`)
-    .then(r => r.json())
-    .then(data => {
-      if (data.success) {
-        setMerchant(data);
-        setCountries(getCountriesForProviders(data.activeProviders || []));
-        if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
-        if (data.amount) setAmount(String(data.amount));           // ✅ AJOUTER
-        if (data.description) setDescription(data.description);   // ✅ AJOUTER
-      }
-    })
+    fetch(`/api/gateway/merchant/${encodeURIComponent(rawToken)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          setMerchant(data);
+          setCountries(getCountriesForProviders(data.activeProviders || []));
+          if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
+          if (data.amount) setAmount(String(data.amount));
+          if (data.description) setDescription(data.description);
+          if (data.country) handleSelectCountry(data.country);
+        }
+      })
       .catch(() => toast.error('Impossible de charger le marchand'))
       .finally(() => setFetchingMerchant(false));
 
