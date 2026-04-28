@@ -14,17 +14,9 @@ const css = `
     to   { opacity: 1; transform: translateY(0); }
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes float {
-    0%,100% { transform: translateY(0px); }
-    50%      { transform: translateY(-8px); }
-  }
   @keyframes pulse-ring {
     0%   { transform: scale(1);   opacity: .6; }
     100% { transform: scale(1.6); opacity: 0;  }
-  }
-  @keyframes shimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position:  200% 0; }
   }
 
   .rg-root * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -70,8 +62,6 @@ const css = `
     width: 38px; height: 38px; border-radius: 11px;
     background: #F97316;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 0 0 0 rgba(249,115,22,.5);
-    animation: none;
   }
   .rg-logo-text {
     font-family: 'Bricolage Grotesque', sans-serif;
@@ -79,26 +69,10 @@ const css = `
     color: #fff; letter-spacing: -.02em;
   }
 
-  .rg-hero { position: relative; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 40px 0; }
-
-  .rg-badge {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.25);
-    color: #F97316; border-radius: 50px;
-    padding: 5px 14px; font-size: 12px; font-weight: 700;
-    letter-spacing: .04em; text-transform: uppercase;
-    margin-bottom: 24px; width: fit-content;
-    animation: fadeUp .5s ease both;
-  }
-  .rg-badge-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #F97316; position: relative;
-  }
-  .rg-badge-dot::after {
-    content: '';
-    position: absolute; inset: -3px;
-    border-radius: 50%; border: 1.5px solid #F97316;
-    animation: pulse-ring 1.5s ease infinite;
+  .rg-hero {
+    position: relative; flex: 1;
+    display: flex; flex-direction: column;
+    justify-content: center; padding: 40px 0;
   }
 
   .rg-headline {
@@ -132,7 +106,7 @@ const css = `
   .rg-stat-lbl { font-size: 11px; color: rgba(255,255,255,.35); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
   .rg-stat-divider { width: 1px; background: rgba(255,255,255,.08); align-self: stretch; }
 
-  .rg-features { display: flex; flex-direction: column; gap: 12px; animation: fadeUp .5s .35s ease both; }
+  .rg-features { display: flex; flex-direction: column; gap: 12px; animation: fadeUp .5s .35s ease both; margin-bottom: 24px; }
   .rg-feature {
     display: flex; align-items: center; gap: 12px;
     padding: 12px 16px;
@@ -151,29 +125,25 @@ const css = `
   .rg-feature-title { font-size: 13px; font-weight: 700; color: #fff; }
   .rg-feature-sub { font-size: 11px; color: rgba(255,255,255,.35); margin-top: 1px; }
 
-  /* Floating card */
-  .rg-float-card {
-    position: relative;
-    background: rgba(255,255,255,.06);
-    border: 1px solid rgba(255,255,255,.1);
-    border-radius: 16px; padding: 16px 20px;
-    display: flex; align-items: center; gap: 14px;
-    animation: float 4s ease-in-out infinite;
-    backdrop-filter: blur(8px);
+  /* Badge repositionné en bas */
+  .rg-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.25);
+    color: #F97316; border-radius: 50px;
+    padding: 5px 14px; font-size: 12px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase;
+    width: fit-content;
+    animation: fadeUp .5s .4s ease both;
   }
-  .rg-float-avatar {
-    width: 40px; height: 40px; border-radius: 12px;
-    background: linear-gradient(135deg, #F97316, #FBBF24);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
+  .rg-badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #F97316; position: relative;
   }
-  .rg-float-name { font-size: 13px; font-weight: 700; color: #fff; }
-  .rg-float-sub  { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
-  .rg-float-badge {
-    margin-left: auto;
-    background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.3);
-    color: #10B981; border-radius: 8px;
-    padding: 4px 10px; font-size: 11px; font-weight: 700;
+  .rg-badge-dot::after {
+    content: '';
+    position: absolute; inset: -3px;
+    border-radius: 50%; border: 1.5px solid #F97316;
+    animation: pulse-ring 1.5s ease infinite;
   }
 
   /* ── RIGHT PANEL ── */
@@ -236,7 +206,6 @@ const css = `
   }
   .rg-input:focus { border-color: #F97316; box-shadow: 0 0 0 3px rgba(249,115,22,.1); }
   .rg-input::placeholder { color: #CCC; }
-  .rg-input-no-icon { padding-left: 14px; }
 
   .rg-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -317,7 +286,13 @@ const css = `
   @media (max-width: 900px) {
     .rg-root { grid-template-columns: 1fr; }
     .rg-left  { display: none; }
-    .rg-right { padding: 32px 24px; }
+    .rg-right { padding: 32px 24px; min-height: 100vh; }
+    .rg-grid-2 { grid-template-columns: 1fr; gap: 0; }
+  }
+
+  @media (max-width: 480px) {
+    .rg-right { padding: 24px 16px; }
+    .rg-form-wrap { max-width: 100%; }
   }
 `;
 
@@ -405,11 +380,6 @@ export default function RegisterForm() {
         </Link>
 
         <div className="rg-hero">
-          <div className="rg-badge">
-            <div className="rg-badge-dot" />
-            40+ pays · 30 providers
-          </div>
-
           <h1 className="rg-headline">
             Acceptez les<br />
             paiements<br />
@@ -428,11 +398,6 @@ export default function RegisterForm() {
             </div>
             <div className="rg-stat-divider" />
             <div className="rg-stat">
-              <div className="rg-stat-val">1<span>%</span></div>
-              <div className="rg-stat-lbl">Commission</div>
-            </div>
-            <div className="rg-stat-divider" />
-            <div className="rg-stat">
               <div className="rg-stat-val">99.9<span>%</span></div>
               <div className="rg-stat-lbl">Uptime</div>
             </div>
@@ -440,9 +405,9 @@ export default function RegisterForm() {
 
           <div className="rg-features">
             {[
-              { icon: Zap, bg: 'rgba(249,115,22,.15)', color: '#F97316', title: 'Paiements instantanés', sub: 'Mobile Money, cartes, PayPal' },
-              { icon: Shield, bg: 'rgba(16,185,129,.15)', color: '#10B981', title: 'Sécurité PCI DSS', sub: 'Chiffrement SSL bout-en-bout' },
-              { icon: TrendingUp, bg: 'rgba(99,102,241,.15)', color: '#6366F1', title: 'Dashboard temps réel', sub: 'Analytics et rapports détaillés' },
+              { icon: Zap,       bg: 'rgba(249,115,22,.15)', color: '#F97316', title: 'Paiements instantanés', sub: 'Mobile Money, cartes, PayPal' },
+              { icon: Shield,    bg: 'rgba(16,185,129,.15)', color: '#10B981', title: 'Sécurité PCI DSS',      sub: 'Chiffrement SSL bout-en-bout' },
+              { icon: TrendingUp,bg: 'rgba(99,102,241,.15)', color: '#6366F1', title: 'Dashboard temps réel',  sub: 'Analytics et rapports détaillés' },
             ].map(({ icon: Icon, bg, color, title, sub }) => (
               <div key={title} className="rg-feature">
                 <div className="rg-feature-icon" style={{ background: bg }}>
@@ -455,16 +420,12 @@ export default function RegisterForm() {
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Floating testimonial card */}
-        <div className="rg-float-card">
-          <div className="rg-float-avatar">🏪</div>
-          <div>
-            <div className="rg-float-name">Marie K. — Abidjan</div>
-            <div className="rg-float-sub">+125 000 XOF ce mois</div>
+          {/* Badge déplacé ici, en bas des features */}
+          <div className="rg-badge">
+            <div className="rg-badge-dot" />
+            40+ pays · 30 providers
           </div>
-          <div className="rg-float-badge">+18% ↑</div>
         </div>
       </div>
 
@@ -481,7 +442,7 @@ export default function RegisterForm() {
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
               <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
             </svg>
             S'inscrire avec Google
           </button>
