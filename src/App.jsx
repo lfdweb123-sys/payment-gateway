@@ -13,12 +13,12 @@ import GatewaySettings from './pages/gateway/GatewaySettings';
 import GatewayApiDocs from './pages/gateway/GatewayApiDocs';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
+import ForgotPassword from './components/auth/ForgotPassword'; // ← nouveau
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Developer from './pages/gateway/Developer';
 import Verification from './pages/gateway/Verification';
 import MerchantPayouts from './pages/gateway/MerchantPayouts';
 import PaymentSuccess from './pages/gateway/PaymentSuccess';
-
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -33,10 +33,9 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminMerchants from './pages/admin/AdminMerchants';
 import AdminVerifications from './pages/admin/AdminVerifications';
 import AdminCommissions from './pages/admin/AdminCommissions';
-import AdminLogs from './pages/admin/AdminLogs';          // ← nouveau
+import AdminLogs from './pages/admin/AdminLogs';
 import AdminRoute from './components/auth/AdminRoute';
 import AdminPayouts from './pages/admin/AdminPayouts';
-
 import FraudDashboard from './pages/admin/FraudDashboard';
 
 
@@ -49,10 +48,10 @@ function PublicRoute({ children }) {
 function AppContent() {
   const { user } = useAuth();
   const location = useLocation();
-  const isAuthPage   = location.pathname === '/login' || location.pathname === '/register';
+  const isAuthPage   = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/forgot-password'; // ← ajout
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isPublicPage = location.pathname === '/' || location.pathname === '/pay' ||
-    location.pathname === '/success' ||   // ← ajouter
+    location.pathname === '/success' ||
     location.pathname.startsWith('/api-documentation') ||
     location.pathname === '/help'    || location.pathname === '/privacy' ||
     location.pathname === '/contact' || location.pathname === '/terms'   ||
@@ -70,8 +69,9 @@ function AppContent() {
             {/* Pages publiques */}
             <Route path="/"    element={<GatewayHome />} />
             <Route path="/pay" element={<GatewayPay />} />
-            <Route path="/login"    element={<PublicRoute><LoginForm /></PublicRoute>} />
-            <Route path="/register" element={<PublicRoute><RegisterForm /></PublicRoute>} />
+            <Route path="/login"           element={<PublicRoute><LoginForm /></PublicRoute>} />
+            <Route path="/register"        element={<PublicRoute><RegisterForm /></PublicRoute>} />
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} /> {/* ← nouveau */}
 
             {/* Pages info publiques */}
             <Route path="/api-documentation" element={<GatewayApiDocs />} />
@@ -82,7 +82,6 @@ function AppContent() {
             <Route path="/cookies" element={<Cookies />} />
             <Route path="/legal"   element={<Legal />} />
             <Route path="/success" element={<PaymentSuccess />} />
-
 
             {/* Pages protégées — Marchand */}
             <Route path="/dashboard"   element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
@@ -95,16 +94,14 @@ function AppContent() {
 
             {/* Pages Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-              <Route index                  element={<AdminDashboard />} />
-              <Route path="merchants"       element={<AdminMerchants />} />
-              <Route path="verifications"   element={<AdminVerifications />} />
-              <Route path="transactions"    element={<GatewayTransactions />} />
-              <Route path="commissions"     element={<AdminCommissions />} />
-              <Route path="payouts"         element={<AdminPayouts />} />
-              <Route path="fraud" element={<FraudDashboard />} />
-              <Route path="logs"            element={<AdminLogs />} />  {/* ← nouveau */}
-              
-
+              <Route index                element={<AdminDashboard />} />
+              <Route path="merchants"     element={<AdminMerchants />} />
+              <Route path="verifications" element={<AdminVerifications />} />
+              <Route path="transactions"  element={<GatewayTransactions />} />
+              <Route path="commissions"   element={<AdminCommissions />} />
+              <Route path="payouts"       element={<AdminPayouts />} />
+              <Route path="fraud"         element={<FraudDashboard />} />
+              <Route path="logs"          element={<AdminLogs />} />
             </Route>
 
             {/* Fallback */}
