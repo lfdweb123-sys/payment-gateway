@@ -394,10 +394,16 @@ export default function GatewayPay() {
           if (data.kkiapayPublicKey) setKkiapayPublicKey(data.kkiapayPublicKey);
           if (data.amount)      setAmount(String(data.amount));
           if (data.description) setDescription(data.description);
-          if (data.country)     handleSelectCountry(data.country);
-
-          // ← stocker l'apiKey retournée par le serveur dans le state
-          // Elle sera utilisée dans x-api-key pour les appels /pay et /verify
+          
+          // ✅ CORRECTION : appeler directement avec data.country ET data.activeProviders
+          if (data.country) {
+            setCountry(data.country);
+            setCountryData(getMethodsForCountryWithProviders(data.country, data.activeProviders || []));
+            setPhoneSuffix('');
+            setCountrySearch('');
+            setStep(2);
+          }
+          
           if (data.apiKey) setApiKey(data.apiKey);
         }
       })
