@@ -20,7 +20,9 @@ import Verification from './pages/gateway/Verification';
 import MerchantPayouts from './pages/gateway/MerchantPayouts';
 import PaymentSuccess from './pages/gateway/PaymentSuccess';
 import PaymentLinks from './pages/gateway/PaymentLinks';
-import Team from './pages/gateway/Team'; // ← Ajout de la page Équipe
+import Team from './pages/gateway/Team'; 
+import AcceptInvite from './pages/gateway/AcceptInvite';
+
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -74,6 +76,7 @@ function AppContent() {
             <Route path="/login"           element={<PublicRoute><LoginForm /></PublicRoute>} />
             <Route path="/register"        element={<PublicRoute><RegisterForm /></PublicRoute>} />
             <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+            <Route path="/accept-invite" element={<AcceptInvite />} />
 
             {/* Pages info publiques */}
             <Route path="/api-documentation" element={<GatewayApiDocs />} />
@@ -95,6 +98,7 @@ function AppContent() {
             <Route path="/settings"    element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             <Route path="/verification"element={<ProtectedRoute><Verification /></ProtectedRoute>} />
             <Route path="/team"        element={<ProtectedRoute><Team /></ProtectedRoute>} /> 
+            
 
             {/* Pages Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
