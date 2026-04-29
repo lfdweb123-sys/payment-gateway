@@ -13,8 +13,7 @@ import {
   query, 
   where, 
   updateDoc,
-  arrayUnion,
-  arrayRemove
+  serverTimestamp
 } from 'firebase/firestore';
 import {
   Users,
@@ -26,18 +25,16 @@ import {
   X,
   CheckCircle,
   AlertCircle,
-  Copy,
-  ExternalLink,
-  Key,
-  Calendar,
-  Activity,
   Crown,
   UserMinus,
   RefreshCw,
   Settings,
   Eye,
-  Edit2
+  Edit2,
+  Activity
 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { sendTeamInvitation } from '../../services/brevo';
 
 const ROLES = [
   { id: 'admin', name: 'Administrateur', description: 'Accès complet, peut gérer l\'équipe et les paramètres', permissions: ['all'] },
@@ -45,31 +42,6 @@ const ROLES = [
   { id: 'viewer', name: 'Consultant', description: 'Consultation uniquement (dashboard, transactions, rapports)', permissions: ['view'] },
   { id: 'support', name: 'Support', description: 'Gère les litiges et le support client', permissions: ['disputes', 'support'] }
 ];
-
-function PermissionBadge({ permission }) {
-  const labels = {
-    all: 'Accès complet',
-    transactions: 'Transactions',
-    payments: 'Paiements',
-    providers: 'Providers',
-    view: 'Consultation',
-    disputes: 'Litiges',
-    support: 'Support'
-  };
-  
-  return (
-    <span style={{
-      fontSize: 9,
-      padding: '2px 8px',
-      borderRadius: 20,
-      background: '#f1f5f9',
-      color: '#475569',
-      fontWeight: 500
-    }}>
-      {labels[permission] || permission}
-    </span>
-  );
-}
 
 function RoleBadge({ roleId }) {
   const config = {
@@ -119,7 +91,6 @@ function InviteModal({ isOpen, onClose, onInvite, loading }) {
     await onInvite(email, role);
     setEmail('');
     setRole('viewer');
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -461,10 +432,25 @@ export default function TeamPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [removeLoading, setRemoveLoading] = useState(false);
+  const [merchantInfo, setMerchantInfo] = useState(null);
 
   useEffect(() => {
-    if (user) loadTeamMembers();
+    if (user) {
+      loadTeamMembers();
+      loadMerchantInfo();
+    }
   }, [user]);
+
+  const loadMerchantInfo = async () => {
+    try {
+      const merchantDoc = await getDoc(doc(db, 'gateway_merchants', user.uid));
+      if (merchantDoc.exists()) {
+        setMerchantInfo(merchantDoc.data());
+      }
+    } catch (error) {
+      console.error('Error loading merchant info:', error);
+    }
+  };
 
   const loadTeamMembers = async () => {
     setLoading(true);
@@ -499,6 +485,7 @@ export default function TeamPage() {
       setTeamMembers(members);
     } catch (error) {
       console.error('Error loading team:', error);
+      toast.error('Erreur lors du chargement de l\'équipe');
     } finally {
       setLoading(false);
     }
@@ -507,19 +494,36 @@ export default function TeamPage() {
   const handleInvite = async (email, role) => {
     setInviteLoading(true);
     try {
-      // Vérifier si l'utilisateur existe dans la plateforme
+      // Vérifier si l'utilisateur existe déjà
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
       const snapshot = await getDocs(q);
       
       let userId = null;
+      let userExists = false;
+      
       if (!snapshot.empty) {
         userId = snapshot.docs[0].id;
+        userExists = true;
       } else {
-        // Créer un compte utilisateur invité
+        // Utilisateur non inscrit, on crée un ID temporaire
         userId = `pending_${Date.now()}`;
       }
 
+      // Vérifier si une invitation existe déjà
+      const existingQuery = query(
+        collection(db, 'gateway_merchant_teams'),
+        where('merchantId', '==', user.uid),
+        where('email', '==', email)
+      );
+      const existingSnapshot = await getDocs(existingQuery);
+      
+      if (!existingSnapshot.empty) {
+        toast.error('Une invitation a déjà été envoyée à cet email');
+        return;
+      }
+
+      // Créer l'invitation
       const teamRef = doc(collection(db, 'gateway_merchant_teams'));
       await setDoc(teamRef, {
         merchantId: user.uid,
@@ -528,16 +532,39 @@ export default function TeamPage() {
         role: role,
         invitedBy: user.uid,
         invitedAt: new Date(),
-        status: userId.startsWith('pending_') ? 'pending' : 'active'
+        status: userExists ? 'active' : 'pending',
+        createdAt: serverTimestamp()
       });
 
-      // Envoyer l'invitation par email (à implémenter avec votre service d'email)
-      console.log(`Invitation envoyée à ${email} avec le rôle ${role}`);
+      // Envoyer l'email via Brevo
+      const merchantName = merchantInfo?.businessName || 
+                          merchantInfo?.companyName || 
+                          user.displayName?.split(' ')[0] || 
+                          'Marchand';
+      
+      const inviteLink = `${window.location.origin}/accept-invite?email=${encodeURIComponent(email)}&team=${teamRef.id}&role=${role}`;
+      
+      const emailResult = await sendTeamInvitation(
+        email,
+        email.split('@')[0],
+        user.displayName?.split(' ')[0] || user.email?.split('@')[0],
+        merchantName,
+        role,
+        inviteLink
+      );
+      
+      if (!emailResult.success) {
+        console.warn('Email non envoyé:', emailResult.error);
+        toast.error('Invitation créée mais email non envoyé. Vérifiez votre clé API Brevo.');
+      } else {
+        toast.success('Invitation envoyée avec succès !');
+      }
       
       await loadTeamMembers();
+      setInviteModalOpen(false);
     } catch (error) {
       console.error('Error inviting member:', error);
-      alert('Erreur lors de l\'invitation');
+      toast.error('Erreur lors de l\'invitation: ' + error.message);
     } finally {
       setInviteLoading(false);
     }
@@ -547,11 +574,15 @@ export default function TeamPage() {
     setUpdateLoading(true);
     try {
       const memberRef = doc(db, 'gateway_merchant_teams', memberId);
-      await updateDoc(memberRef, { role: newRole });
+      await updateDoc(memberRef, { 
+        role: newRole,
+        updatedAt: serverTimestamp()
+      });
       await loadTeamMembers();
+      toast.success('Rôle mis à jour avec succès');
     } catch (error) {
       console.error('Error updating role:', error);
-      alert('Erreur lors de la mise à jour du rôle');
+      toast.error('Erreur lors de la mise à jour du rôle');
     } finally {
       setUpdateLoading(false);
     }
@@ -566,9 +597,10 @@ export default function TeamPage() {
       await loadTeamMembers();
       setConfirmModalOpen(false);
       setSelectedMember(null);
+      toast.success('Membre retiré de l\'équipe');
     } catch (error) {
       console.error('Error removing member:', error);
-      alert('Erreur lors du retrait du membre');
+      toast.error('Erreur lors du retrait du membre');
     } finally {
       setRemoveLoading(false);
     }
@@ -803,7 +835,7 @@ export default function TeamPage() {
                   padding: '14px 24px',
                   gap: 12,
                   alignItems: 'center',
-                  borderBottom: idx === activeMembers.length - 1 ? 'none' : '1px solid #f8fafc'
+                  borderBottom: idx === activeMembers.length - 1 && pendingMembers.length === 0 ? 'none' : '1px solid #f8fafc'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{
@@ -871,7 +903,7 @@ export default function TeamPage() {
                 {/* Version mobile membre */}
                 <div className="team-card" style={{
                   padding: '14px 16px',
-                  borderBottom: idx === activeMembers.length - 1 ? 'none' : '1px solid #f8fafc'
+                  borderBottom: idx === activeMembers.length - 1 && pendingMembers.length === 0 ? 'none' : '1px solid #f8fafc'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                     <div style={{
