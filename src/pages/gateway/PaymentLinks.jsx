@@ -161,21 +161,12 @@ export default function PaymentLinks() {
   const primaryColor = '#FF6B00';
 
   /* ─── Charger la clé API du marchand connecté ─── */
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, 'gateway_merchants', user.uid));
-        if (snap.exists()) {
-          setApiKey(snap.data().apiKey || '');
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoadingConfig(false);
-      }
-    })();
-  }, [user]);
+useEffect(() => {
+  if (!user) return;
+  // user.merchant est déjà chargé par AuthContext
+  setApiKey(user.merchant?.apiKey || '');
+  setLoadingConfig(false);
+}, [user]);
 
   const selectedCountryData = COUNTRIES.find(c => c.code === selectedCountry);
   const availableMethods    = selectedCountry ? (METHODS_BY_COUNTRY[selectedCountry] || []) : [];
