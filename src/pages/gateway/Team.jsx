@@ -434,27 +434,34 @@ export default function TeamPage() {
   const [removeLoading, setRemoveLoading] = useState(false);
   const [merchantInfo, setMerchantInfo] = useState(null);
 
+  // Vérifier que le marchand existe
+  const checkMerchantExists = async () => {
+    if (!user) return false;
+    const merchantDoc = await getDoc(doc(db, 'gateway_merchants', user.uid));
+    if (!merchantDoc.exists()) {
+      toast.error('Compte marchand non trouvé. Veuillez contacter le support.');
+      return false;
+    }
+    setMerchantInfo(merchantDoc.data());
+    return true;
+  };
+
   useEffect(() => {
     if (user) {
       loadTeamMembers();
-      loadMerchantInfo();
     }
   }, [user]);
-
-  const loadMerchantInfo = async () => {
-    try {
-      const merchantDoc = await getDoc(doc(db, 'gateway_merchants', user.uid));
-      if (merchantDoc.exists()) {
-        setMerchantInfo(merchantDoc.data());
-      }
-    } catch (error) {
-      console.error('Error loading merchant info:', error);
-    }
-  };
 
   const loadTeamMembers = async () => {
     setLoading(true);
     try {
+      // Vérifier que le merchant existe
+      const merchantExists = await checkMerchantExists();
+      if (!merchantExists) {
+        setLoading(false);
+        return;
+      }
+      
       const teamRef = collection(db, 'gateway_merchant_teams');
       const q = query(teamRef, where('merchantId', '==', user.uid));
       const snapshot = await getDocs(q);
@@ -465,11 +472,16 @@ export default function TeamPage() {
         // Récupérer les infos de l'utilisateur invité
         let userInfo = { email: data.email, displayName: data.email.split('@')[0] };
         try {
-          const userDoc = await getDoc(doc(db, 'users', data.userId));
-          if (userDoc.exists()) {
-            userInfo = { ...userInfo, ...userDoc.data() };
+          // Essayer de récupérer l'utilisateur si userId n'est pas un ID temporaire
+          if (data.userId && !data.userId.startsWith('pending_')) {
+            const userDoc = await getDoc(doc(db, 'users', data.userId));
+            if (userDoc.exists()) {
+              userInfo = { ...userInfo, ...userDoc.data() };
+            }
           }
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+          console.error('Error loading user info:', e);
+        }
         
         members.push({
           id: docSnap.id,
@@ -478,14 +490,14 @@ export default function TeamPage() {
           role: data.role,
           invitedBy: data.invitedBy,
           invitedAt: data.invitedAt?.toDate(),
-          status: data.status,
+          status: data.status || (data.userId?.startsWith('pending_') ? 'pending' : 'active'),
           ...userInfo
         });
       }
       setTeamMembers(members);
     } catch (error) {
       console.error('Error loading team:', error);
-      toast.error('Erreur lors du chargement de l\'équipe');
+      toast.error('Erreur lors du chargement de l\'équipe: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -494,9 +506,28 @@ export default function TeamPage() {
   const handleInvite = async (email, role) => {
     setInviteLoading(true);
     try {
-      // Vérifier si l'utilisateur existe déjà
+      // Vérifier que le merchant existe
+      const merchantExists = await checkMerchantExists();
+      if (!merchantExists) {
+        return;
+      }
+
+      // Vérifier si une invitation existe déjà
+      const existingQuery = query(
+        collection(db, 'gateway_merchant_teams'),
+        where('merchantId', '==', user.uid),
+        where('email', '==', email.toLowerCase())
+      );
+      const existingSnapshot = await getDocs(existingQuery);
+      
+      if (!existingSnapshot.empty) {
+        toast.error('Une invitation a déjà été envoyée à cet email');
+        return;
+      }
+
+      // Vérifier si l'utilisateur existe déjà dans users
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
+      const q = query(usersRef, where('email', '==', email.toLowerCase()));
       const snapshot = await getDocs(q);
       
       let userId = null;
@@ -510,25 +541,12 @@ export default function TeamPage() {
         userId = `pending_${Date.now()}`;
       }
 
-      // Vérifier si une invitation existe déjà
-      const existingQuery = query(
-        collection(db, 'gateway_merchant_teams'),
-        where('merchantId', '==', user.uid),
-        where('email', '==', email)
-      );
-      const existingSnapshot = await getDocs(existingQuery);
-      
-      if (!existingSnapshot.empty) {
-        toast.error('Une invitation a déjà été envoyée à cet email');
-        return;
-      }
-
       // Créer l'invitation
       const teamRef = doc(collection(db, 'gateway_merchant_teams'));
       await setDoc(teamRef, {
         merchantId: user.uid,
         userId: userId,
-        email: email,
+        email: email.toLowerCase(),
         role: role,
         invitedBy: user.uid,
         invitedAt: new Date(),
@@ -582,7 +600,7 @@ export default function TeamPage() {
       toast.success('Rôle mis à jour avec succès');
     } catch (error) {
       console.error('Error updating role:', error);
-      toast.error('Erreur lors de la mise à jour du rôle');
+      toast.error('Erreur lors de la mise à jour du rôle: ' + error.message);
     } finally {
       setUpdateLoading(false);
     }
@@ -600,20 +618,28 @@ export default function TeamPage() {
       toast.success('Membre retiré de l\'équipe');
     } catch (error) {
       console.error('Error removing member:', error);
-      toast.error('Erreur lors du retrait du membre');
+      toast.error('Erreur lors du retrait du membre: ' + error.message);
     } finally {
       setRemoveLoading(false);
     }
   };
 
   const owner = {
-    name: user?.displayName?.split(' ')[0] || user?.email?.split('@')[0],
+    name: merchantInfo?.businessName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0],
     email: user?.email,
     role: 'admin'
   };
 
   const activeMembers = teamMembers.filter(m => m.status !== 'pending');
   const pendingMembers = teamMembers.filter(m => m.status === 'pending');
+
+  if (!user) {
+    return (
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px 80px', textAlign: 'center' }}>
+        <p>Veuillez vous connecter pour accéder à cette page.</p>
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px 80px', fontFamily: "'DM Sans', sans-serif" }}>
