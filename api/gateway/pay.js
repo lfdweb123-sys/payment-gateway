@@ -321,31 +321,43 @@ const PROVIDER_CALLS = {
     return { success: true, reference: `kkia-${Date.now()}`, url: `https://widget.kkiapay.me/?${params.toString()}`, status: 'pending', provider: 'kkiapay' };
   },
 
-    geniuspay: async (config, { amount, phone, email, description, method, country, customerName }) => {
+  geniuspay: async (config, { amount, phone, email, description, method, country, customerName }) => {
     /* GeniusPay — https://pay.genius.ci/docs/api
       Clés : GENIUSPAY_API_KEY (pk_...) + GENIUSPAY_API_SECRET (sk_...)
       Devise native : XOF — pas de conversion nécessaire
       Modes :
         - Sans payment_method → checkout page GeniusPay (client choisit)
         - Avec payment_method → redirection directe vers le gateway
+        - Avec payment_method = 'pawapay' + mmo_provider → opérateur forcé via PawaPay
     */
 
-    // Mapping méthode interne → code GeniusPay
+    // Mapping méthode interne → code GeniusPay (méthodes directes uniquement)
     const METHOD_MAP = {
-      wave_money:    'wave',
-      orange_money:  'orange_money',
-      mtn_money:     'mtn_money',
-      moov_money:    'moov_money',
-      airtel_money:  'airtel_money',
-      card:          'card',
-      paypal:        'paystack',   // paystack gère les cartes aussi
-      // pawapay = auto-routing depuis le numéro
-      mtn_money_bj:  'pawapay',
-      moov_money_bj: 'pawapay',
+      wave_money:   'wave',
+      orange_money: 'orange_money',
+      mtn_money:    'mtn_money',
+      moov_money:   'moov_money',   // valide seulement pour CI, TG, BF — pas BJ
+      airtel_money: 'airtel_money',
+      card:         'card',
     };
 
-    const geniusMethod = METHOD_MAP[method] || null;
-    // Si la méthode n'est pas reconnue → mode checkout (le client choisit)
+    // Pays qui nécessitent PawaPay avec mmo_provider explicite.
+    // Pour ces pays+méthodes, on passe payment_method='pawapay' + mmo_provider=<code>.
+    const PAWAPAY_OVERRIDE = {
+      bj: { mtn_money: 'MTN_MOMO_BEN', moov_money: 'MOOV_BEN' },
+      cm: { mtn_money: 'MTN_MOMO_CMR', orange_money: 'ORANGE_CMR' },
+      cd: { airtel_money: 'AIRTEL_COD', orange_money: 'ORANGE_COD' },
+      cg: { airtel_money: 'AIRTEL_COG', mtn_money: 'MTN_MOMO_COG' },
+      ke: { mpesa: 'MPESA_KEN' },
+      rw: { airtel_money: 'AIRTEL_RWA', mtn_money: 'MTN_MOMO_RWA' },
+      ug: { airtel_money: 'AIRTEL_UGA', mtn_money: 'MTN_MOMO_UGA' },
+      zm: { mtn_money: 'MTN_MOMO_ZMB' },
+      sn: { free_money: 'FREE_SEN', orange_money: 'ORANGE_SEN' },
+    };
+
+    const pawapayProviders = PAWAPAY_OVERRIDE[country?.toLowerCase()];
+    const mmoProvider      = pawapayProviders?.[method];
+    const geniusMethod     = METHOD_MAP[method] || null;
 
     const body = {
       amount:      Math.round(amount),
@@ -362,11 +374,15 @@ const PROVIDER_CALLS = {
       metadata: { gateway_ref: `GW-${Date.now()}` },
     };
 
-    // Ajouter payment_method seulement si connu — sinon checkout GeniusPay
-    if (geniusMethod) body.payment_method = geniusMethod;
-
-    // Pour PawaPay : auto-routing depuis le numéro, pas besoin de mmo_provider
-    // Si besoin de forcer un opérateur, ajouter : body.mmo_provider = 'ORANGE_CIV'
+    if (mmoProvider) {
+      // PawaPay avec opérateur forcé (ex: BJ → MTN_MOMO_BEN ou MOOV_BEN)
+      body.payment_method = 'pawapay';
+      body.mmo_provider   = mmoProvider;
+    } else if (geniusMethod) {
+      // Méthode directe reconnue (wave, card, mtn_money CI/TG/BF, etc.)
+      body.payment_method = geniusMethod;
+    }
+    // Sinon → checkout GeniusPay (client choisit lui-même)
 
     const { ok, data } = await safeFetch('https://pay.genius.ci/api/v1/merchant/payments', {
       method: 'POST',
@@ -382,8 +398,7 @@ const PROVIDER_CALLS = {
       return { success: false, error: data?.error?.message || 'Erreur GeniusPay' };
     }
 
-    // L'API retourne payment_url (direct) ou checkout_url (mode checkout)
-    const url = data.data?.payment_url || data.data?.checkout_url || null;
+    const url       = data.data?.payment_url || data.data?.checkout_url || null;
     const reference = data.data?.reference || `GW-${Date.now()}`;
 
     return {
@@ -821,8 +836,6 @@ export default async function handler(req, res) {
     let providerAmount   = netAmount;
 
     if (PROVIDERS_NEEDING_CONVERSION.has(providerId)) {
-      // Utiliser la devise native du provider sauf si le merchant l'a
-      // explicitement indiqué et que le provider l'accepte
       const nativeCurrency = PROVIDER_NATIVE_CURRENCY[providerId] || 'EUR';
       if (merchantCurrency !== nativeCurrency) {
         providerCurrency = nativeCurrency;
@@ -837,9 +850,9 @@ export default async function handler(req, res) {
     }
 
     const result = await callFn(providers[providerId], {
-      amount:          providerAmount,   // ← montant converti si besoin
+      amount:          providerAmount,
       phone, email, country, method, description,
-      currency:        providerCurrency, // ← devise du provider
+      currency:        providerCurrency,
       customerName,
       customerSurname,
     });
@@ -853,11 +866,11 @@ export default async function handler(req, res) {
 
     const txRef = await db.collection('gateway_transactions').add({
       merchantId:       merchant.id,
-      amount:           amountNum,          // toujours en devise marchand
+      amount:           amountNum,
       commission,
       netAmount,
-      providerAmount,                        // montant réellement envoyé au provider
-      providerCurrency,                      // devise utilisée côté provider
+      providerAmount,
+      providerCurrency,
       merchantCurrency,
       country,
       method,
