@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Layout, CreditCard, Settings, Key, LogOut, HelpCircle, FileText, Code, Shield, Wallet, LayoutGrid, X, Link2 } from 'lucide-react';
+import { Layout, CreditCard, Settings, Key, LogOut, HelpCircle, FileText, Code, Shield, Wallet, LayoutGrid, X, Link2, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
@@ -33,6 +33,7 @@ export default function MerchantSidebar() {
     { title: 'Providers',        icon: Key,         path: '/providers',       requireVerification: true },
     { title: 'Transactions',     icon: CreditCard,  path: '/transactions',    requireVerification: true },
     { title: 'Retraits',         icon: Wallet,      path: '/payouts',         requireVerification: true },
+    { title: 'Équipe',           icon: Users,       path: '/team',            requireVerification: true },
     { title: 'Développeur',      icon: Code,        path: '/developer',       requireVerification: true },
     { title: 'Paramètres',       icon: Settings,    path: '/settings',        requireVerification: false },
   ];

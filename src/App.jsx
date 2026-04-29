@@ -13,13 +13,14 @@ import GatewaySettings from './pages/gateway/GatewaySettings';
 import GatewayApiDocs from './pages/gateway/GatewayApiDocs';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
-import ForgotPassword from './components/auth/ForgotPassword'; // ← nouveau
+import ForgotPassword from './components/auth/ForgotPassword';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Developer from './pages/gateway/Developer';
 import Verification from './pages/gateway/Verification';
 import MerchantPayouts from './pages/gateway/MerchantPayouts';
 import PaymentSuccess from './pages/gateway/PaymentSuccess';
 import PaymentLinks from './pages/gateway/PaymentLinks';
+import Team from './pages/gateway/Team'; // ← Ajout de la page Équipe
 
 import Help from './pages/Help';
 import Privacy from './pages/Privacy';
@@ -49,7 +50,7 @@ function PublicRoute({ children }) {
 function AppContent() {
   const { user } = useAuth();
   const location = useLocation();
-  const isAuthPage   = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/forgot-password'; // ← ajout
+  const isAuthPage   = location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/forgot-password';
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isPublicPage = location.pathname === '/' || location.pathname === '/pay' ||
     location.pathname === '/success' ||
@@ -72,7 +73,7 @@ function AppContent() {
             <Route path="/pay" element={<GatewayPay />} />
             <Route path="/login"           element={<PublicRoute><LoginForm /></PublicRoute>} />
             <Route path="/register"        element={<PublicRoute><RegisterForm /></PublicRoute>} />
-            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} /> {/* ← nouveau */}
+            <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
             {/* Pages info publiques */}
             <Route path="/api-documentation" element={<GatewayApiDocs />} />
@@ -93,7 +94,7 @@ function AppContent() {
             <Route path="/developer"   element={<ProtectedRoute><Developer /></ProtectedRoute>} />
             <Route path="/settings"    element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             <Route path="/verification"element={<ProtectedRoute><Verification /></ProtectedRoute>} />
-            
+            <Route path="/team"        element={<ProtectedRoute><Team /></ProtectedRoute>} /> 
 
             {/* Pages Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
