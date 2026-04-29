@@ -1,6 +1,5 @@
 // src/pages/gateway/Team.jsx
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/firebase';
 import { 
@@ -19,12 +18,9 @@ import {
   Users,
   UserPlus,
   Mail,
-  Shield,
   Clock,
   Trash2,
   X,
-  CheckCircle,
-  AlertCircle,
   Crown,
   UserMinus,
   RefreshCw,
@@ -36,24 +32,46 @@ import {
 import toast from 'react-hot-toast';
 import { sendTeamInvitation } from '../../services/brevo';
 
+// ─── Définition des rôles disponibles ────────────────────────────────────────
 const ROLES = [
-  { id: 'admin', name: 'Administrateur', description: 'Accès complet, peut gérer l\'équipe et les paramètres', permissions: ['all'] },
-  { id: 'manager', name: 'Gestionnaire', description: 'Gère les transactions, les paiements et les providers', permissions: ['transactions', 'payments', 'providers'] },
-  { id: 'viewer', name: 'Consultant', description: 'Consultation uniquement (dashboard, transactions, rapports)', permissions: ['view'] },
-  { id: 'support', name: 'Support', description: 'Gère les litiges et le support client', permissions: ['disputes', 'support'] }
+  {
+    id: 'admin',
+    name: 'Administrateur',
+    description: "Accès complet, peut gérer l'équipe et les paramètres",
+    permissions: ['all']
+  },
+  {
+    id: 'manager',
+    name: 'Gestionnaire',
+    description: 'Gère les transactions, les paiements et les providers',
+    permissions: ['transactions', 'payments', 'providers']
+  },
+  {
+    id: 'viewer',
+    name: 'Consultant',
+    description: 'Consultation uniquement (dashboard, transactions, rapports)',
+    permissions: ['view']
+  },
+  {
+    id: 'support',
+    name: 'Support',
+    description: 'Gère les litiges et le support client',
+    permissions: ['disputes', 'support']
+  }
 ];
 
+// ─── Badge de rôle coloré ─────────────────────────────────────────────────────
 function RoleBadge({ roleId }) {
   const config = {
-    admin: { bg: '#fef3c7', color: '#d97706', icon: Crown },
+    admin:   { bg: '#fef3c7', color: '#d97706', icon: Crown },
     manager: { bg: '#eff6ff', color: '#2563eb', icon: Settings },
-    viewer: { bg: '#f0fdf4', color: '#16a34a', icon: Eye },
+    viewer:  { bg: '#f0fdf4', color: '#16a34a', icon: Eye },
     support: { bg: '#fdf4ff', color: '#a855f7', icon: Activity }
   };
-  
+
   const cfg = config[roleId] || config.viewer;
   const Icon = cfg.icon;
-  
+
   return (
     <span style={{
       display: 'inline-flex',
@@ -72,6 +90,7 @@ function RoleBadge({ roleId }) {
   );
 }
 
+// ─── Modal d'invitation d'un nouveau membre ───────────────────────────────────
 function InviteModal({ isOpen, onClose, onInvite, loading }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('viewer');
@@ -96,58 +115,53 @@ function InviteModal({ isOpen, onClose, onInvite, loading }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(4px)'
-    }} onClick={onClose}>
-      <div style={{
-        background: '#fff',
-        borderRadius: 24,
-        width: '90%',
-        maxWidth: 450,
-        padding: 24,
-        animation: 'fadeUp 0.2s ease'
-      }} onClick={e => e.stopPropagation()}>
+    <div
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000, backdropFilter: 'blur(4px)'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: '#fff', borderRadius: 24,
+          width: '90%', maxWidth: 450, padding: 24,
+          animation: 'fadeUp 0.2s ease'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* En-tête */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
+              width: 40, height: 40, borderRadius: 12,
               background: '#f0fdf4',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
             }}>
               <UserPlus size={18} color="#16a34a" />
             </div>
             <div>
-              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#0f172a' }}>Inviter un membre</h3>
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>Ajoutez un collaborateur à votre équipe</p>
+              <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#0f172a' }}>
+                Inviter un membre
+              </h3>
+              <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>
+                Ajoutez un collaborateur à votre équipe
+              </p>
             </div>
           </div>
-          <button onClick={onClose} style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 8,
-            borderRadius: 8,
-            color: '#94a3b8'
-          }}>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, borderRadius: 8, color: '#94a3b8' }}
+          >
             <X size={18} />
           </button>
         </div>
 
+        {/* Formulaire */}
         <form onSubmit={handleSubmit}>
+          {/* Champ email */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', marginBottom: 6, display: 'block' }}>
               Email
@@ -160,36 +174,35 @@ function InviteModal({ isOpen, onClose, onInvite, loading }) {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="collaborateur@exemple.com"
                 style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 36px',
+                  width: '100%', padding: '12px 12px 12px 36px',
                   border: error ? '1px solid #ef4444' : '1px solid #e2e8f0',
-                  borderRadius: 12,
-                  fontSize: 13,
-                  outline: 'none',
-                  transition: 'border-color 0.15s'
+                  borderRadius: 12, fontSize: 13, outline: 'none', boxSizing: 'border-box'
                 }}
                 onFocus={e => e.target.style.borderColor = '#f97316'}
+                onBlur={e => e.target.style.borderColor = error ? '#ef4444' : '#e2e8f0'}
               />
             </div>
             {error && <p style={{ fontSize: 11, color: '#ef4444', margin: '4px 0 0' }}>{error}</p>}
           </div>
 
+          {/* Sélection du rôle */}
           <div style={{ marginBottom: 24 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', marginBottom: 6, display: 'block' }}>
               Rôle
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {ROLES.map(r => (
-                <label key={r.id} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '10px 12px',
-                  border: role === r.id ? '2px solid #f97316' : '1px solid #e2e8f0',
-                  borderRadius: 12,
-                  cursor: 'pointer',
-                  background: role === r.id ? '#fff7ed' : '#fff',
-                  transition: 'all 0.15s'
-                }}>
+                <label
+                  key={r.id}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '10px 12px',
+                    border: role === r.id ? '2px solid #f97316' : '1px solid #e2e8f0',
+                    borderRadius: 12, cursor: 'pointer',
+                    background: role === r.id ? '#fff7ed' : '#fff',
+                    transition: 'all 0.15s'
+                  }}
+                >
                   <input
                     type="radio"
                     name="role"
@@ -207,28 +220,21 @@ function InviteModal({ isOpen, onClose, onInvite, loading }) {
             </div>
           </div>
 
+          {/* Bouton d'envoi */}
           <button
             type="submit"
             disabled={loading}
             style={{
-              width: '100%',
-              padding: '12px',
-              background: '#f97316',
-              border: 'none',
-              borderRadius: 12,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
+              width: '100%', padding: '12px',
+              background: '#f97316', border: 'none', borderRadius: 12,
+              color: '#fff', fontSize: 14, fontWeight: 600,
               cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
             }}
           >
             {loading ? <RefreshCw size={16} className="spin" /> : <UserPlus size={16} />}
-            {loading ? 'Invitation en cours...' : 'Envoyer l\'invitation'}
+            {loading ? 'Invitation en cours...' : "Envoyer l'invitation"}
           </button>
         </form>
       </div>
@@ -236,6 +242,7 @@ function InviteModal({ isOpen, onClose, onInvite, loading }) {
   );
 }
 
+// ─── Modal de modification du rôle d'un membre ───────────────────────────────
 function EditRoleModal({ isOpen, onClose, member, onUpdateRole, loading }) {
   const [role, setRole] = useState(member?.role || 'viewer');
 
@@ -252,27 +259,24 @@ function EditRoleModal({ isOpen, onClose, member, onUpdateRole, loading }) {
   };
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(4px)'
-    }} onClick={onClose}>
-      <div style={{
-        background: '#fff',
-        borderRadius: 24,
-        width: '90%',
-        maxWidth: 400,
-        padding: 24,
-        animation: 'fadeUp 0.2s ease'
-      }} onClick={e => e.stopPropagation()}>
+    <div
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000, backdropFilter: 'blur(4px)'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: '#fff', borderRadius: 24,
+          width: '90%', maxWidth: 400, padding: 24,
+          animation: 'fadeUp 0.2s ease'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* En-tête */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
             <h3 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#0f172a' }}>Modifier le rôle</h3>
@@ -286,16 +290,17 @@ function EditRoleModal({ isOpen, onClose, member, onUpdateRole, loading }) {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 24 }}>
             {ROLES.map(r => (
-              <label key={r.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px',
-                border: role === r.id ? '2px solid #f97316' : '1px solid #e2e8f0',
-                borderRadius: 12,
-                cursor: 'pointer',
-                background: role === r.id ? '#fff7ed' : '#fff',
-                marginBottom: 8
-              }}>
+              <label
+                key={r.id}
+                style={{
+                  display: 'flex', alignItems: 'center',
+                  padding: '12px',
+                  border: role === r.id ? '2px solid #f97316' : '1px solid #e2e8f0',
+                  borderRadius: 12, cursor: 'pointer',
+                  background: role === r.id ? '#fff7ed' : '#fff',
+                  marginBottom: 8
+                }}
+              >
                 <input
                   type="radio"
                   name="editRole"
@@ -316,16 +321,12 @@ function EditRoleModal({ isOpen, onClose, member, onUpdateRole, loading }) {
             type="submit"
             disabled={loading || role === member.role}
             style={{
-              width: '100%',
-              padding: '12px',
-              background: '#f97316',
-              border: 'none',
-              borderRadius: 12,
-              color: '#fff',
-              fontSize: 14,
-              fontWeight: 600,
+              width: '100%', padding: '12px',
+              background: '#f97316', border: 'none', borderRadius: 12,
+              color: '#fff', fontSize: 14, fontWeight: 600,
               cursor: (loading || role === member.role) ? 'not-allowed' : 'pointer',
-              opacity: (loading || role === member.role) ? 0.6 : 1
+              opacity: (loading || role === member.role) ? 0.6 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
             }}
           >
             {loading ? <RefreshCw size={16} className="spin" /> : 'Mettre à jour'}
@@ -336,40 +337,32 @@ function EditRoleModal({ isOpen, onClose, member, onUpdateRole, loading }) {
   );
 }
 
+// ─── Modal de confirmation de suppression ─────────────────────────────────────
 function ConfirmModal({ isOpen, onClose, onConfirm, memberName, loading }) {
   if (!isOpen) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(4px)'
-    }} onClick={onClose}>
-      <div style={{
-        background: '#fff',
-        borderRadius: 24,
-        width: '90%',
-        maxWidth: 380,
-        padding: 24,
-        textAlign: 'center',
-        animation: 'fadeUp 0.2s ease'
-      }} onClick={e => e.stopPropagation()}>
+    <div
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1000, backdropFilter: 'blur(4px)'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: '#fff', borderRadius: 24,
+          width: '90%', maxWidth: 380, padding: 24,
+          textAlign: 'center', animation: 'fadeUp 0.2s ease'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
         <div style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
+          width: 48, height: 48, borderRadius: 24,
           background: '#fef2f2',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           margin: '0 auto 16px'
         }}>
           <UserMinus size={22} color="#dc2626" />
@@ -384,15 +377,10 @@ function ConfirmModal({ isOpen, onClose, onConfirm, memberName, loading }) {
           <button
             onClick={onClose}
             style={{
-              flex: 1,
-              padding: '10px',
-              background: '#fff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              color: '#64748b'
+              flex: 1, padding: '10px',
+              background: '#fff', border: '1px solid #e2e8f0',
+              borderRadius: 10, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', color: '#64748b'
             }}
           >
             Annuler
@@ -401,16 +389,12 @@ function ConfirmModal({ isOpen, onClose, onConfirm, memberName, loading }) {
             onClick={onConfirm}
             disabled={loading}
             style={{
-              flex: 1,
-              padding: '10px',
-              background: '#dc2626',
-              border: 'none',
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
+              flex: 1, padding: '10px',
+              background: '#dc2626', border: 'none',
+              borderRadius: 10, fontSize: 13, fontWeight: 600,
               cursor: loading ? 'not-allowed' : 'pointer',
-              color: '#fff',
-              opacity: loading ? 0.6 : 1
+              color: '#fff', opacity: loading ? 0.6 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
             }}
           >
             {loading ? <RefreshCw size={14} className="spin" /> : 'Retirer'}
@@ -421,20 +405,22 @@ function ConfirmModal({ isOpen, onClose, onConfirm, memberName, loading }) {
   );
 }
 
+// ─── Page principale Équipe ───────────────────────────────────────────────────
 export default function TeamPage() {
   const { user } = useAuth();
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [updateLoading, setUpdateLoading] = useState(false);
-  const [removeLoading, setRemoveLoading] = useState(false);
-  const [merchantInfo, setMerchantInfo] = useState(null);
 
-  // Vérifier que le marchand existe
+  const [teamMembers,      setTeamMembers]      = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [inviteModalOpen,  setInviteModalOpen]  = useState(false);
+  const [editModalOpen,    setEditModalOpen]    = useState(false);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [selectedMember,   setSelectedMember]   = useState(null);
+  const [inviteLoading,    setInviteLoading]    = useState(false);
+  const [updateLoading,    setUpdateLoading]    = useState(false);
+  const [removeLoading,    setRemoveLoading]    = useState(false);
+  const [merchantInfo,     setMerchantInfo]     = useState(null);
+
+  // ── Vérifie que le document marchand existe en base ───────────────────────
   const checkMerchantExists = async () => {
     if (!user) return false;
     const merchantDoc = await getDoc(doc(db, 'gateway_merchants', user.uid));
@@ -447,121 +433,94 @@ export default function TeamPage() {
   };
 
   useEffect(() => {
-    if (user) {
-      loadTeamMembers();
-    }
+    if (user) loadTeamMembers();
   }, [user]);
 
+  // ── Charge les membres de l'équipe depuis Firestore ───────────────────────
   const loadTeamMembers = async () => {
     setLoading(true);
     try {
-      // Vérifier que le merchant existe
       const merchantExists = await checkMerchantExists();
-      if (!merchantExists) {
-        setLoading(false);
-        return;
-      }
-      
+      if (!merchantExists) return;
+
       const teamRef = collection(db, 'gateway_merchant_teams');
       const q = query(teamRef, where('merchantId', '==', user.uid));
       const snapshot = await getDocs(q);
-      
-      const members = [];
-      for (const docSnap of snapshot.docs) {
+
+      const members = snapshot.docs.map(docSnap => {
         const data = docSnap.data();
-        // Récupérer les infos de l'utilisateur invité
-        let userInfo = { email: data.email, displayName: data.email.split('@')[0] };
-        try {
-          // Essayer de récupérer l'utilisateur si userId n'est pas un ID temporaire
-          if (data.userId && !data.userId.startsWith('pending_')) {
-            const userDoc = await getDoc(doc(db, 'users', data.userId));
-            if (userDoc.exists()) {
-              userInfo = { ...userInfo, ...userDoc.data() };
-            }
-          }
-        } catch (e) { 
-          console.error('Error loading user info:', e);
-        }
-        
-        members.push({
-          id: docSnap.id,
-          userId: data.userId,
-          email: data.email,
-          role: data.role,
-          invitedBy: data.invitedBy,
-          invitedAt: data.invitedAt?.toDate(),
-          status: data.status || (data.userId?.startsWith('pending_') ? 'pending' : 'active'),
-          ...userInfo
-        });
-      }
+        const isPending = !data.userId || data.userId.startsWith('pending_');
+        return {
+          id:          docSnap.id,
+          userId:      data.userId,
+          email:       data.email,
+          role:        data.role,
+          invitedBy:   data.invitedBy,
+          invitedAt:   data.invitedAt?.toDate() || null,
+          // Statut dérivé du userId : pending_ = invitation non acceptée
+          status:      data.status || (isPending ? 'pending' : 'active'),
+          displayName: data.email.split('@')[0]
+        };
+      });
+
       setTeamMembers(members);
     } catch (error) {
-      console.error('Error loading team:', error);
-      toast.error('Erreur lors du chargement de l\'équipe: ' + error.message);
+      console.error('Erreur chargement équipe :', error);
+      toast.error('Erreur lors du chargement de l\'équipe : ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Invite un nouveau membre ──────────────────────────────────────────────
+  // CORRECTIF : suppression de la requête getDocs sur /users (permissions insuffisantes).
+  // On utilise toujours un userId temporaire "pending_" ; il sera résolu
+  // vers le vrai UID quand l'utilisateur acceptera l'invitation via /accept-invite.
   const handleInvite = async (email, role) => {
     setInviteLoading(true);
     try {
-      // Vérifier que le merchant existe
+      // Vérification du compte marchand
       const merchantExists = await checkMerchantExists();
-      if (!merchantExists) {
-        return;
-      }
+      if (!merchantExists) return;
 
-      // Vérifier si une invitation existe déjà
+      // Vérifier qu'il n'y a pas déjà une invitation pour cet email
       const existingQuery = query(
         collection(db, 'gateway_merchant_teams'),
         where('merchantId', '==', user.uid),
         where('email', '==', email.toLowerCase())
       );
       const existingSnapshot = await getDocs(existingQuery);
-      
       if (!existingSnapshot.empty) {
         toast.error('Une invitation a déjà été envoyée à cet email');
         return;
       }
 
-      // Vérifier si l'utilisateur existe déjà dans users
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email.toLowerCase()));
-      const snapshot = await getDocs(q);
-      
-      let userId = null;
-      let userExists = false;
-      
-      if (!snapshot.empty) {
-        userId = snapshot.docs[0].id;
-        userExists = true;
-      } else {
-        // Utilisateur non inscrit, on crée un ID temporaire
-        userId = `pending_${Date.now()}`;
-      }
+      // On génère toujours un ID temporaire.
+      // Quand l'invité accepte, la route /accept-invite met à jour
+      // userId avec son vrai UID Firebase et passe status à "active".
+      const userId = `pending_${Date.now()}`;
 
-      // Créer l'invitation
+      // Création du document d'invitation
       const teamRef = doc(collection(db, 'gateway_merchant_teams'));
       await setDoc(teamRef, {
         merchantId: user.uid,
-        userId: userId,
-        email: email.toLowerCase(),
-        role: role,
-        invitedBy: user.uid,
-        invitedAt: new Date(),
-        status: userExists ? 'active' : 'pending',
-        createdAt: serverTimestamp()
+        userId,
+        email:      email.toLowerCase(),
+        role,
+        invitedBy:  user.uid,
+        invitedAt:  new Date(),
+        status:     'pending',
+        createdAt:  serverTimestamp()
       });
 
-      // Envoyer l'email via Brevo
-      const merchantName = merchantInfo?.businessName || 
-                          merchantInfo?.companyName || 
-                          user.displayName?.split(' ')[0] || 
-                          'Marchand';
-      
+      // Envoi de l'email d'invitation via Brevo
+      const merchantName = merchantInfo?.businessName
+        || merchantInfo?.companyName
+        || user.displayName?.split(' ')[0]
+        || 'Marchand';
+
       const inviteLink = `${window.location.origin}/accept-invite?email=${encodeURIComponent(email)}&team=${teamRef.id}&role=${role}`;
-      
+
       const emailResult = await sendTeamInvitation(
         email,
         email.split('@')[0],
@@ -570,42 +529,44 @@ export default function TeamPage() {
         role,
         inviteLink
       );
-      
+
       if (!emailResult.success) {
-        console.warn('Email non envoyé:', emailResult.error);
+        console.warn('Email non envoyé :', emailResult.error);
         toast.error('Invitation créée mais email non envoyé. Vérifiez votre clé API Brevo.');
       } else {
         toast.success('Invitation envoyée avec succès !');
       }
-      
+
       await loadTeamMembers();
       setInviteModalOpen(false);
     } catch (error) {
-      console.error('Error inviting member:', error);
-      toast.error('Erreur lors de l\'invitation: ' + error.message);
+      console.error('Erreur invitation :', error);
+      toast.error('Erreur lors de l\'invitation : ' + error.message);
     } finally {
       setInviteLoading(false);
     }
   };
 
+  // ── Met à jour le rôle d'un membre ────────────────────────────────────────
   const handleUpdateRole = async (memberId, newRole) => {
     setUpdateLoading(true);
     try {
       const memberRef = doc(db, 'gateway_merchant_teams', memberId);
-      await updateDoc(memberRef, { 
-        role: newRole,
+      await updateDoc(memberRef, {
+        role:      newRole,
         updatedAt: serverTimestamp()
       });
       await loadTeamMembers();
       toast.success('Rôle mis à jour avec succès');
     } catch (error) {
-      console.error('Error updating role:', error);
-      toast.error('Erreur lors de la mise à jour du rôle: ' + error.message);
+      console.error('Erreur mise à jour rôle :', error);
+      toast.error('Erreur lors de la mise à jour du rôle : ' + error.message);
     } finally {
       setUpdateLoading(false);
     }
   };
 
+  // ── Retire un membre de l'équipe ──────────────────────────────────────────
   const handleRemoveMember = async () => {
     if (!selectedMember) return;
     setRemoveLoading(true);
@@ -617,22 +578,26 @@ export default function TeamPage() {
       setSelectedMember(null);
       toast.success('Membre retiré de l\'équipe');
     } catch (error) {
-      console.error('Error removing member:', error);
-      toast.error('Erreur lors du retrait du membre: ' + error.message);
+      console.error('Erreur suppression membre :', error);
+      toast.error('Erreur lors du retrait du membre : ' + error.message);
     } finally {
       setRemoveLoading(false);
     }
   };
 
+  // ── Données du propriétaire (compte connecté) ─────────────────────────────
   const owner = {
-    name: merchantInfo?.businessName || user?.displayName?.split(' ')[0] || user?.email?.split('@')[0],
+    name:  merchantInfo?.businessName
+           || user?.displayName?.split(' ')[0]
+           || user?.email?.split('@')[0],
     email: user?.email,
-    role: 'admin'
+    role:  'admin'
   };
 
-  const activeMembers = teamMembers.filter(m => m.status !== 'pending');
+  const activeMembers  = teamMembers.filter(m => m.status !== 'pending');
   const pendingMembers = teamMembers.filter(m => m.status === 'pending');
 
+  // ── Garde si non connecté ─────────────────────────────────────────────────
   if (!user) {
     return (
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px 80px', textAlign: 'center' }}>
@@ -641,32 +606,27 @@ export default function TeamPage() {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px 80px', fontFamily: "'DM Sans', sans-serif" }}>
-      <style>
-        {`
-          @keyframes spin { to { transform: rotate(360deg); } }
-          @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-          .spin { animation: spin 0.7s linear infinite; }
-          .team-row:hover { background: #fafafa !important; }
-          @media (max-width: 640px) {
-            .team-header { display: none !important; }
-            .team-card { display: block !important; }
-            .team-desktop { display: none !important; }
-          }
-          .team-card { display: none; }
-          .team-desktop { display: block; }
-        `}
-      </style>
+      <style>{`
+        @keyframes spin    { to { transform: rotate(360deg); } }
+        @keyframes fadeUp  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .spin              { animation: spin 0.7s linear infinite; }
+        .team-row:hover    { background: #fafafa !important; }
+        @media (max-width: 640px) {
+          .team-header  { display: none !important; }
+          .team-card    { display: block !important; }
+          .team-desktop { display: none !important; }
+        }
+        .team-card    { display: none; }
+        .team-desktop { display: block; }
+      `}</style>
 
-      {/* Header */}
+      {/* ── En-tête de page ── */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 28,
-        flexWrap: 'wrap',
-        gap: 12,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 28, flexWrap: 'wrap', gap: 12,
         animation: 'fadeUp 0.3s ease'
       }}>
         <div>
@@ -683,18 +643,10 @@ export default function TeamPage() {
         <button
           onClick={() => setInviteModalOpen(true)}
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
             padding: '10px 20px',
-            background: '#f97316',
-            border: 'none',
-            borderRadius: 12,
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.15s'
+            background: '#f97316', border: 'none', borderRadius: 12,
+            color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer'
           }}
           onMouseEnter={e => e.currentTarget.style.background = '#ea580c'}
           onMouseLeave={e => e.currentTarget.style.background = '#f97316'}
@@ -704,56 +656,32 @@ export default function TeamPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* ── Statistiques ── */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: 12,
-        marginBottom: 28,
-        animation: 'fadeUp 0.3s ease 0.05s both'
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 12, marginBottom: 28, animation: 'fadeUp 0.3s ease 0.05s both'
       }}>
-        <div style={{
-          background: '#fff',
-          border: '1px solid #f0f0f0',
-          borderRadius: 16,
-          padding: '16px 20px'
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 4 }}>
-            Propriétaire
+        {[
+          { label: 'Propriétaire',            value: 1 },
+          { label: 'Membres actifs',           value: activeMembers.length },
+          { label: 'Invitations en attente',   value: pendingMembers.length }
+        ].map(stat => (
+          <div key={stat.label} style={{
+            background: '#fff', border: '1px solid #f0f0f0',
+            borderRadius: 16, padding: '16px 20px'
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 4 }}>
+              {stat.label}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{stat.value}</div>
           </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>1</div>
-        </div>
-        <div style={{
-          background: '#fff',
-          border: '1px solid #f0f0f0',
-          borderRadius: 16,
-          padding: '16px 20px'
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 4 }}>
-            Membres actifs
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{activeMembers.length}</div>
-        </div>
-        <div style={{
-          background: '#fff',
-          border: '1px solid #f0f0f0',
-          borderRadius: 16,
-          padding: '16px 20px'
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 4 }}>
-            Invitations en attente
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{pendingMembers.length}</div>
-        </div>
+        ))}
       </div>
 
-      {/* Team list */}
+      {/* ── Tableau des membres ── */}
       <div style={{
-        background: '#fff',
-        borderRadius: 20,
-        border: '1px solid #f0f0f0',
-        overflow: 'hidden',
-        animation: 'fadeUp 0.3s ease 0.1s both'
+        background: '#fff', borderRadius: 20, border: '1px solid #f0f0f0',
+        overflow: 'hidden', animation: 'fadeUp 0.3s ease 0.1s both'
       }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #f8fafc' }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>
@@ -761,19 +689,13 @@ export default function TeamPage() {
           </h3>
         </div>
 
-        {/* Header Desktop */}
+        {/* En-tête colonnes (desktop) */}
         <div className="team-header" style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 160px 120px 100px',
-          padding: '8px 24px',
-          gap: 12,
-          fontSize: 10,
-          fontWeight: 700,
-          color: '#94a3b8',
-          textTransform: 'uppercase',
-          letterSpacing: '.08em',
-          borderBottom: '1px solid #f8fafc',
-          background: '#fafafa'
+          display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px',
+          padding: '8px 24px', gap: 12,
+          fontSize: 10, fontWeight: 700, color: '#94a3b8',
+          textTransform: 'uppercase', letterSpacing: '.08em',
+          borderBottom: '1px solid #f8fafc', background: '#fafafa'
         }}>
           <span>Membre</span>
           <span>Rôle</span>
@@ -781,31 +703,24 @@ export default function TeamPage() {
           <span style={{ textAlign: 'right' }}>Actions</span>
         </div>
 
+        {/* Chargement */}
         {loading ? (
           <div style={{ padding: '48px', textAlign: 'center' }}>
             <RefreshCw size={24} className="spin" color="#f97316" />
           </div>
         ) : (
           <>
-            {/* Propriétaire */}
+            {/* ── Propriétaire (desktop) ── */}
             <div className="team-desktop team-row" style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 160px 120px 100px',
-              padding: '14px 24px',
-              gap: 12,
-              alignItems: 'center',
-              borderBottom: '1px solid #f8fafc',
-              background: '#fffaf5'
+              display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px',
+              padding: '14px 24px', gap: 12, alignItems: 'center',
+              borderBottom: '1px solid #f8fafc', background: '#fffaf5'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
+                  width: 36, height: 36, borderRadius: 10,
                   background: '#fef3c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
                   <Crown size={16} color="#d97706" />
                 </div>
@@ -814,30 +729,22 @@ export default function TeamPage() {
                   <div style={{ fontSize: 11, color: '#94a3b8' }}>{owner.email}</div>
                 </div>
               </div>
-              <div>
-                <RoleBadge roleId="admin" />
-              </div>
+              <RoleBadge roleId="admin" />
               <div style={{ fontSize: 11, color: '#94a3b8' }}>Propriétaire</div>
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontSize: 11, color: '#94a3b8' }}>—</span>
               </div>
             </div>
 
-            {/* Version mobile propriétaire */}
+            {/* ── Propriétaire (mobile) ── */}
             <div className="team-card" style={{
-              padding: '14px 16px',
-              borderBottom: '1px solid #f8fafc',
-              background: '#fffaf5'
+              padding: '14px 16px', borderBottom: '1px solid #f8fafc', background: '#fffaf5'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
                 <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
+                  width: 40, height: 40, borderRadius: 10,
                   background: '#fef3c7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }}>
                   <Crown size={18} color="#d97706" />
                 </div>
@@ -852,164 +759,122 @@ export default function TeamPage() {
               </div>
             </div>
 
-            {/* Membres */}
-            {activeMembers.map((member, idx) => (
-              <div key={member.id}>
-                <div className="team-desktop team-row" style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 160px 120px 100px',
-                  padding: '14px 24px',
-                  gap: 12,
-                  alignItems: 'center',
-                  borderBottom: idx === activeMembers.length - 1 && pendingMembers.length === 0 ? 'none' : '1px solid #f8fafc'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      background: '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Mail size={16} color="#64748b" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                        {member.displayName || member.email.split('@')[0]}
+            {/* ── Membres actifs ── */}
+            {activeMembers.map((member, idx) => {
+              const isLast = idx === activeMembers.length - 1 && pendingMembers.length === 0;
+              return (
+                <div key={member.id}>
+                  {/* Desktop */}
+                  <div className="team-desktop team-row" style={{
+                    display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px',
+                    padding: '14px 24px', gap: 12, alignItems: 'center',
+                    borderBottom: isLast ? 'none' : '1px solid #f8fafc'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10, background: '#f1f5f9',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <Mail size={16} color="#64748b" />
                       </div>
-                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{member.email}</div>
-                    </div>
-                  </div>
-                  <div>
-                    <RoleBadge roleId={member.role} />
-                  </div>
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                    {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString('fr-FR') : '-'}
-                  </div>
-                  <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() => {
-                        setSelectedMember(member);
-                        setEditModalOpen(true);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 6,
-                        borderRadius: 6,
-                        color: '#64748b'
-                      }}
-                      title="Modifier le rôle"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedMember(member);
-                        setConfirmModalOpen(true);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        padding: 6,
-                        borderRadius: 6,
-                        color: '#ef4444'
-                      }}
-                      title="Retirer"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Version mobile membre */}
-                <div className="team-card" style={{
-                  padding: '14px 16px',
-                  borderBottom: idx === activeMembers.length - 1 && pendingMembers.length === 0 ? 'none' : '1px solid #f8fafc'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                    <div style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      background: '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <Mail size={18} color="#64748b" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-                        {member.displayName || member.email.split('@')[0]}
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                          {member.displayName}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{member.email}</div>
                       </div>
-                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{member.email}</div>
                     </div>
-                  </div>
-                  <div style={{ paddingLeft: 52, marginBottom: 8 }}>
                     <RoleBadge roleId={member.role} />
-                  </div>
-                  <div style={{ paddingLeft: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                      Invité le {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString('fr-FR') : '-'}
-                    </span>
-                    <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                      {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString('fr-FR') : '—'}
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                       <button
-                        onClick={() => {
-                          setSelectedMember(member);
-                          setEditModalOpen(true);
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                        onClick={() => { setSelectedMember(member); setEditModalOpen(true); }}
+                        title="Modifier le rôle"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 6, color: '#64748b' }}
                       >
                         <Edit2 size={14} />
                       </button>
                       <button
-                        onClick={() => {
-                          setSelectedMember(member);
-                          setConfirmModalOpen(true);
-                        }}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                        onClick={() => { setSelectedMember(member); setConfirmModalOpen(true); }}
+                        title="Retirer le membre"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 6, color: '#ef4444' }}
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
 
-            {/* Invitations en attente */}
-            {pendingMembers.length > 0 && (
-              <>
-                <div style={{ padding: '16px 24px', background: '#fafafa', borderTop: '1px solid #f8fafc', borderBottom: '1px solid #f8fafc' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Clock size={14} color="#d97706" />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#d97706' }}>Invitations en attente</span>
+                  {/* Mobile */}
+                  <div className="team-card" style={{
+                    padding: '14px 16px',
+                    borderBottom: isLast ? 'none' : '1px solid #f8fafc'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 10, background: '#f1f5f9',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        <Mail size={18} color="#64748b" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{member.displayName}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{member.email}</div>
+                      </div>
+                    </div>
+                    <div style={{ paddingLeft: 52, marginBottom: 8 }}>
+                      <RoleBadge roleId={member.role} />
+                    </div>
+                    <div style={{ paddingLeft: 52, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                        Invité le {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString('fr-FR') : '—'}
+                      </span>
+                      <div style={{ display: 'flex', gap: 12 }}>
+                        <button
+                          onClick={() => { setSelectedMember(member); setEditModalOpen(true); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => { setSelectedMember(member); setConfirmModalOpen(true); }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+
+            {/* ── Invitations en attente ── */}
+            {pendingMembers.length > 0 && (
+              <>
+                <div style={{
+                  padding: '16px 24px', background: '#fafafa',
+                  borderTop: '1px solid #f8fafc', borderBottom: '1px solid #f8fafc'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Clock size={14} color="#d97706" />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#d97706' }}>
+                      Invitations en attente
+                    </span>
+                  </div>
+                </div>
+
                 {pendingMembers.map(member => (
                   <div key={member.id} className="team-desktop" style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 160px 120px 100px',
-                    padding: '14px 24px',
-                    gap: 12,
-                    alignItems: 'center',
-                    borderBottom: '1px solid #f8fafc',
-                    opacity: 0.7
+                    display: 'grid', gridTemplateColumns: '1fr 160px 120px 100px',
+                    padding: '14px 24px', gap: 12, alignItems: 'center',
+                    borderBottom: '1px solid #f8fafc', opacity: 0.7
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: '#fef3c7',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                        width: 36, height: 36, borderRadius: 10, background: '#fef3c7',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}>
                         <Clock size={16} color="#d97706" />
                       </div>
@@ -1018,25 +883,15 @@ export default function TeamPage() {
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>Invitation envoyée</div>
                       </div>
                     </div>
-                    <div>
-                      <RoleBadge roleId={member.role} />
-                    </div>
+                    <RoleBadge roleId={member.role} />
                     <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                      {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString('fr-FR') : '-'}
+                      {member.invitedAt ? new Date(member.invitedAt).toLocaleDateString('fr-FR') : '—'}
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <button
-                        onClick={() => {
-                          setSelectedMember(member);
-                          setConfirmModalOpen(true);
-                        }}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: 6,
-                          color: '#ef4444'
-                        }}
+                        onClick={() => { setSelectedMember(member); setConfirmModalOpen(true); }}
+                        title="Annuler l'invitation"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: '#ef4444' }}
                       >
                         <X size={14} />
                       </button>
@@ -1045,70 +900,54 @@ export default function TeamPage() {
                 ))}
               </>
             )}
-          </>
-        )}
 
-        {!loading && activeMembers.length === 0 && pendingMembers.length === 0 && (
-          <div style={{ padding: '64px 24px', textAlign: 'center' }}>
-            <div style={{
-              width: 64,
-              height: 64,
-              borderRadius: 20,
-              background: '#f8fafc',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px'
-            }}>
-              <Users size={28} color="#cbd5e1" />
-            </div>
-            <p style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>
-              Aucun membre dans votre équipe
-            </p>
-            <button
-              onClick={() => setInviteModalOpen(true)}
-              style={{
-                background: '#f97316',
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 20px',
-                color: '#fff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Inviter un premier membre
-            </button>
-          </div>
+            {/* ── État vide ── */}
+            {!loading && activeMembers.length === 0 && pendingMembers.length === 0 && (
+              <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 20, background: '#f8fafc',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 16px'
+                }}>
+                  <Users size={28} color="#cbd5e1" />
+                </div>
+                <p style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>
+                  Aucun membre dans votre équipe
+                </p>
+                <button
+                  onClick={() => setInviteModalOpen(true)}
+                  style={{
+                    background: '#f97316', border: 'none', borderRadius: 10,
+                    padding: '10px 20px', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                  }}
+                >
+                  Inviter un premier membre
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
-      {/* Modales */}
+      {/* ── Modales ── */}
       <InviteModal
         isOpen={inviteModalOpen}
         onClose={() => setInviteModalOpen(false)}
         onInvite={handleInvite}
         loading={inviteLoading}
       />
-      
+
       <EditRoleModal
         isOpen={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setSelectedMember(null);
-        }}
+        onClose={() => { setEditModalOpen(false); setSelectedMember(null); }}
         member={selectedMember}
         onUpdateRole={handleUpdateRole}
         loading={updateLoading}
       />
-      
+
       <ConfirmModal
         isOpen={confirmModalOpen}
-        onClose={() => {
-          setConfirmModalOpen(false);
-          setSelectedMember(null);
-        }}
+        onClose={() => { setConfirmModalOpen(false); setSelectedMember(null); }}
         onConfirm={handleRemoveMember}
         memberName={selectedMember?.email?.split('@')[0] || ''}
         loading={removeLoading}
