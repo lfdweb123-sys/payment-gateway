@@ -753,8 +753,7 @@ async function creerLien(amount, description) {
     body: JSON.stringify({ amount, description })
   });
   const data = await res.json();
-  return data.url; // ${GATEWAY_URL}/pay?pid=...
-}
+  return data.url; // \${GATEWAY_URL}/pay?pid=...}
 
 async function payer(amount, description) {
   const url = await creerLien(amount, description);
