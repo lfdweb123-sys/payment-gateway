@@ -500,24 +500,30 @@ export default function TeamPage() {
       // userId avec son vrai UID Firebase et passe status à "active".
       const userId = `pending_${Date.now()}`;
 
-      // Création du document d'invitation
-      const teamRef = doc(collection(db, 'gateway_merchant_teams'));
-      await setDoc(teamRef, {
-        merchantId: user.uid,
-        userId,
-        email:      email.toLowerCase(),
-        role,
-        invitedBy:  user.uid,
-        invitedAt:  new Date(),
-        status:     'pending',
-        createdAt:  serverTimestamp()
-      });
-
-      // Envoi de l'email d'invitation via Brevo
+      // Noms résolus ici (l'invitant est connecté) et dénormalisés dans le document
+      // pour qu'AcceptInvite puisse les afficher sans interroger d'autres collections.
       const merchantName = merchantInfo?.businessName
         || merchantInfo?.companyName
         || user.displayName?.split(' ')[0]
         || 'Marchand';
+      const inviterName = user.displayName?.split(' ')[0]
+        || user.email?.split('@')[0]
+        || 'Un administrateur';
+
+      // Création du document d'invitation
+      const teamRef = doc(collection(db, 'gateway_merchant_teams'));
+      await setDoc(teamRef, {
+        merchantId:   user.uid,
+        userId,
+        email:        email.toLowerCase(),
+        role,
+        invitedBy:    user.uid,
+        invitedAt:    new Date(),
+        status:       'pending',
+        createdAt:    serverTimestamp(),
+        merchantName,   // dénormalisé pour AcceptInvite
+        inviterName     // dénormalisé pour AcceptInvite
+      });
 
       const inviteLink = `${window.location.origin}/accept-invite?email=${encodeURIComponent(email)}&team=${teamRef.id}&role=${role}`;
 
