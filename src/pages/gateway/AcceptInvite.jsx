@@ -1,4 +1,4 @@
-// src/pages/AcceptInvite.jsx
+// src/pages/gateway/AcceptInvite.jsx
 // Route : /accept-invite?email=...&team=...&role=...
 //
 // Comportement :
@@ -8,8 +8,8 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { db } from '../services/firebase';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/firebase';
 import {
   doc,
   getDoc,
