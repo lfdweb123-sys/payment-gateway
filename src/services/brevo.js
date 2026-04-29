@@ -2,6 +2,7 @@ const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY;
 const SENDER_EMAIL = import.meta.env.VITE_BREVO_SENDER_EMAIL || 'noreply@payment-gateway.com';
 const SENDER_NAME = 'Passerelle de Paiement';
 
+// ─── Envoi générique ──────────────────────────────────────────────────────────
 export async function sendEmail({ to, toName, subject, htmlContent }) {
   if (!BREVO_API_KEY) {
     console.warn('Brevo API key non configurée');
@@ -32,198 +33,176 @@ export async function sendEmail({ to, toName, subject, htmlContent }) {
   }
 }
 
-// Templates existants
+// ─── Base commune ─────────────────────────────────────────────────────────────
+// Un wrapper minimaliste : fond blanc, texte foncé, une seule colonne.
+// Pas de dégradés, pas d'emojis de décoration, pas d'ombres.
+function layout(content) {
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:8px;border:1px solid #e4e4e7;">
+        <!-- Header -->
+        <tr>
+          <td style="padding:28px 36px 20px;border-bottom:1px solid #e4e4e7;">
+            <span style="font-size:13px;font-weight:600;color:#f97316;letter-spacing:.05em;text-transform:uppercase;">
+              Passerelle de Paiement
+            </span>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr><td style="padding:32px 36px;">${content}</td></tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:20px 36px;border-top:1px solid #e4e4e7;">
+            <p style="margin:0;font-size:12px;color:#a1a1aa;">
+              Vous recevez cet email car une action a été effectuée sur votre compte.
+              Si vous n'êtes pas concerné, ignorez ce message.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+// Styles partagés (inline pour compatibilité email)
+const s = {
+  h1:    'margin:0 0 16px;font-size:22px;font-weight:700;color:#18181b;line-height:1.3;',
+  p:     'margin:0 0 14px;font-size:15px;color:#3f3f46;line-height:1.6;',
+  small: 'margin:0;font-size:13px;color:#71717a;line-height:1.5;',
+  btn:   'display:inline-block;margin-top:8px;padding:12px 28px;background:#f97316;color:#ffffff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600;',
+  pill:  'display:inline-block;padding:4px 12px;background:#fff7ed;color:#c2410c;border-radius:4px;font-size:13px;font-weight:600;border:1px solid #fed7aa;',
+  code:  'display:block;margin-top:16px;padding:12px 16px;background:#f4f4f5;border-radius:6px;font-size:12px;color:#52525b;word-break:break-all;font-family:monospace;',
+  rule:  'margin:24px 0;border:none;border-top:1px solid #e4e4e7;'
+};
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
 export function getVerificationApprovedTemplate(name) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#f9fafb;">
-      <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:24px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:12px;">✅</div>
-        <h2 style="color:#111827;margin:0 0 8px;">Compte vérifié</h2>
-        <p style="color:#6b7280;font-size:14px;">Bonjour ${name},</p>
-        <p style="color:#6b7280;font-size:14px;">Votre compte a été vérifié. Toutes les fonctionnalités sont accessibles.</p>
-        <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Passerelle de Paiement</p>
-      </div>
-    </div>`;
+  return layout(`
+    <h1 style="${s.h1}">Compte vérifié</h1>
+    <p style="${s.p}">Bonjour ${name},</p>
+    <p style="${s.p}">Votre compte a été vérifié avec succès. Vous avez désormais accès à l'ensemble des fonctionnalités de la plateforme.</p>
+    <p style="${s.small}">Bienvenue sur la Passerelle de Paiement.</p>
+  `);
 }
 
 export function getVerificationRejectedTemplate(name) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#f9fafb;">
-      <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:24px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:12px;">❌</div>
-        <h2 style="color:#111827;margin:0 0 8px;">Vérification refusée</h2>
-        <p style="color:#6b7280;font-size:14px;">Bonjour ${name},</p>
-        <p style="color:#6b7280;font-size:14px;">Vos documents n'ont pas été acceptés. Veuillez soumettre à nouveau.</p>
-        <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Passerelle de Paiement</p>
-      </div>
-    </div>`;
+  return layout(`
+    <h1 style="${s.h1}">Vérification refusée</h1>
+    <p style="${s.p}">Bonjour ${name},</p>
+    <p style="${s.p}">Vos documents n'ont pas pu être acceptés. Veuillez les soumettre à nouveau en vous assurant qu'ils sont lisibles et conformes aux exigences.</p>
+    <p style="${s.small}">En cas de difficulté, contactez notre support.</p>
+  `);
 }
 
 export function getPaymentReceivedTemplate(name, amount, reference) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#f9fafb;">
-      <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:24px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:12px;">💰</div>
-        <h2 style="color:#111827;margin:0 0 8px;">Paiement reçu</h2>
-        <p style="color:#6b7280;font-size:14px;">Bonjour ${name},</p>
-        <p style="color:#6b7280;font-size:14px;">Paiement de <strong>${amount.toLocaleString()} XOF</strong> reçu.</p>
-        <p style="color:#9ca3af;font-size:12px;margin-top:8px;">Réf: ${reference}</p>
-        <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Passerelle de Paiement</p>
-      </div>
-    </div>`;
+  return layout(`
+    <h1 style="${s.h1}">Paiement reçu</h1>
+    <p style="${s.p}">Bonjour ${name},</p>
+    <p style="${s.p}">Un paiement de <strong>${amount.toLocaleString('fr-FR')} XOF</strong> a bien été reçu sur votre compte.</p>
+    <hr style="${s.rule}">
+    <p style="${s.small}">Référence : <strong>${reference}</strong></p>
+  `);
 }
 
 export function getPayoutSentTemplate(name, amount, reference) {
-  return `
-    <div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#f9fafb;">
-      <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:24px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:12px;">📤</div>
-        <h2 style="color:#111827;margin:0 0 8px;">Retrait envoyé</h2>
-        <p style="color:#6b7280;font-size:14px;">Bonjour ${name},</p>
-        <p style="color:#6b7280;font-size:14px;">Retrait de <strong>${amount.toLocaleString()} XOF</strong> envoyé sur votre numéro.</p>
-        <p style="color:#9ca3af;font-size:12px;margin-top:8px;">Réf: ${reference}</p>
-        <p style="color:#9ca3af;font-size:12px;margin-top:16px;">Passerelle de Paiement</p>
-      </div>
-    </div>`;
+  return layout(`
+    <h1 style="${s.h1}">Retrait envoyé</h1>
+    <p style="${s.p}">Bonjour ${name},</p>
+    <p style="${s.p}">Votre retrait de <strong>${amount.toLocaleString('fr-FR')} XOF</strong> a été traité et envoyé sur votre numéro enregistré.</p>
+    <hr style="${s.rule}">
+    <p style="${s.small}">Référence : <strong>${reference}</strong></p>
+  `);
 }
 
-// Nouveau template pour l'invitation d'équipe
+// ─── Invitation d'équipe ──────────────────────────────────────────────────────
 export function getTeamInvitationTemplate(invitedByName, merchantName, role, inviteLink) {
   const roleLabels = {
-    admin: 'Administrateur',
+    admin:   'Administrateur',
     manager: 'Gestionnaire',
-    viewer: 'Consultant',
+    viewer:  'Consultant',
     support: 'Support'
   };
-  
+
   const roleDescriptions = {
-    admin: 'Accès complet à toutes les fonctionnalités et gestion de l\'équipe',
-    manager: 'Gestion des transactions, paiements et configuration des providers',
-    viewer: 'Consultation uniquement (dashboard, transactions, rapports)',
-    support: 'Gestion des litiges et du support client'
+    admin:   'Accès complet à toutes les fonctionnalités et gestion de l\'équipe.',
+    manager: 'Gestion des transactions, paiements et configuration des providers.',
+    viewer:  'Consultation uniquement — dashboard, transactions et rapports.',
+    support: 'Gestion des litiges et du support client.'
   };
-  
-  return `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:linear-gradient(135deg,#f9fafb 0%,#ffffff 100%);">
-      <div style="background:#ffffff;border-radius:24px;border:1px solid #e5e7eb;padding:32px;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
-        <!-- Logo / Header -->
-        <div style="text-align:center;margin-bottom:28px;">
-          <div style="display:inline-block;background:#f97316;border-radius:50px;padding:12px;margin-bottom:16px;">
-            <span style="font-size:28px;">👥</span>
-          </div>
-          <h2 style="color:#111827;margin:0 0 8px;font-size:24px;font-weight:700;">Invitation à rejoindre l'équipe</h2>
-          <p style="color:#6b7280;margin:0;font-size:14px;border-bottom:1px solid #e5e7eb;padding-bottom:20px;">
-            ${invitedByName} vous invite à collaborer sur <strong>${merchantName}</strong>
-          </p>
-        </div>
-        
-        <!-- Message -->
-        <div style="margin-bottom:28px;">
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">Bonjour,</p>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-            Vous avez été invité à rejoindre l'équipe en tant que <strong style="color:#f97316;">${roleLabels[role]}</strong>.
-          </p>
-          <div style="background:#fef3c7;border-left:4px solid #f97316;border-radius:12px;padding:16px;margin:20px 0;">
-            <div style="font-size:13px;color:#92400e;margin-bottom:4px;">📋 Rôle attribué</div>
-            <div style="font-weight:700;color:#78350f;margin-bottom:6px;">${roleLabels[role]}</div>
-            <div style="font-size:13px;color:#92400e;">${roleDescriptions[role]}</div>
-          </div>
-          <p style="color:#374151;font-size:15px;line-height:1.6;margin:0;">
-            Cliquez sur le bouton ci-dessous pour accepter l'invitation et accéder au tableau de bord.
-          </p>
-        </div>
-        
-        <!-- Button -->
-        <div style="text-align:center;margin-bottom:28px;">
-          <a href="${inviteLink}" style="display:inline-block;background:#f97316;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:40px;font-weight:600;font-size:15px;transition:all 0.3s;box-shadow:0 2px 8px rgba(249,115,22,0.3);">
-            ✨ Accepter l'invitation
-          </a>
-        </div>
-        
-        <!-- Alternative link -->
-        <div style="background:#f9fafb;border-radius:12px;padding:14px;margin-bottom:24px;text-align:center;">
-          <p style="font-size:12px;color:#6b7280;margin:0 0 8px;">Si le bouton ne fonctionne pas, copiez ce lien :</p>
-          <code style="font-size:11px;color:#374151;background:#fff;padding:6px 12px;border-radius:8px;word-break:break-all;">${inviteLink}</code>
-        </div>
-        
-        <!-- Footer -->
-        <div style="text-align:center;border-top:1px solid #e5e7eb;padding-top:20px;margin-top:8px;">
-          <p style="color:#9ca3af;font-size:12px;margin:0 0 8px;">
-            Passerelle de Paiement - Plateforme de paiement sécurisée
-          </p>
-          <p style="color:#9ca3af;font-size:11px;margin:0;">
-            Cette invitation expirera dans 7 jours.
-          </p>
-        </div>
-      </div>
-    </div>`;
+
+  return layout(`
+    <h1 style="${s.h1}">Vous avez été invité à rejoindre une équipe</h1>
+    <p style="${s.p}"><strong>${invitedByName}</strong> vous invite à collaborer sur le compte <strong>${merchantName}</strong>.</p>
+
+    <p style="margin:0 0 6px;font-size:13px;color:#71717a;font-weight:500;text-transform:uppercase;letter-spacing:.04em;">Rôle attribué</p>
+    <span style="${s.pill}">${roleLabels[role] || role}</span>
+    <p style="margin:10px 0 24px;font-size:14px;color:#52525b;">${roleDescriptions[role] || ''}</p>
+
+    <a href="${inviteLink}" style="${s.btn}">Accepter l'invitation</a>
+
+    <p style="${s.code}">${inviteLink}</p>
+
+    <hr style="${s.rule}">
+    <p style="${s.small}">Ce lien est valable 7 jours. Si vous n'attendiez pas cette invitation, vous pouvez ignorer cet email.</p>
+  `);
 }
 
-// Nouveau template pour la confirmation d'ajout à l'équipe (pour le propriétaire)
+// ─── Notification propriétaire : nouveau membre ───────────────────────────────
 export function getTeamMemberAddedTemplate(ownerName, memberEmail, role, memberName) {
   const roleLabels = {
-    admin: 'Administrateur',
+    admin:   'Administrateur',
     manager: 'Gestionnaire',
-    viewer: 'Consultant',
+    viewer:  'Consultant',
     support: 'Support'
   };
-  
-  return `
-    <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f9fafb;">
-      <div style="background:#ffffff;border-radius:24px;border:1px solid #e5e7eb;padding:32px;">
-        <div style="text-align:center;margin-bottom:28px;">
-          <div style="display:inline-block;background:#f0fdf4;border-radius:50px;padding:12px;margin-bottom:16px;">
-            <span style="font-size:28px;">✅</span>
-          </div>
-          <h2 style="color:#111827;margin:0;font-size:22px;font-weight:700;">Nouveau membre dans l'équipe</h2>
-        </div>
-        
-        <p style="color:#374151;font-size:15px;margin:0 0 20px;">Bonjour ${ownerName},</p>
-        
-        <div style="background:#f8fafc;border-radius:16px;padding:20px;margin-bottom:24px;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <div style="width:48px;height:48px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;">
-              <span style="font-size:22px;">👤</span>
-            </div>
-            <div>
-              <div style="font-weight:700;color:#0f172a;font-size:16px;">${memberName || memberEmail}</div>
-              <div style="font-size:13px;color:#64748b;">${memberEmail}</div>
-            </div>
-          </div>
-          <div style="background:#fff7ed;border-radius:12px;padding:12px;">
-            <span style="font-size:13px;color:#92400e;">🎯 Rôle : <strong>${roleLabels[role]}</strong></span>
-          </div>
-        </div>
-        
-        <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;border-top:1px solid #e5e7eb;padding-top:20px;">
-          Passerelle de Paiement
-        </p>
-      </div>
-    </div>`;
+
+  return layout(`
+    <h1 style="${s.h1}">Nouveau membre dans votre équipe</h1>
+    <p style="${s.p}">Bonjour ${ownerName},</p>
+    <p style="${s.p}"><strong>${memberName || memberEmail}</strong> a rejoint votre équipe.</p>
+
+    <hr style="${s.rule}">
+    <table cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td style="font-size:13px;color:#71717a;padding-bottom:6px;">Adresse email</td>
+        <td style="font-size:13px;color:#18181b;font-weight:500;text-align:right;">${memberEmail}</td>
+      </tr>
+      <tr>
+        <td style="font-size:13px;color:#71717a;padding-top:6px;">Rôle</td>
+        <td style="text-align:right;padding-top:6px;">
+          <span style="${s.pill}">${roleLabels[role] || role}</span>
+        </td>
+      </tr>
+    </table>
+    <hr style="${s.rule}">
+
+    <p style="${s.small}">Vous pouvez gérer les accès de votre équipe depuis les paramètres de votre compte.</p>
+  `);
 }
 
-// Fonction utilitaire pour envoyer une invitation d'équipe
+// ─── Fonctions utilitaires ────────────────────────────────────────────────────
+
 export async function sendTeamInvitation(email, name, invitedByName, merchantName, role, inviteLink) {
-  const subject = `Invitation à rejoindre l'équipe ${merchantName}`;
-  const htmlContent = getTeamInvitationTemplate(invitedByName, merchantName, role, inviteLink);
-  
   return await sendEmail({
     to: email,
     toName: name || email,
-    subject,
-    htmlContent
+    subject: `Invitation à rejoindre l'équipe ${merchantName}`,
+    htmlContent: getTeamInvitationTemplate(invitedByName, merchantName, role, inviteLink)
   });
 }
 
-// Fonction pour notifier le propriétaire qu'un membre a rejoint
 export async function sendTeamMemberAddedNotification(ownerEmail, ownerName, memberEmail, role, memberName) {
-  const subject = `Nouveau membre dans votre équipe`;
-  const htmlContent = getTeamMemberAddedTemplate(ownerName, memberEmail, role, memberName);
-  
   return await sendEmail({
     to: ownerEmail,
     toName: ownerName,
-    subject,
-    htmlContent
+    subject: 'Nouveau membre dans votre équipe',
+    htmlContent: getTeamMemberAddedTemplate(ownerName, memberEmail, role, memberName)
   });
 }
