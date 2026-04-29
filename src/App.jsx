@@ -87,12 +87,13 @@ function AppContent() {
             {/* Pages protégées — Marchand */}
             <Route path="/dashboard"   element={<ProtectedRoute><GatewayDashboard /></ProtectedRoute>} />
             <Route path="/providers"   element={<ProtectedRoute><MerchantProviders /></ProtectedRoute>} />
+            <Route path="/payment-links" element={<ProtectedRoute><PaymentLinks /></ProtectedRoute>} />
             <Route path="/transactions"element={<ProtectedRoute><GatewayTransactions /></ProtectedRoute>} />
             <Route path="/payouts"     element={<ProtectedRoute><MerchantPayouts /></ProtectedRoute>} />
             <Route path="/developer"   element={<ProtectedRoute><Developer /></ProtectedRoute>} />
             <Route path="/settings"    element={<ProtectedRoute><GatewaySettings /></ProtectedRoute>} />
             <Route path="/verification"element={<ProtectedRoute><Verification /></ProtectedRoute>} />
-            <Route path="/payment-links" element={<ProtectedRoute><PaymentLinks /></ProtectedRoute>} />
+            
 
             {/* Pages Admin */}
             <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

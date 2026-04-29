@@ -317,10 +317,10 @@ const CSS = `
 `;
 
 const TABS = [
-  { id: 'api',      label: 'Clé API',       icon: Key },
-  { id: 'links',    label: 'Lien de paiement', icon: Link },
-  { id: 'webhooks', label: 'Webhooks',      icon: Webhook },
-  { id: 'docs',     label: 'Documentation', icon: BookOpen },
+  { id: 'api',      label: 'Clé API',            icon: Key },
+  { id: 'links',    label: 'Lien de paiement',   icon: Link },
+  { id: 'webhooks', label: 'Webhooks',            icon: Webhook },
+  { id: 'docs',     label: 'Documentation',       icon: BookOpen },
 ];
 
 const EVENTS = [
@@ -337,7 +337,12 @@ function CopyBtn({ text }) {
   return (
     <button className="dev-copybtn"
       style={{ background: done ? '#F0FDF4' : '#FAFAFA', color: done ? '#00A550' : '#888' }}
-      onClick={() => { navigator.clipboard.writeText(text); toast.success('Copié !'); setDone(true); setTimeout(() => setDone(false), 1800); }}>
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        toast.success('Copié !');
+        setDone(true);
+        setTimeout(() => setDone(false), 1800);
+      }}>
       {done ? <CheckCircle size={14} /> : <Copy size={14} />}
     </button>
   );
@@ -371,7 +376,9 @@ function TerminalBlock({ code }) {
     <div className="dev-terminal">
       <div className="dev-terminal-dots">
         <div style={{ display: 'flex', gap: 5 }}>
-          {['#FF5F56','#FFBD2E','#27C93F'].map((c, i) => <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />)}
+          {['#FF5F56', '#FFBD2E', '#27C93F'].map((c, i) => (
+            <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />
+          ))}
         </div>
         <CopyBtn text={code} />
       </div>
@@ -412,33 +419,43 @@ function TabApiKey({ apiKey, setApiKey }) {
     try {
       await setDoc(doc(db, 'gateway_merchants', user.uid), { apiKey, updatedAt: new Date().toISOString() }, { merge: true });
       toast.success('Clé enregistrée');
-    } catch { toast.error('Erreur'); }
-    finally { setSaving(false); }
+    } catch {
+      toast.error('Erreur');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const masked  = apiKey ? (show ? apiKey : apiKey.substring(0, 10) + '••••••••••••••') : null;
-  const curl    = `curl -X POST ${APP_URL}/api/gateway/pay \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: ${apiKey || 'YOUR_API_KEY'}" \\\n  -d '{"amount":5000,"currency":"XOF","description":"Facture #123"}'`;
+  const masked = apiKey ? (show ? apiKey : apiKey.substring(0, 10) + '••••••••••••••') : null;
+  const curl   = `curl -X POST ${APP_URL}/api/gateway/pay \\\n  -H "Content-Type: application/json" \\\n  -H "x-api-key: ${apiKey || 'YOUR_API_KEY'}" \\\n  -d '{"amount":5000,"currency":"XOF","description":"Facture #123"}'`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
       {/* Clé */}
       <div className="dev-card">
-        <CardHead iconBg="#FFF3EA" iconColor="#FF6B00" icon={Key}
+        <CardHead
+          iconBg="#FFF3EA" iconColor="#FF6B00" icon={Key}
           title="Clé API secrète" sub="Authentifie toutes vos requêtes"
-          right={apiKey && <span style={{ fontSize: 10, fontWeight: 700, background: '#EDFAF3', color: '#00A550', padding: '4px 9px', borderRadius: 100, whiteSpace: 'nowrap' }}>● Active</span>}
+          right={apiKey && (
+            <span style={{ fontSize: 10, fontWeight: 700, background: '#EDFAF3', color: '#00A550', padding: '4px 9px', borderRadius: 100, whiteSpace: 'nowrap' }}>
+              ● Active
+            </span>
+          )}
         />
 
         <div className="dev-keyrow">
           <div className="dev-keyrow-text">
             {masked ?? <span style={{ color: '#CCC', fontStyle: 'italic' }}>Aucune clé générée</span>}
           </div>
-          {apiKey && <>
-            <button className="dev-eyebtn" onClick={() => setShow(v => !v)}>
-              {show ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
-            <CopyBtn text={apiKey} />
-          </>}
+          {apiKey && (
+            <>
+              <button className="dev-eyebtn" onClick={() => setShow(v => !v)}>
+                {show ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+              <CopyBtn text={apiKey} />
+            </>
+          )}
         </div>
 
         {apiKey && show && (
@@ -450,16 +467,23 @@ function TabApiKey({ apiKey, setApiKey }) {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className={apiKey ? 'dev-btn-secondary' : 'dev-btn-primary'} onClick={generate} disabled={genning}>
-            {genning ? <><Loader size={12} className="dev-spin" /> Génération…</> : <><RefreshCw size={12} /> {apiKey ? 'Regénérer' : 'Générer ma clé'}</>}
+            {genning
+              ? <><Loader size={12} className="dev-spin" /> Génération…</>
+              : <><RefreshCw size={12} /> {apiKey ? 'Regénérer' : 'Générer ma clé'}</>
+            }
           </button>
           {apiKey && (
             <button className="dev-btn-primary" onClick={save} disabled={saving} style={{ opacity: saving ? .6 : 1 }}>
-              {saving ? <><Loader size={12} className="dev-spin" /> Enreg…</> : <><Save size={12} /> Enregistrer</>}
+              {saving
+                ? <><Loader size={12} className="dev-spin" /> Enreg…</>
+                : <><Save size={12} /> Enregistrer</>
+              }
             </button>
           )}
         </div>
       </div>
 
+      {/* Test cURL */}
       {apiKey && (
         <div className="dev-card">
           <CardHead iconBg="#1A1A2E" iconColor="#A0AEC0" icon={Terminal} title="Test cURL" sub="Testez depuis votre terminal" />
@@ -472,14 +496,14 @@ function TabApiKey({ apiKey, setApiKey }) {
 
 /* ─── TAB: LIEN DE PAIEMENT ─── */
 function TabPaymentLink({ apiKey }) {
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount]           = useState('');
   const [description, setDescription] = useState('');
   const [generatedLink, setGeneratedLink] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [copied, setCopied]           = useState(false);
 
   const generateLink = async () => {
-    if (!apiKey) { toast.error('Générez d\'abord une clé API'); return; }
+    if (!apiKey) { toast.error("Générez d'abord une clé API"); return; }
     if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
     if (!description.trim()) { toast.error('Description requise'); return; }
 
@@ -521,7 +545,7 @@ function TabPaymentLink({ apiKey }) {
 
   const shareViaWhatsApp = () => {
     const text = encodeURIComponent(
-      `💳 *Lien de paiement*\n\nMontant : *${parseFloat(amount).toLocaleString('fr-FR')}*\nDescription : ${description}\n\n👉 ${generatedLink}`
+      `💳 *Lien de paiement*\n\nMontant : *${parseFloat(amount).toLocaleString('fr-FR')} XOF*\nDescription : ${description}\n\n👉 ${generatedLink}`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
@@ -529,10 +553,28 @@ function TabPaymentLink({ apiKey }) {
   const shareViaEmail = () => {
     const subject = encodeURIComponent('Lien de paiement');
     const body = encodeURIComponent(
-      `Bonjour,\n\nVoici votre lien de paiement :\n\n${generatedLink}\n\nMontant : ${parseFloat(amount).toLocaleString('fr-FR')}\nDescription : ${description}\n\nMerci !`
+      `Bonjour,\n\nVoici votre lien de paiement :\n\n${generatedLink}\n\nMontant : ${parseFloat(amount).toLocaleString('fr-FR')} XOF\nDescription : ${description}\n\nMerci !`
     );
     window.open(`mailto:?subject=${subject}&body=${body}`);
   };
+
+  const exampleCode = `// Générer un lien de paiement depuis votre backend Node.js
+
+const response = await fetch('${APP_URL}/api/gateway/generate-link', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-api-key': process.env.GATEWAY_API_KEY  // gw_xxx — jamais côté client
+  },
+  body: JSON.stringify({
+    amount: ${amount || 5000},
+    description: "${description || 'Facture #123'}"
+  })
+});
+
+const data = await response.json();
+// data.success → true
+// data.url     → ${generatedLink || APP_URL + '/pay?pid=a1b2c3d4-e5f6-4abc-8def-...'}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -546,16 +588,17 @@ function TabPaymentLink({ apiKey }) {
 
       {/* Générateur */}
       <div className="dev-card">
-        <CardHead iconBg="#EBF0FF" iconColor="#0057FF" icon={Link}
+        <CardHead
+          iconBg="#EBF0FF" iconColor="#0057FF" icon={Link}
           title="Générer un lien de paiement"
-          sub="Le montant est inclus dans un token signé HMAC — infalsifiable"
+          sub="Lien sécurisé avec pid UUID — expire après 15 minutes"
         />
 
         <div className="dev-link-generator">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 5 }}>
-                Montant
+                Montant (XOF)
               </label>
               <input
                 className="dev-input"
@@ -588,22 +631,19 @@ function TabPaymentLink({ apiKey }) {
             disabled={loading || !apiKey}
             style={{ width: '100%', justifyContent: 'center', opacity: loading ? .7 : 1 }}
           >
-            {loading ? (
-              <><Loader size={13} className="dev-spin" /> Génération…</>
-            ) : (
-              <><Zap size={13} /> Générer le lien de paiement</>
-            )}
+            {loading
+              ? <><Loader size={13} className="dev-spin" /> Génération…</>
+              : <><Zap size={13} /> Générer le lien de paiement</>
+            }
           </button>
         </div>
 
         {generatedLink && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Lien généré */}
             <div className="dev-link-result">
-              <Link size={14} color="#00A550" style={{ flexShrink: 0 }} />
-              <span style={{
-                flex: 1, fontSize: 11, fontFamily: "'Fira Code',monospace",
-                color: '#555', wordBreak: 'break-all', minWidth: 0,
-              }}>
+              <CheckCircle size={14} color="#00A550" style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 11, fontFamily: "'Fira Code',monospace", color: '#555', wordBreak: 'break-all', minWidth: 0 }}>
                 {generatedLink}
               </span>
               <button
@@ -615,7 +655,7 @@ function TabPaymentLink({ apiKey }) {
               </button>
             </div>
 
-            {/* Infos */}
+            {/* Métadonnées */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, fontSize: 11, color: '#888' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Banknote size={11} />
@@ -631,7 +671,7 @@ function TabPaymentLink({ apiKey }) {
               </span>
             </div>
 
-            {/* Actions */}
+            {/* Actions partage */}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 className="dev-btn-green"
@@ -661,34 +701,15 @@ function TabPaymentLink({ apiKey }) {
         <div className="dev-info">
           <Lock size={13} style={{ marginTop: 1, flexShrink: 0, color: '#3730A3' }} />
           <span>
-            <strong>Sécurisé :</strong> Le token est signé avec HMAC-SHA256. Le client ne peut pas modifier le montant. Le lien expire après 15 minutes.
+            <strong>Sécurisé :</strong> L'URL contient un pid UUID opaque généré par la gateway. La clé API reste côté serveur et n'apparaît jamais dans le lien. Le pid expire après 15 minutes.
           </span>
         </div>
       </div>
 
-      {/* Code exemple */}
+      {/* Exemple de code */}
       <div className="dev-card">
-        <CardHead iconBg="#0D1117" iconColor="#A0AEC0" icon={Code} title="Génération via API" sub="Exemple Node.js" />
-        <TerminalBlock code={`// Générer un lien de paiement depuis votre backend
-const crypto = require('crypto');
-
-const payload = {
-  amount: ${amount || 5000},
-  description: "${description || 'Facture #123'}",
-  timestamp: Date.now()
-};
-
-const sig = crypto
-  .createHmac('sha256', process.env.GATEWAY_SECRET)
-  .update(JSON.stringify(payload))
-  .digest('hex');
-
-const token = Buffer.from(
-  JSON.stringify({ ...payload, sig })
-).toString('base64');
-
-const url = \`${APP_URL}/pay?token=\${encodeURIComponent(token)}\`;
-// ${generatedLink || APP_URL + '/pay?token=eyJhbW91bnQiOjUwMDAs...'}`} />
+        <CardHead iconBg="#0D1117" iconColor="#A0AEC0" icon={Code} title="Génération via API" sub="Exemple Node.js / Express" />
+        <TerminalBlock code={exampleCode} />
       </div>
     </div>
   );
@@ -704,8 +725,10 @@ function TabWebhooks({ merchant, webhooks, setWebhooks }) {
   const activeProviders = merchant?.providers
     ? Object.keys(merchant.providers).filter(k => merchant.providers[k]?.active)
     : [];
+
   const providerUrls = activeProviders.map(id => ({
-    id, name: id.charAt(0).toUpperCase() + id.slice(1),
+    id,
+    name: id.charAt(0).toUpperCase() + id.slice(1),
     url: `${APP_URL}/api/webhook/${id}`,
   }));
 
@@ -714,15 +737,24 @@ function TabWebhooks({ merchant, webhooks, setWebhooks }) {
     if (!form.url.startsWith('https://')) { toast.error("L'URL doit commencer par https://"); return; }
     setSaving(true);
     try {
-      const item = { id: 'wh_' + Date.now(), url: form.url, events: form.events, active: true, createdAt: new Date().toISOString() };
+      const item = {
+        id: 'wh_' + Date.now(),
+        url: form.url,
+        events: form.events,
+        active: true,
+        createdAt: new Date().toISOString(),
+      };
       const updated = [...webhooks, item];
       await setDoc(doc(db, 'gateway_merchants', user.uid), { webhooks: updated, updatedAt: new Date().toISOString() }, { merge: true });
       setWebhooks(updated);
       setForm({ url: '', events: ['payment.completed'] });
       setShowForm(false);
       toast.success('Webhook ajouté');
-    } catch { toast.error('Erreur'); }
-    finally { setSaving(false); }
+    } catch {
+      toast.error('Erreur');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const del = async (id) => {
@@ -739,12 +771,14 @@ function TabWebhooks({ merchant, webhooks, setWebhooks }) {
   };
 
   const toggleEvent = (val) => setForm(f => ({
-    ...f, events: f.events.includes(val) ? f.events.filter(e => e !== val) : [...f.events, val],
+    ...f,
+    events: f.events.includes(val) ? f.events.filter(e => e !== val) : [...f.events, val],
   }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+      {/* URLs providers actifs */}
       {providerUrls.length > 0 && (
         <div className="dev-card">
           <CardHead iconBg="#FFF3EA" iconColor="#FF6B00" icon={Webhook} title="URLs pour vos providers" sub="Copiez dans le dashboard de chaque provider" />
@@ -765,7 +799,7 @@ function TabWebhooks({ merchant, webhooks, setWebhooks }) {
         </div>
       )}
 
-      {/* Webhooks perso */}
+      {/* Webhooks personnalisés */}
       <div className="dev-card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
@@ -787,14 +821,21 @@ function TabWebhooks({ merchant, webhooks, setWebhooks }) {
         {showForm && (
           <div style={{ background: '#F7F8FC', border: '1px solid #E8E8E8', borderRadius: 12, padding: '14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 5 }}>URL du webhook</label>
-              <input className="dev-input" type="url" value={form.url}
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 5 }}>
+                URL du webhook
+              </label>
+              <input
+                className="dev-input"
+                type="url"
+                value={form.url}
                 onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
                 placeholder="https://votre-serveur.com/webhook"
               />
             </div>
             <div>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 7 }}>Événements</label>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.08em', display: 'block', marginBottom: 7 }}>
+                Événements
+              </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {EVENTS.map(ev => {
                   const on = form.events.includes(ev.value);
@@ -839,10 +880,12 @@ function TabWebhooks({ merchant, webhooks, setWebhooks }) {
                   </div>
                   <span style={{ fontSize: 10, color: '#BBB' }}>{new Date(w.createdAt).toLocaleDateString('fr-FR')}</span>
                 </div>
-                <button onClick={() => del(w.id)}
+                <button
+                  onClick={() => del(w.id)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#DDD', padding: 3, flexShrink: 0, transition: 'color .2s' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#EF4444'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#DDD'}>
+                  onMouseLeave={e => e.currentTarget.style.color = '#DDD'}
+                >
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -859,20 +902,38 @@ function TabDocs() {
   const docsUrl = `${API_URL}/api-documentation`;
 
   const steps = [
-    { num: '01', title: 'Clé API',     desc: 'Générez et enregistrez votre clé dans l\'onglet Clé API.',          icon: Key,        color: '#FF6B00', bg: '#FFF3EA' },
-    { num: '02', title: 'Token signé', desc: 'Générez un token HMAC avec amount + description côté backend.',     icon: Lock,       color: '#00A550', bg: '#EDFAF3' },
-    { num: '03', title: 'Intégration', desc: 'Utilisez le lien de paiement ou l\'API REST depuis votre backend.',  icon: Globe,      color: '#0057FF', bg: '#EBF0FF' },
-    { num: '04', title: 'Webhooks',    desc: 'Recevez des notifications POST à chaque événement de paiement.',     icon: Webhook,    color: '#9B00E8', bg: '#F4EBFF' },
+    { num: '01', title: 'Clé API',       desc: "Générez et enregistrez votre clé dans l'onglet Clé API.",             icon: Key,     color: '#FF6B00', bg: '#FFF3EA' },
+    { num: '02', title: 'Lien sécurisé', desc: "Appelez /api/gateway/generate-link avec votre clé depuis votre backend.", icon: Link,    color: '#00A550', bg: '#EDFAF3' },
+    { num: '03', title: 'Intégration',   desc: "Redirigez le client vers l'URL retournée (/pay?pid=...).",             icon: Globe,   color: '#0057FF', bg: '#EBF0FF' },
+    { num: '04', title: 'Webhooks',      desc: "Recevez des notifications POST à chaque événement de paiement.",       icon: Webhook, color: '#9B00E8', bg: '#F4EBFF' },
   ];
 
   const endpoints = [
-    { method: 'POST', path: '/api/gateway/pay',          desc: 'Initier' },
-    { method: 'GET',  path: '/api/gateway/verify/:id',   desc: 'Statut' },
-    { method: 'GET',  path: '/api/gateway/transactions', desc: 'Lister' },
+    { method: 'POST', path: '/api/gateway/generate-link', desc: 'Générer un lien' },
+    { method: 'POST', path: '/api/gateway/pay',           desc: 'Paiement direct' },
+    { method: 'GET',  path: '/api/gateway/verify/:id',    desc: 'Statut' },
+    { method: 'GET',  path: '/api/gateway/transactions',  desc: 'Lister' },
+    { method: 'GET',  path: '/api/gateway/balance',       desc: 'Solde' },
   ];
 
   const MC = { POST: '#FF6B00', GET: '#0057FF' };
-  const payload = `{\n  "event": "payment.completed",\n  "data": {\n    "id": "txn_abc123",\n    "amount": 5000,\n    "currency": "XOF",\n    "status": "completed"\n  }\n}`;
+
+  const payload = `{
+  "event": "payment.completed",
+  "transaction": {
+    "id": "txn_abc123",
+    "reference": "GW-1714000000000",
+    "amount": 5000,
+    "netAmount": 4950,
+    "commission": 50,
+    "country": "bj",
+    "method": "mtn_money",
+    "provider": "feexpay",
+    "status": "completed",
+    "createdAt": "2026-01-01T12:00:00.000Z",
+    "completedAt": "2026-01-01T12:01:30.000Z"
+  }
+}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -886,7 +947,7 @@ function TabDocs() {
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Documentation complète</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', marginTop: 1 }}>Référence, exemples et guides</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,.7)', marginTop: 1 }}>Référence, exemples et guides d'intégration</div>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,.2)', borderRadius: 8, padding: '6px 11px', flexShrink: 0 }}>
@@ -920,8 +981,12 @@ function TabDocs() {
         <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #EBEBEB' }}>
           {endpoints.map((ep, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: i % 2 === 0 ? '#fff' : '#FAFAFA', borderBottom: i < endpoints.length - 1 ? '1px solid #F0F0F0' : 'none', overflow: 'hidden' }}>
-              <span style={{ fontSize: 9, fontWeight: 800, color: MC[ep.method] || '#888', background: `${MC[ep.method] || '#888'}15`, padding: '2px 7px', borderRadius: 5, minWidth: 34, textAlign: 'center', flexShrink: 0 }}>{ep.method}</span>
-              <code style={{ flex: '1 1 0%', minWidth: 0, fontSize: 11, color: '#444', fontFamily: "'Fira Code',monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.path}</code>
+              <span style={{ fontSize: 9, fontWeight: 800, color: MC[ep.method] || '#888', background: `${MC[ep.method] || '#888'}15`, padding: '2px 7px', borderRadius: 5, minWidth: 34, textAlign: 'center', flexShrink: 0 }}>
+                {ep.method}
+              </span>
+              <code style={{ flex: '1 1 0%', minWidth: 0, fontSize: 11, color: '#444', fontFamily: "'Fira Code',monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {ep.path}
+              </code>
               <span style={{ fontSize: 10, color: '#AAA', flexShrink: 0 }}>{ep.desc}</span>
             </div>
           ))}
@@ -954,8 +1019,11 @@ export default function Developer() {
         setMerchant(data);
         setApiKey(data.apiKey || '');
         setWebhooks(data.webhooks || []);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -975,7 +1043,9 @@ export default function Developer() {
           <h1 style={{ fontSize: 19, fontWeight: 900, color: '#0A0A0A', letterSpacing: '-.02em', marginBottom: 3 }}>
             Espace Développeur
           </h1>
-          <p style={{ fontSize: 12, color: '#AAA' }}>Gérez vos clés API, webhooks et générez des liens de paiement sécurisés.</p>
+          <p style={{ fontSize: 12, color: '#AAA' }}>
+            Gérez vos clés API, webhooks et générez des liens de paiement sécurisés.
+          </p>
         </div>
 
         {/* Tab bar */}
@@ -987,7 +1057,9 @@ export default function Developer() {
                 style={{ background: on ? '#fff' : 'transparent', color: on ? '#111' : '#888', fontWeight: on ? 700 : 500, boxShadow: on ? '0 1px 5px rgba(0,0,0,.07)' : 'none', fontFamily: 'inherit' }}>
                 <t.icon size={13} color={on ? '#FF6B00' : '#CCC'} />
                 {t.label}
-                {t.id === 'api' && apiKey && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00A550', flexShrink: 0 }} />}
+                {t.id === 'api' && apiKey && (
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00A550', flexShrink: 0 }} />
+                )}
                 {t.id === 'webhooks' && webhooks.length > 0 && (
                   <span style={{ background: '#FF6B00', color: '#fff', fontSize: 9, fontWeight: 800, padding: '1px 5px', borderRadius: 100 }}>
                     {webhooks.length}
@@ -998,7 +1070,7 @@ export default function Developer() {
           })}
         </div>
 
-        {/* Contenu */}
+        {/* Contenu par onglet */}
         {tab === 'api'      && <TabApiKey      apiKey={apiKey} setApiKey={setApiKey} />}
         {tab === 'links'    && <TabPaymentLink apiKey={apiKey} />}
         {tab === 'webhooks' && <TabWebhooks    merchant={merchant} webhooks={webhooks} setWebhooks={setWebhooks} />}

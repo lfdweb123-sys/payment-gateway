@@ -12,7 +12,7 @@ const BASE_URL = import.meta.env.VITE_APP_URL || 'https://votre-domaine.vercel.a
 /*
   ─── COMMENT FONCTIONNE LA GÉNÉRATION DE LIEN ────────────────────────────
   
-  Le marchand appelle POST /api/gateway/create-payment-link avec sa clé API.
+  Le marchand appelle POST /api/gateway/generate-link avec sa clé API.
   La gateway crée un enregistrement dans Firestore (collection payment_links)
   et retourne une URL avec un pid (UUID opaque).
 
@@ -42,16 +42,16 @@ const TABS = [
 const METHODS = {
   quickstart: {
     title: 'Démarrage rapide',
-    sub: "Appelez create-payment-link avec votre clé API — la gateway génère un lien sécurisé avec pid.",
+    sub: "Appelez generate-link avec votre clé API — la gateway génère un lien sécurisé avec pid.",
     items: [
       {
         name: '① Générer un lien de paiement',
-        desc: "Appelez POST /api/gateway/create-payment-link avec votre clé API. La gateway crée un pid (UUID opaque) et retourne l'URL complète. Le pid expire après 15 minutes.",
+        desc: "Appelez POST /api/gateway/generate-link avec votre clé API. La gateway crée un pid (UUID opaque) et retourne l'URL complète. Le pid expire après 15 minutes.",
         lang: 'javascript',
         code: `// Appelez cet endpoint depuis votre backend ou serveur
 // Votre clé API (gw_xxx) dans le header x-api-key — jamais dans l'URL
 
-const response = await fetch('${BASE_URL}/api/gateway/create-payment-link', {
+const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -91,7 +91,7 @@ ${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-ef1234567890
 app.post('/payer', async (req, res) => {
   const { amount, description } = req.body;
   
-  const response = await fetch('${BASE_URL}/api/gateway/create-payment-link', {
+  const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ const data = await res.json();
 
 <script>
 async function startPayment() {
-  // Appel à VOTRE backend (qui appelle create-payment-link)
+  // Appel à VOTRE backend (qui appelle generate-link)
   const res = await fetch('/api/creer-lien', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -211,7 +211,7 @@ async function pay(amount, description) {
 
   javascript: {
     title: 'JavaScript / Node.js',
-    sub: "Appelez create-payment-link depuis votre backend — la clé API reste côté serveur.",
+    sub: "Appelez generate-link depuis votre backend — la clé API reste côté serveur.",
     items: [
       {
         name: 'Générer un lien de paiement (Node.js / Express)',
@@ -225,7 +225,7 @@ app.use(express.json());
 app.post('/creer-lien', async (req, res) => {
   const { amount, description, country, method } = req.body;
   
-  const response = await fetch('${BASE_URL}/api/gateway/create-payment-link', {
+  const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -300,7 +300,7 @@ export default async function handler(req, res) {
   
   const { amount, description } = req.body;
   
-  const response = await fetch('${BASE_URL}/api/gateway/create-payment-link', {
+  const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -318,14 +318,14 @@ export default async function handler(req, res) {
 
   php: {
     title: 'PHP',
-    sub: "Appelez create-payment-link côté serveur PHP — clé API dans les variables d'environnement.",
+    sub: "Appelez generate-link côté serveur PHP — clé API dans les variables d'environnement.",
     items: [
       {
         name: 'Générer un lien de paiement',
         lang: 'php',
         code: `<?php
 function creerLienPaiement($amount, $description, $country = null, $method = null) {
-  $ch = curl_init('${BASE_URL}/api/gateway/create-payment-link');
+  $ch = curl_init('${BASE_URL}/api/gateway/generate-link');
   curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_HTTPHEADER => [
@@ -409,7 +409,7 @@ echo json_encode(['received' => true]);`,
 
   python: {
     title: 'Python',
-    sub: "create-payment-link depuis Flask/Django — clé API dans os.environ.",
+    sub: "generate-link depuis Flask/Django — clé API dans os.environ.",
     items: [
       {
         name: 'Générer un lien de paiement',
@@ -424,7 +424,7 @@ def creer_lien_paiement(amount, description, country=None, method=None):
     if method:  payload['method']  = method
     
     response = requests.post(
-        f'{GATEWAY_URL}/api/gateway/create-payment-link',
+        f'{GATEWAY_URL}/api/gateway/generate-link',
         headers={
             'Content-Type': 'application/json',
             'x-api-key': os.environ['GATEWAY_API_KEY']  # gw_xxx
@@ -487,17 +487,17 @@ def webhook():
 
   wordpress: {
     title: 'WordPress',
-    sub: "Shortcode qui appelle create-payment-link côté serveur PHP.",
+    sub: "Shortcode qui appelle generate-link côté serveur PHP.",
     items: [
       {
-        name: 'Shortcode avec create-payment-link',
+        name: 'Shortcode avec generate-link',
         lang: 'php',
         code: `// Dans functions.php de votre thème
 // Stockez GATEWAY_API_KEY dans wp-config.php :
 // define('GATEWAY_API_KEY', 'gw_votre_cle_api');
 
 function creer_lien_gateway($amount, $description) {
-  $ch = curl_init('${BASE_URL}/api/gateway/create-payment-link');
+  $ch = curl_init('${BASE_URL}/api/gateway/generate-link');
   curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_HTTPHEADER => [
@@ -535,10 +535,10 @@ add_shortcode('bouton_paiement', function($atts) {
     sub: "Référence complète — clé API en header x-api-key pour tous les appels.",
     items: [
       {
-        name: 'POST /api/gateway/create-payment-link — Générer un lien sécurisé',
+        name: 'POST /api/gateway/generate-link — Générer un lien sécurisé',
         desc: "Crée un pid UUID dans Firestore et retourne l'URL de paiement. La clé API du marchand ne sera jamais dans l'URL.",
         lang: 'bash',
-        code: `curl -X POST ${BASE_URL}/api/gateway/create-payment-link \\
+        code: `curl -X POST ${BASE_URL}/api/gateway/generate-link \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: gw_votre_cle_api" \\
   -d '{
@@ -717,7 +717,7 @@ import 'package:url_launcher/url_launcher.dart';
 const gatewayUrl = '${BASE_URL}';
 
 // ⚠️ La clé API ne doit PAS être dans le code mobile.
-// Appelez votre propre backend qui appelle create-payment-link.
+// Appelez votre propre backend qui appelle generate-link.
 
 Future<String?> creerLien(double amount, String description) async {
   // Appel à VOTRE backend (pas directement à la gateway)
@@ -954,7 +954,7 @@ export default function GatewayApiDocs() {
             </div>
           </div>
           <p style={{ fontSize:13, color:'rgba(255,255,255,.5)', maxWidth:520, lineHeight:1.6, marginBottom:14 }}>
-            Intégrez la passerelle en 2 étapes : appelez <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>create-payment-link</code> avec votre clé API, redirigez vers l'URL retournée.
+            Intégrez la passerelle en 2 étapes : appelez <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>generate-link</code> avec votre clé API, redirigez vers l'URL retournée.
           </p>
 
           {/* Base URL */}
