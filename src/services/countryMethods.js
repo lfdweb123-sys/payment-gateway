@@ -275,6 +275,23 @@ const PROVIDER_METHODS = {
       gm: ['afrimoney', 'qmoney', 'wave_money'],
     },
   },
+  
+  geniuspay: {
+    countries: {
+      ci: ['wave_money', 'orange_money', 'mtn_money', 'moov_money', 'card'],
+      sn: ['wave_money', 'orange_money', 'free_money', 'card'],
+      bj: ['mtn_money', 'moov_money', 'card'],
+      cm: ['orange_money', 'mtn_money', 'card'],
+      cd: ['airtel_money', 'orange_money', 'card'],
+      cg: ['mtn_money', 'airtel_money', 'card'],
+      gn: ['orange_money', 'mtn_money', 'card'],
+      ne: ['orange_money', 'moov_money', 'card'],
+      bf: ['orange_money', 'moov_money', 'card'],
+      ml: ['orange_money', 'moov_money', 'card'],
+      tg: ['moov_money', 'card'],
+      ke: ['airtel_money', 'mpesa', 'card'],
+    },
+  },
 
   // ── Mobile Money direct (opérateurs) ──────────────────────────────────────
 
