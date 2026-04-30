@@ -8,7 +8,6 @@
 
 import { log, logError } from '../logs/logger.js';
 import admin from 'firebase-admin';
-import { sendBrevoEmail, getPaymentReceivedTemplate } from '../lib/brevo.js';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -20,6 +19,41 @@ if (!admin.apps.length) {
   });
 }
 const db = admin.firestore();
+
+/* ─── Brevo email (fonction locale) ─────────────────────────────────────── */
+async function sendEmail({ to, toName, subject, htmlContent }) {
+  const apiKey = process.env.VITE_BREVO_API_KEY;
+  if (!apiKey) { console.warn('VITE_BREVO_API_KEY manquant'); return { success: false }; }
+  if (!to) { console.warn('Email destinataire manquant'); return { success: false }; }
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify({
+        sender: {
+          name: 'Passerelle de Paiement',
+          email: process.env.BREVO_SENDER_EMAIL || 'noreply@payment-gateway.com',
+        },
+        to: [{ email: to, name: toName || to }],
+        subject,
+        htmlContent,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('Brevo erreur:', err.message || res.status);
+      return { success: false, error: err.message };
+    }
+    return { success: true };
+  } catch (e) {
+    console.error('Brevo exception:', e.message);
+    return { success: false, error: e.message };
+  }
+}
 
 /* ─── Récupérer l'email du marchand (depuis gateway_merchants ou users) ─── */
 async function getMerchantEmailAndName(merchantId) {
@@ -59,7 +93,7 @@ async function getMerchantEmailAndName(merchantId) {
   return { email: null, name: null };
 }
 
-/* ─── Templates email de secours (si brevo.js n'est pas accessible) ─────── */
+/* ─── Templates email ────────────────────────────────────────────────────── */
 function tplPaymentReceived(name, amount, currency, reference, provider) {
   return `
     <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;background:#f9fafb;">
@@ -604,25 +638,12 @@ export default async function handler(req, res) {
 
         if (isSuccessful) {
           console.log(`📧 Envoi email notification au marchand: ${merchantEmail}`);
-          
-          // Utiliser le template de brevo.js
-          const emailResult = await sendEmail({
+          await sendEmail({
             to: merchantEmail,
             toName: merchantName || merchantEmail,
             subject: `💰 Paiement reçu — ${Number(netAmount).toLocaleString('fr-FR')} ${currency}`,
-            htmlContent: getPaymentReceivedTemplate(merchantName || merchantEmail, netAmount, reference)
+            htmlContent: tplPaymentReceived(merchantName || merchantEmail, netAmount, currency, reference, provider)
           });
-          
-          if (!emailResult.success) {
-            // Fallback vers le template local
-            console.log('Fallback vers template local');
-            await sendEmail({
-              to: merchantEmail,
-              toName: merchantName || merchantEmail,
-              subject: `💰 Paiement reçu — ${Number(netAmount).toLocaleString('fr-FR')} ${currency}`,
-              htmlContent: tplPaymentReceived(merchantName || merchantEmail, netAmount, currency, reference, provider)
-            });
-          }
         } else {
           await sendEmail({
             to: merchantEmail,
