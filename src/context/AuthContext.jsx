@@ -36,31 +36,42 @@ export function AuthProvider({ children }) {
           // 3. Détection membre d'équipe
           // Si l'utilisateur n'est pas propriétaire d'un compte marchand,
           // on cherche s'il est membre d'une équipe (status = active).
-          let teamMembership = null;
-          if (!merchantDoc.exists()) {
-            try {
-              const teamQuery = query(
-                collection(db, 'gateway_merchant_teams'),
-                where('userId', '==', firebaseUser.uid),
-                where('status',  '==', 'active')
-              );
-              const teamSnap = await getDocs(teamQuery);
-              if (!teamSnap.empty) {
-                const teamData = teamSnap.docs[0].data();
-                // Charger le document du marchand propriétaire
-                const ownerMerchantDoc = await getDoc(doc(db, 'gateway_merchants', teamData.merchantId));
-                teamMembership = {
-                  teamId:             teamSnap.docs[0].id,
-                  merchantId:         teamData.merchantId,
-                  role:               teamData.role,
-                  merchantData:       ownerMerchantDoc.exists() ? ownerMerchantDoc.data() : {}
-                };
-              }
-            } catch (e) {
-              // Erreur de permissions possible si les règles ne couvrent pas ce cas
-              console.warn('Impossible de charger le membership équipe :', e.message);
-            }
-          }
+let teamMembership = null;
+if (!merchantDoc.exists()) {
+  try {
+    console.log('=== TEAM DEBUG ===');
+    console.log('uid:', firebaseUser.uid);
+    console.log('email:', firebaseUser.email);
+
+    const teamQuery = query(
+      collection(db, 'gateway_merchant_teams'),
+      where('userId', '==', firebaseUser.uid),
+      where('status',  '==', 'active')
+    );
+    const teamSnap = await getDocs(teamQuery);
+
+    console.log('teamSnap.size:', teamSnap.size);
+    console.log('docs:', teamSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+    if (!teamSnap.empty) {
+      const teamData = teamSnap.docs[0].data();
+      console.log('teamData:', teamData);
+      const ownerMerchantDoc = await getDoc(doc(db, 'gateway_merchants', teamData.merchantId));
+      console.log('ownerMerchant exists:', ownerMerchantDoc.exists());
+      teamMembership = {
+        teamId:       teamSnap.docs[0].id,
+        merchantId:   teamData.merchantId,
+        role:         teamData.role,
+        merchantData: ownerMerchantDoc.exists() ? ownerMerchantDoc.data() : {}
+      };
+      console.log('teamMembership SET:', teamMembership);
+    }
+  } catch (e) {
+    console.error('TEAM QUERY ERROR:', e.code, e.message);
+  }
+}
+
+console.log('isTeamMember final:', !!teamMembership && !merchantDoc.exists());
 
           setUser({
             ...firebaseUser,
