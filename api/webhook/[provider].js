@@ -22,8 +22,8 @@ const db = admin.firestore();
 
 /* ─── Brevo email (appel direct API — pas d'import src/) ─────────────────── */
 async function sendBrevoEmail({ to, toName, subject, htmlContent }) {
-  const apiKey = process.env.BREVO_API_KEY;
-  if (!apiKey) { console.warn('BREVO_API_KEY manquant'); return; }
+  const apiKey = process.env.VITE_BREVO_API_KEY;
+  if (!apiKey) { console.warn('VITE_BREVO_API_KEY manquant'); return; }
   try {
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
