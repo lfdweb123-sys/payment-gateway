@@ -21,81 +21,72 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const loadUserData = async (firebaseUser) => {
+    const userDoc  = await getDoc(doc(db, 'users', firebaseUser.uid));
+    const userData = userDoc.exists() ? userDoc.data() : { role: 'user' };
+
+    const merchantDoc  = await getDoc(doc(db, 'gateway_merchants', firebaseUser.uid));
+    const merchantData = merchantDoc.exists() ? merchantDoc.data() : null;
+
+    let teamMembership = null;
+    if (!merchantDoc.exists()) {
+      try {
+        const teamQuery = query(
+          collection(db, 'gateway_merchant_teams'),
+          where('userId', '==', firebaseUser.uid),
+          where('status', '==', 'active')
+        );
+        const teamSnap = await getDocs(teamQuery);
+
+        if (!teamSnap.empty) {
+          const teamData = teamSnap.docs[0].data();
+          const ownerMerchantDoc = await getDoc(doc(db, 'gateway_merchants', teamData.merchantId));
+          teamMembership = {
+            teamId:       teamSnap.docs[0].id,
+            merchantId:   teamData.merchantId,
+            role:         teamData.role,
+            merchantData: ownerMerchantDoc.exists() ? ownerMerchantDoc.data() : {}
+          };
+        }
+      } catch (e) {
+        console.error('TEAM QUERY ERROR:', e.code, e.message);
+      }
+    }
+
+    return {
+      ...firebaseUser,
+      ...userData,
+      merchant:              merchantData,
+      teamMembership,
+      isTeamMember:          !!teamMembership && !merchantDoc.exists(),
+      effectiveMerchantId:   merchantDoc.exists()
+        ? firebaseUser.uid
+        : teamMembership?.merchantId || null,
+      effectiveMerchantData: merchantDoc.exists()
+        ? merchantData
+        : teamMembership?.merchantData || null,
+      teamRole:              teamMembership?.role || null,
+    };
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // 1. Données utilisateur
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const userData = userDoc.exists() ? userDoc.data() : { role: 'user' };
-
-          // 2. Compte marchand propre
-          const merchantDoc  = await getDoc(doc(db, 'gateway_merchants', firebaseUser.uid));
-          const merchantData = merchantDoc.exists() ? merchantDoc.data() : null;
-
-          // 3. Détection membre d'équipe
-          // Si l'utilisateur n'est pas propriétaire d'un compte marchand,
-          // on cherche s'il est membre d'une équipe (status = active).
-let teamMembership = null;
-if (!merchantDoc.exists()) {
-  try {
-    console.log('=== TEAM DEBUG ===');
-    console.log('uid:', firebaseUser.uid);
-    console.log('email:', firebaseUser.email);
-
-    const teamQuery = query(
-      collection(db, 'gateway_merchant_teams'),
-      where('userId', '==', firebaseUser.uid),
-      where('status',  '==', 'active')
-    );
-    const teamSnap = await getDocs(teamQuery);
-
-    console.log('teamSnap.size:', teamSnap.size);
-    console.log('docs:', teamSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-    if (!teamSnap.empty) {
-      const teamData = teamSnap.docs[0].data();
-      console.log('teamData:', teamData);
-      const ownerMerchantDoc = await getDoc(doc(db, 'gateway_merchants', teamData.merchantId));
-      console.log('ownerMerchant exists:', ownerMerchantDoc.exists());
-      teamMembership = {
-        teamId:       teamSnap.docs[0].id,
-        merchantId:   teamData.merchantId,
-        role:         teamData.role,
-        merchantData: ownerMerchantDoc.exists() ? ownerMerchantDoc.data() : {}
-      };
-      console.log('teamMembership SET:', teamMembership);
-    }
-  } catch (e) {
-    console.error('TEAM QUERY ERROR:', e.code, e.message);
-  }
-}
-
-console.log('isTeamMember final:', !!teamMembership && !merchantDoc.exists());
-
-          setUser({
-            ...firebaseUser,
-            ...userData,
-            // Compte marchand propre (null si membre invité)
-            merchant: merchantData,
-            // Membership équipe (null si propriétaire ou pas de compte)
-            teamMembership,
-            // Raccourcis pratiques
-            isTeamMember:      !!teamMembership && !merchantDoc.exists(),
-            // merchantId effectif : le sien ou celui du propriétaire
-            effectiveMerchantId: merchantDoc.exists()
-              ? firebaseUser.uid
-              : teamMembership?.merchantId || null,
-            // merchantData effectif : le sien ou celui du propriétaire
-            effectiveMerchantData: merchantDoc.exists()
-              ? merchantData
-              : teamMembership?.merchantData || null,
-            // Rôle dans l'équipe (null si propriétaire)
-            teamRole: teamMembership?.role || null,
-          });
+          const enrichedUser = await loadUserData(firebaseUser);
+          setUser(enrichedUser);
         } catch (error) {
           console.error('Erreur chargement user :', error);
-          setUser({ ...firebaseUser, role: 'user', merchant: null, teamMembership: null, isTeamMember: false, effectiveMerchantId: null, effectiveMerchantData: null, teamRole: null });
+          setUser({
+            ...firebaseUser,
+            role:                  'user',
+            merchant:              null,
+            teamMembership:        null,
+            isTeamMember:          false,
+            effectiveMerchantId:   null,
+            effectiveMerchantData: null,
+            teamRole:              null,
+          });
         }
       } else {
         setUser(null);
@@ -104,6 +95,17 @@ console.log('isTeamMember final:', !!teamMembership && !merchantDoc.exists());
     });
     return unsubscribe;
   }, []);
+
+  const refreshUser = async () => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return;
+    try {
+      const enrichedUser = await loadUserData(firebaseUser);
+      setUser(enrichedUser);
+    } catch (error) {
+      console.error('Erreur refreshUser :', error);
+    }
+  };
 
   const login = (email, password) =>
     signInWithEmailAndPassword(auth, email, password);
@@ -138,7 +140,7 @@ console.log('isTeamMember final:', !!teamMembership && !merchantDoc.exists());
     return result;
   };
 
-  const logout       = () => signOut(auth);
+  const logout        = () => signOut(auth);
   const resetPassword = (email) => sendPasswordResetEmail(auth, email);
 
   const value = {
@@ -148,7 +150,8 @@ console.log('isTeamMember final:', !!teamMembership && !merchantDoc.exists());
     register,
     logout,
     resetPassword,
-    loading
+    loading,
+    refreshUser,
   };
 
   return (

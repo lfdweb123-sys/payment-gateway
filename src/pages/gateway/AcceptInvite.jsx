@@ -29,7 +29,7 @@ const STATE = {
 
 export default function AcceptInvite() {
   const [searchParams] = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   const email  = searchParams.get('email') || '';
@@ -109,26 +109,22 @@ export default function AcceptInvite() {
     }
   };
 
-  // On passe aussi invite pour pouvoir logger les infos utiles
   const acceptInvitation = async (teamDocRef, invite) => {
     setState(STATE.ACCEPTING);
     try {
-      console.log('=== ACCEPT DEBUG ===');
-      console.log('teamDocRef.id:', teamDocRef.id);
-      console.log('user.uid:', user.uid);
-      console.log('invite.userId actuel:', invite.userId);
-      console.log('invite.status actuel:', invite.status);
-
       await updateDoc(teamDocRef, {
         userId:     user.uid,
         status:     'active',
         acceptedAt: serverTimestamp()
       });
 
-      console.log('updateDoc OK');
+      // Recharger le contexte auth APRÈS le updateDoc
+      // pour que isTeamMember soit true avant la navigation
+      await refreshUser();
+
       setState(STATE.SUCCESS);
     } catch (err) {
-      console.error('=== ACCEPT ERROR ===', err.code, err.message);
+      console.error('ACCEPT ERROR:', err.code, err.message);
       setState(STATE.ERROR);
       setErrorMessage(
         err.code === 'permission-denied'
@@ -215,10 +211,18 @@ export default function AcceptInvite() {
                   Connectez-vous ou créez un compte avec <strong>{email}</strong> pour accepter.
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <Link to={`/login?redirect=${encodeURIComponent(window.location.href)}`} className="btn-primary" style={{ justifyContent: 'center' }}>
+                  <Link
+                    to={`/login?redirect=${encodeURIComponent(window.location.href)}`}
+                    className="btn-primary"
+                    style={{ justifyContent: 'center' }}
+                  >
                     <LogIn size={16} /> Se connecter
                   </Link>
-                  <Link to={`/register?email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(window.location.href)}`} className="btn-secondary" style={{ justifyContent: 'center' }}>
+                  <Link
+                    to={`/register?email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(window.location.href)}`}
+                    className="btn-secondary"
+                    style={{ justifyContent: 'center' }}
+                  >
                     <UserPlus size={16} /> Créer un compte
                   </Link>
                 </div>
@@ -232,11 +236,17 @@ export default function AcceptInvite() {
               <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                 <CheckCircle size={30} color="#16a34a" />
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>Invitation acceptée !</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
+                Invitation acceptée !
+              </h2>
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 28px', lineHeight: 1.6 }}>
                 Vous faites maintenant partie de l'équipe <strong>{merchantName}</strong> en tant que <strong>{ROLE_LABELS[role] || role}</strong>.
               </p>
-              <button className="btn-primary" onClick={() => navigate('/dashboard')} style={{ margin: '0 auto' }}>
+              <button
+                className="btn-primary"
+                onClick={() => navigate('/dashboard')}
+                style={{ margin: '0 auto' }}
+              >
                 Accéder au tableau de bord <ArrowRight size={16} />
               </button>
             </div>
@@ -248,11 +258,17 @@ export default function AcceptInvite() {
               <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                 <CheckCircle size={30} color="#2563eb" />
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>Vous êtes déjà membre</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
+                Vous êtes déjà membre
+              </h2>
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 28px', lineHeight: 1.6 }}>
                 Cette invitation a déjà été acceptée. Votre accès à <strong>{merchantName}</strong> est actif.
               </p>
-              <button className="btn-primary" onClick={() => navigate('/dashboard')} style={{ margin: '0 auto' }}>
+              <button
+                className="btn-primary"
+                onClick={() => navigate('/dashboard')}
+                style={{ margin: '0 auto' }}
+              >
                 Accéder au tableau de bord <ArrowRight size={16} />
               </button>
             </div>
@@ -264,7 +280,9 @@ export default function AcceptInvite() {
               <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                 <XCircle size={30} color="#dc2626" />
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>Lien invalide</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
+                Lien invalide
+              </h2>
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 28px', lineHeight: 1.6 }}>
                 {errorMessage || "Ce lien d'invitation est invalide ou a expiré."}
               </p>
