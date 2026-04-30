@@ -240,29 +240,41 @@ export default function LoginForm() {
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await login(email, password);
-      toast.success('Connexion réussie !');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  try {
+    await login(email, password);
+    toast.success('Connexion réussie !');
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = urlParams.get('redirect');
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    } else {
       navigate('/dashboard');
-    } catch {
-      toast.error('Email ou mot de passe incorrect');
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch {
+    toast.error('Email ou mot de passe incorrect');
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleGoogleLogin = async () => {
-    try {
-      await loginWithGoogle();
-      toast.success('Connexion réussie !');
+const handleGoogleLogin = async () => {
+  try {
+    await loginWithGoogle();
+    toast.success('Connexion réussie !');
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = urlParams.get('redirect');
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    } else {
       navigate('/dashboard');
-    } catch {
-      toast.error('Erreur lors de la connexion avec Google');
     }
-  };
+  } catch {
+    toast.error('Erreur lors de la connexion avec Google');
+  }
+};
 
   return (
     <div className="lg-root">

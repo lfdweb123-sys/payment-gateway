@@ -309,15 +309,23 @@ export default function RegisterForm() {
   const set = (key, val) => setFormData(p => ({ ...p, [key]: val }));
   const generateApiKey = () => 'gw_' + Array.from({ length: 48 }, () => Math.random().toString(36)[2]).join('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (formData.password !== formData.confirmPassword) { toast.error('Les mots de passe ne correspondent pas'); return; }
-    if (formData.password.length < 6) { toast.error('Minimum 6 caractères'); return; }
-    setLoading(true);
-    try {
-      const result = await register(formData.email, formData.password, {
-        displayName: formData.name, phone: formData.phone, company: formData.company
-      });
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (formData.password !== formData.confirmPassword) { toast.error('Les mots de passe ne correspondent pas'); return; }
+  if (formData.password.length < 6) { toast.error('Minimum 6 caractères'); return; }
+  setLoading(true);
+  try {
+    const result = await register(formData.email, formData.password, {
+      displayName: formData.name, phone: formData.phone, company: formData.company
+    });
+
+    // Vérifier si c'est un invité (redirect vers accept-invite)
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = urlParams.get('redirect') || '';
+    const isInvite = redirectUrl.includes('accept-invite');
+
+    if (!isInvite) {
+      // Seulement pour les nouveaux marchands, pas les invités
       const apiKey = generateApiKey();
       await setDoc(doc(db, 'gateway_merchants', result.user.uid), {
         name: formData.company || formData.name,
@@ -328,14 +336,25 @@ export default function RegisterForm() {
       });
       toast.success('Compte créé avec succès !');
       setStep(2);
-    } catch (error) {
-      toast.error(error.code === 'auth/email-already-in-use' ? 'Email déjà utilisé' : "Erreur lors de l'inscription");
-    } finally { setLoading(false); }
-  };
+    } else {
+      // Invité → rediriger vers accept-invite
+      toast.success('Compte créé ! Acceptation de l\'invitation...');
+      window.location.href = redirectUrl;
+    }
+  } catch (error) {
+    toast.error(error.code === 'auth/email-already-in-use' ? 'Email déjà utilisé' : "Erreur lors de l'inscription");
+  } finally { setLoading(false); }
+};
 
-  const handleGoogleSignup = async () => {
-    try {
-      const result = await loginWithGoogle();
+const handleGoogleSignup = async () => {
+  try {
+    const result = await loginWithGoogle();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectUrl = urlParams.get('redirect') || '';
+    const isInvite = redirectUrl.includes('accept-invite');
+
+    if (!isInvite) {
       const apiKey = generateApiKey();
       await setDoc(doc(db, 'gateway_merchants', result.user.uid), {
         name: result.user.displayName || '', email: result.user.email,
@@ -345,8 +364,12 @@ export default function RegisterForm() {
       });
       toast.success('Compte créé avec succès !');
       navigate('/dashboard');
-    } catch { toast.error('Erreur avec Google'); }
-  };
+    } else {
+      toast.success('Compte créé ! Acceptation de l\'invitation...');
+      window.location.href = redirectUrl;
+    }
+  } catch { toast.error('Erreur avec Google'); }
+};
 
   if (step === 2) return (
     <div className="rg-success">
