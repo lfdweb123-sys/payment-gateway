@@ -759,7 +759,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Trop de requêtes' });
   }
 
-  const { amount, country, method, phone, email, description, currency, customerName, customerSurname } = req.body;
+  const { amount, country, method, phone, email, description, currency, customerName, customerSurname, pid } = req.body;
   if (!apiKey)                return res.status(401).json({ error: 'Clé API requise' });
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Montant invalide' });
 
@@ -863,6 +863,23 @@ export default async function handler(req, res) {
     );
 
     const isCompleted = result.success && (result.status === 'SUCCESSFUL' || result.status === 'completed');
+
+        // Charger les métadonnées depuis payment_links si un pid est fourni
+    let metadataFromLink = {};
+    if (pid) {
+      try {
+        const linkSnap = await db.collection('payment_links').doc(pid).get();
+        if (linkSnap.exists && linkSnap.data().metadata) {
+          metadataFromLink = linkSnap.data().metadata;
+          console.log('📦 Métadonnées chargées depuis payment_links:', metadataFromLink);
+        }
+      } catch (err) {
+        console.error('Erreur chargement payment_links:', err);
+      }
+    }
+
+    // Fusionner les métadonnées (celles du body ont priorité)
+    const finalMetadata = { ...metadataFromLink, ...(req.body.metadata || {}) };
 
     const txRef = await db.collection('gateway_transactions').add({
       merchantId:       merchant.id,
