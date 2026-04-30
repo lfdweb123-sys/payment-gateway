@@ -8,7 +8,7 @@
 
 import { log, logError } from '../logs/logger.js';
 import admin from 'firebase-admin';
-import { sendEmail, getPaymentReceivedTemplate } from '../../src/services/brevo.js';
+import { sendBrevoEmail, getPaymentReceivedTemplate } from '../lib/brevo.js';
 
 if (!admin.apps.length) {
   admin.initializeApp({
