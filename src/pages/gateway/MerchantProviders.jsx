@@ -528,22 +528,23 @@ function MethodsModal({ provider, onClose }) {
 /* ── Provider card ── */
 function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
   const [showKeys, setShowKeys] = useState({});
-  const [localKeys, setLocalKeys] = useState(
-    ()=>provider.keys.reduce((acc,k)=>({...acc,[k]:provider.keys.find(key=>key===k)?.value || ''}),{})
-  );
+  const [localKeys, setLocalKeys] = useState({});
   const [errors, setErrors] = useState({});
 
-  useEffect(()=>{
-    const newKeys = {};
-    provider.keys.forEach(k => {
-      newKeys[k] = provider.keys.find(key => key === k)?.value || '';
+  // Initialiser localKeys avec les valeurs existantes
+  useEffect(() => {
+    const initialKeys = {};
+    provider.keys.forEach(keyName => {
+      initialKeys[keyName] = provider.keyValues?.[keyName] || '';
     });
-    setLocalKeys(newKeys);
-  },[provider.keys]);
+    setLocalKeys(initialKeys);
+  }, [provider.keys, provider.keyValues]);
 
   const handleSave = () => {
     const newErrors = {};
-    provider.keys.forEach(k=>{ if(!localKeys[k]?.trim()) newErrors[k]=true; });
+    provider.keys.forEach(keyName => {
+      if (!localKeys[keyName]?.trim()) newErrors[keyName] = true;
+    });
     if (Object.keys(newErrors).length) {
       setErrors(newErrors);
       toast.error('Remplissez tous les champs avant d\'enregistrer');
@@ -553,7 +554,7 @@ function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
     onSave(provider.id, localKeys);
   };
 
-  const allFilled = provider.keys.every(k=>localKeys[k]?.trim());
+  const allFilled = provider.keys.every(keyName => localKeys[keyName]?.trim());
 
   return (
     <div className={`mp-card ${provider.active?'active':''}`}>
@@ -588,32 +589,32 @@ function ProviderCard({ provider, onToggle, onSave, onShowMethods, saving }) {
             </a>
           </div>
           <hr className="mp-divider" style={{margin:'0 0 14px'}}/>
-          {provider.keys.map(key => (
-            <div key={key} className="mp-field">
-              <label className="mp-label">{key}<span className="mp-label-req">*</span></label>
+          {provider.keys.map(keyName => (
+            <div key={keyName} className="mp-field">
+              <label className="mp-label">{keyName}<span className="mp-label-req">*</span></label>
               <div className="mp-input-wrap">
                 <input
-                  className={`mp-input${errors[key]?' error':''}`}
-                  type={showKeys[key]?'text':'password'}
-                  value={localKeys[key]||''}
-                  onChange={e=>{
-                    setLocalKeys(p=>({...p,[key]:e.target.value}));
-                    if(errors[key]) setErrors(p=>({...p,[key]:false}));
+                  className={`mp-input${errors[keyName]?' error':''}`}
+                  type={showKeys[keyName]?'text':'password'}
+                  value={localKeys[keyName] || ''}
+                  onChange={e => {
+                    setLocalKeys(prev => ({...prev, [keyName]: e.target.value}));
+                    if (errors[keyName]) setErrors(prev => ({...prev, [keyName]: false}));
                   }}
-                  placeholder={`Votre ${key}`}
+                  placeholder={`Votre ${keyName}`}
                 />
                 <button className="mp-input-eye"
-                  onClick={()=>setShowKeys(p=>({...p,[key]:!p[key]}))}>
-                  {showKeys[key]?<EyeOff size={13}/>:<Eye size={13}/>}
+                  onClick={() => setShowKeys(prev => ({...prev, [keyName]: !prev[keyName]}))}>
+                  {showKeys[keyName] ? <EyeOff size={13}/> : <Eye size={13}/>}
                 </button>
               </div>
-              {errors[key] && (
-                <p className="mp-error-msg"><AlertCircle size={10}/> Ce champ est requis</p>
+              {errors[keyName] && (
+                <div className="mp-error-msg"><AlertCircle size={10}/> Ce champ est requis</div>
               )}
             </div>
           ))}
-          <button className="mp-btn-save" onClick={handleSave} disabled={saving===provider.id}>
-            {saving===provider.id ? <span className="mp-spinner"/> : <Save size={13}/>}
+          <button className="mp-btn-save" onClick={handleSave} disabled={saving === provider.id}>
+            {saving === provider.id ? <span className="mp-spinner"/> : <Save size={13}/>}
             Enregistrer
           </button>
         </div>
@@ -637,58 +638,63 @@ export default function MerchantProviders() {
 
   // Utiliser effectiveMerchantId pour les membres d'équipe
   const merchantId = user?.effectiveMerchantId || user?.uid;
+  const isTeamMember = user?.isTeamMember || false;
+  const teamRole = user?.teamRole || null;
 
-  useEffect(()=>{ loadProviders(); },[]);
+  useEffect(() => { loadProviders(); }, []);
 
   const loadProviders = async () => {
+    if (!merchantId) return;
     try {
-      const snap = await getDoc(doc(db,'gateway_merchants',merchantId));
-      const saved = snap.exists()?snap.data().providers||{}:{};
-      setProviders(PROVIDER_LIST.map(p=>({
+      const snap = await getDoc(doc(db, 'gateway_merchants', merchantId));
+      const saved = snap.exists() ? snap.data().providers || {} : {};
+      setProviders(PROVIDER_LIST.map(p => ({
         ...p,
-        active: saved[p.id]?.active||false,
-        keys: p.keys.map(k => k),
+        active: saved[p.id]?.active || false,
         keyValues: saved[p.id] || {},
+        keys: p.keys // Garder comme tableau de strings
       })));
-    } catch(e){ console.error(e); }
-    finally{ setLoading(false); }
+    } catch(e) { 
+      console.error(e);
+      toast.error('Erreur lors du chargement des providers');
+    }
+    finally { setLoading(false); }
   };
 
   const handleToggle = async (id) => {
-    const provider = providers.find(p=>p.id===id);
+    const provider = providers.find(p => p.id === id);
     const next = !provider.active;
-    setProviders(prev=>prev.map(p=>p.id===id?{...p,active:next}:p));
+    setProviders(prev => prev.map(p => p.id === id ? {...p, active: next} : p));
     try {
-      const snap = await getDoc(doc(db,'gateway_merchants',merchantId));
-      const current = snap.exists()?snap.data().providers||{}:{};
-      current[id]={...(current[id]||{}),active:next};
-      await setDoc(doc(db,'gateway_merchants',merchantId),{providers:current,updatedAt:new Date().toISOString()},{merge:true});
-      toast.success(next?`${provider.name} activé`:`${provider.name} désactivé`);
+      const snap = await getDoc(doc(db, 'gateway_merchants', merchantId));
+      const current = snap.exists() ? snap.data().providers || {} : {};
+      current[id] = {...(current[id] || {}), active: next};
+      await setDoc(doc(db, 'gateway_merchants', merchantId), {providers: current, updatedAt: new Date().toISOString()}, {merge: true});
+      toast.success(next ? `${provider.name} activé` : `${provider.name} désactivé`);
     } catch {
-      setProviders(prev=>prev.map(p=>p.id===id?{...p,active:!next}:p));
+      setProviders(prev => prev.map(p => p.id === id ? {...p, active: !next} : p));
       toast.error('Erreur de sauvegarde');
     }
   };
 
   const handleSave = async (id, localKeys) => {
     setSaving(id);
-    const provider = providers.find(p=>p.id===id);
+    const provider = providers.find(p => p.id === id);
     try {
-      const snap = await getDoc(doc(db,'gateway_merchants',merchantId));
-      const current = snap.exists()?snap.data().providers||{}:{};
-      current[id]={active:provider.active,...localKeys};
-      await setDoc(doc(db,'gateway_merchants',merchantId),{providers:current,updatedAt:new Date().toISOString()},{merge:true});
-      setProviders(prev=>prev.map(p=>p.id!==id?p:{
-        ...p, keyValues: {...p.keyValues, ...localKeys}
+      const snap = await getDoc(doc(db, 'gateway_merchants', merchantId));
+      const current = snap.exists() ? snap.data().providers || {} : {};
+      current[id] = {active: provider.active, ...localKeys};
+      await setDoc(doc(db, 'gateway_merchants', merchantId), {providers: current, updatedAt: new Date().toISOString()}, {merge: true});
+      setProviders(prev => prev.map(p => p.id !== id ? p : {
+        ...p,
+        keyValues: {...p.keyValues, ...localKeys}
       }));
       toast.success(`${provider.name} enregistré`);
-    } catch{ toast.error('Erreur de sauvegarde'); }
-    finally{ setSaving(null); }
-  };
-
-  // Helper pour récupérer la valeur d'une clé
-  const getKeyValue = (provider, keyName) => {
-    return provider.keyValues?.[keyName] || '';
+    } catch(e) { 
+      console.error(e);
+      toast.error('Erreur de sauvegarde'); 
+    }
+    finally { setSaving(null); }
   };
 
   if (loading) return (
@@ -698,21 +704,14 @@ export default function MerchantProviders() {
     </div>
   );
 
-  const activeCount = providers.filter(p=>p.active).length;
-  const configuredCount = providers.filter(p=>p.active && p.keys.every(k => getKeyValue(p, k)?.trim())).length;
-
-  // Ajouter les valeurs aux providers pour l'affichage
-  const providersWithValues = providers.map(p => ({
-    ...p,
-    keys: p.keys.map(k => ({ name: k, value: getKeyValue(p, k) }))
-  }));
+  const activeCount = providers.filter(p => p.active).length;
+  const configuredCount = providers.filter(p => p.active && p.keys.every(keyName => p.keyValues?.[keyName]?.trim())).length;
 
   return (
     <div className="mp-root" style={{maxWidth:1100,margin:'0 auto',padding:'24px 16px 60px'}}>
       <style>{styles}</style>
 
-      {/* Bannière pour les membres d'équipe */}
-      {user?.isTeamMember && (
+      {isTeamMember && (
         <div style={{
           borderRadius: 16, padding: '12px 16px', marginBottom: 20,
           background: '#f0fdf4', border: '1px solid #bbf7d0',
@@ -720,7 +719,7 @@ export default function MerchantProviders() {
         }}>
           <CheckCircle size={18} color="#16a34a" style={{ flexShrink: 0 }}/>
           <p style={{ fontSize: 13, color: '#15803d', margin: 0 }}>
-            Vous consultez les providers en tant que <strong>{user?.teamRole === 'admin' ? 'Administrateur' : user?.teamRole === 'manager' ? 'Gestionnaire' : 'Consultant'}</strong>.
+            Vous gérez les providers en tant que <strong>{teamRole}</strong>.
           </p>
         </div>
       )}
@@ -728,7 +727,7 @@ export default function MerchantProviders() {
       <div style={{marginBottom:24}}>
         <h1 style={{fontSize:22,fontWeight:700,color:'#0f172a',margin:0}}>Providers de paiement</h1>
         <p style={{fontSize:12,color:'#94a3b8',marginTop:4}}>
-          {activeCount} activé{activeCount!==1?'s':''} · {configuredCount} configuré{configuredCount!==1?'s':''} sur {PROVIDER_LIST.length}
+          {activeCount} activé{activeCount !== 1 ? 's' : ''} · {configuredCount} configuré{configuredCount !== 1 ? 's' : ''} sur {PROVIDER_LIST.length}
         </p>
       </div>
 
@@ -740,15 +739,14 @@ export default function MerchantProviders() {
         </p>
       </div>
 
-      {/* Rendu par section */}
       {SECTIONS.map(section => {
-        const sectionProviders = providersWithValues.filter(p => p.section === section);
-        if (!sectionProviders.length) return null;
+        const sectionProviders = providers.filter(p => p.section === section);
+        if (sectionProviders.length === 0) return null;
         return (
           <div key={section}>
             <div className="mp-section-title">{section}</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))',gap:16}}>
-              {sectionProviders.map(provider=>(
+              {sectionProviders.map(provider => (
                 <ProviderCard
                   key={provider.id}
                   provider={provider}
@@ -770,13 +768,13 @@ export default function MerchantProviders() {
             Suggérez un provider ou agrégateur, nous l'étudierons pour l'intégrer.
           </p>
         </div>
-        <button className="mp-btn-suggest" onClick={()=>setSuggestOpen(true)}>
+        <button className="mp-btn-suggest" onClick={() => setSuggestOpen(true)}>
           <Plus size={14}/> Suggérer un provider
         </button>
       </div>
 
-      <MethodsModal provider={methodsModal} onClose={()=>setMethodsModal(null)}/>
-      {suggestOpen && <SuggestModal onClose={()=>setSuggestOpen(false)}/>}
+      {methodsModal && <MethodsModal provider={methodsModal} onClose={() => setMethodsModal(null)}/>}
+      {suggestOpen && <SuggestModal onClose={() => setSuggestOpen(false)}/>}
     </div>
   );
 }
