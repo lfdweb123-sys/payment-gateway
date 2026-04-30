@@ -454,6 +454,7 @@ export default function GatewayPay() {
   };
 
   const pollStatus = (id) => {
+    console.log('🔄 pollStatus - ID reçu:', id);
     setStatus('pending');
     const msgs = ['Paiement en cours…','En attente de confirmation…','Vérification en cours…','Presque terminé…'];
     let mi = 0;
@@ -532,7 +533,7 @@ const handleSubmit = async (e) => {
       setLoading(false);
       if (isMobile && fullPhone) savePhoneNumber(fullPhone);
       if (data.url) window.location.href = data.url;
-      else pollStatus(data.transactionId);
+      else pollStatus(data.reference);
     } else {
       toast.error(data.error || 'Une erreur est survenue');
       setLoading(false);
