@@ -119,7 +119,6 @@ function TxRowDesktop({ tx, isLast }) {
       borderBottom: isLast ? 'none' : '1px solid #f8fafc',
       alignItems: 'center', transition: 'background .1s', cursor: 'default',
     }}>
-      {/* Transaction info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <MethodIcon method={tx.method}/>
         <div style={{ minWidth: 0 }}>
@@ -132,38 +131,24 @@ function TxRowDesktop({ tx, isLast }) {
           </div>
         </div>
       </div>
-      {/* Méthode */}
-      <div style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>
-        {tx.method?.replace(/_/g, ' ') || '—'}
-      </div>
-      {/* Provider */}
+      <div style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>{tx.method?.replace(/_/g, ' ') || '—'}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <div style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0, background: tx.provider === 'feexpay' ? '#f97316' : tx.provider === 'stripe' ? '#6366f1' : tx.provider === 'paystack' ? '#22c55e' : '#94a3b8' }}/>
         <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>{tx.provider || '—'}</span>
       </div>
-      {/* Montant */}
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', letterSpacing: '-.01em' }}>
-          {parseFloat(tx.amount || 0).toLocaleString('fr-FR')}
-        </div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', letterSpacing: '-.01em' }}>{parseFloat(tx.amount || 0).toLocaleString('fr-FR')}</div>
         <div style={{ fontSize: 10, color: '#94a3b8' }}>XOF</div>
       </div>
-      {/* Statut */}
-      <div style={{ textAlign: 'right' }}>
-        <StatusBadge status={tx.status}/>
-      </div>
+      <div style={{ textAlign: 'right' }}><StatusBadge status={tx.status}/></div>
     </div>
   );
 }
 
-/* ── Transaction Row — Mobile card ── */
+/* ── Transaction Row — Mobile ── */
 function TxRowMobile({ tx, isLast }) {
   return (
-    <div style={{
-      padding: '14px 16px',
-      borderBottom: isLast ? 'none' : '1px solid #f8fafc',
-    }}>
-      {/* Ligne 1 : icône + description + montant */}
+    <div style={{ padding: '14px 16px', borderBottom: isLast ? 'none' : '1px solid #f8fafc' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <MethodIcon method={tx.method}/>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -176,25 +161,18 @@ function TxRowMobile({ tx, isLast }) {
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', letterSpacing: '-.01em' }}>
-            {parseFloat(tx.amount || 0).toLocaleString('fr-FR')}
-          </div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{parseFloat(tx.amount || 0).toLocaleString('fr-FR')}</div>
           <div style={{ fontSize: 10, color: '#94a3b8' }}>XOF</div>
         </div>
       </div>
-
-      {/* Ligne 2 : provider + méthode + badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 48 }}>
-        {/* Provider pill */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 6, padding: '3px 8px' }}>
           <div style={{ width: 5, height: 5, borderRadius: '50%', background: tx.provider === 'feexpay' ? '#f97316' : tx.provider === 'stripe' ? '#6366f1' : tx.provider === 'paystack' ? '#22c55e' : '#94a3b8' }}/>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{tx.provider || '—'}</span>
         </div>
-        {/* Méthode pill */}
         <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: '#64748b', fontWeight: 500, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {tx.method?.replace(/_/g, ' ') || '—'}
         </div>
-        {/* Badge statut */}
         <StatusBadge status={tx.status}/>
       </div>
     </div>
@@ -204,26 +182,34 @@ function TxRowMobile({ tx, isLast }) {
 /* ── Main ── */
 export default function GatewayDashboard() {
   const { user } = useAuth();
-  const [stats, setStats]     = useState({ balance: 0, totalTransactions: 0, todayTransactions: 0, recentTransactions: [], providersCount: 0, successRate: 0 });
+
+  // Utiliser effectiveMerchantId : son propre UID s'il est propriétaire,
+  // ou l'UID du marchand propriétaire s'il est membre d'équipe.
+  const merchantId   = user?.effectiveMerchantId || user?.uid;
+  const merchantData = user?.effectiveMerchantData || user?.merchant;
+  const isTeamMember = user?.isTeamMember || false;
+
+  const [stats,   setStats]   = useState({ balance: 0, totalTransactions: 0, todayTransactions: 0, recentTransactions: [], providersCount: 0, successRate: 0 });
   const [loading, setLoading] = useState(true);
   const [merchant, setMerchant] = useState(null);
 
-  const [search, setSearch]             = useState('');
-  const [statusFilter, setStatusFilter] = useState('Tous');
+  const [search,         setSearch]         = useState('');
+  const [statusFilter,   setStatusFilter]   = useState('Tous');
   const [providerFilter, setProviderFilter] = useState('Tous');
-  const [page, setPage]                 = useState(1);
+  const [page,           setPage]           = useState(1);
 
   useEffect(() => { if (user) loadData(); }, [user]);
 
   const loadData = async () => {
     try {
-      const merchantSnap = await getDoc(doc(db, 'gateway_merchants', user.uid));
-      const merchantData = merchantSnap.exists() ? merchantSnap.data() : {};
-      setMerchant(merchantData);
+      // Utiliser les données déjà chargées dans AuthContext pour éviter
+      // une nouvelle lecture sur gateway_merchants (permission refusée pour les membres)
+      const mData = merchantData || {};
+      setMerchant(mData);
 
       const txQuery = query(
         collection(db, 'gateway_transactions'),
-        where('merchantId', '==', user.uid),
+        where('merchantId', '==', merchantId),
         orderBy('createdAt', 'desc'),
         limit(200)
       );
@@ -238,15 +224,15 @@ export default function GatewayDashboard() {
       const completed   = transactions.filter(t => t.status === 'completed');
       const successRate = transactions.length ? Math.round((completed.length / transactions.length) * 100) : 0;
 
-      const providers       = merchantData.providers || {};
+      const providers       = mData.providers || {};
       const activeProviders = Object.values(providers).filter(p => p.active).length;
 
       setStats({
-        balance:           merchantData.balance || 0,
-        totalTransactions: merchantData.totalTransactions || 0,
-        todayTransactions: today.length,
+        balance:            mData.balance || 0,
+        totalTransactions:  mData.totalTransactions || 0,
+        todayTransactions:  today.length,
         recentTransactions: transactions,
-        providersCount:    activeProviders,
+        providersCount:     activeProviders,
         successRate,
       });
     } catch (e) { console.error(e); }
@@ -260,9 +246,11 @@ export default function GatewayDashboard() {
     </div>
   );
 
-  const isVerified = merchant?.verificationStatus === 'approved';
-  const isPending  = merchant?.verificationStatus === 'pending';
-  const isRejected = merchant?.verificationStatus === 'rejected';
+  // Un membre d'équipe est toujours considéré comme "vérifié" —
+  // c'est le compte marchand propriétaire qui a été vérifié.
+  const isVerified = isTeamMember || merchant?.verificationStatus === 'approved';
+  const isPending  = !isTeamMember && merchant?.verificationStatus === 'pending';
+  const isRejected = !isTeamMember && merchant?.verificationStatus === 'rejected';
 
   const allProviders = ['Tous', ...new Set(stats.recentTransactions.map(tx => tx.provider).filter(Boolean))];
 
@@ -304,17 +292,14 @@ export default function GatewayDashboard() {
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px 80px', fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
-        @keyframes spin    { to { transform: rotate(360deg); } }
-        @keyframes fadeUp  { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+        @keyframes spin   { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
         .gd-row:hover { background: #fafafa !important; }
         .gd-filter-select { appearance: none; }
-
-        /* Responsive table/cards */
         .gd-table-header { display: grid; }
         .gd-tx-desktop   { display: block; }
         .gd-tx-mobile    { display: none; }
-
         @media (max-width: 640px) {
           .gd-table-header { display: none !important; }
           .gd-tx-desktop   { display: none !important; }
@@ -325,8 +310,8 @@ export default function GatewayDashboard() {
         }
       `}</style>
 
-      {/* ── Bannière vérification ── */}
-      {!isVerified && (
+      {/* ── Bannière vérification — masquée pour les membres d'équipe ── */}
+      {!isVerified && !isTeamMember && (
         <div style={{
           borderRadius: 18, padding: '18px 22px', marginBottom: 24,
           background: isPending ? '#fffbeb' : '#fef2f2',
@@ -348,6 +333,21 @@ export default function GatewayDashboard() {
           <Link to="/verification" style={{ padding: '9px 18px', borderRadius: 11, fontSize: 12, fontWeight: 700, background: isPending ? '#f59e0b' : '#0f172a', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {isPending ? 'Voir le statut' : isRejected ? 'Réessayer' : 'Vérifier →'}
           </Link>
+        </div>
+      )}
+
+      {/* ── Bannière membre d'équipe ── */}
+      {isTeamMember && (
+        <div style={{
+          borderRadius: 18, padding: '14px 20px', marginBottom: 24,
+          background: '#f0fdf4', border: '1px solid #bbf7d0',
+          display: 'flex', alignItems: 'center', gap: 12,
+          animation: 'fadeUp .3s ease',
+        }}>
+          <CheckCircle size={18} color="#16a34a" style={{ flexShrink: 0 }}/>
+          <p style={{ fontSize: 13, color: '#15803d', margin: 0 }}>
+            Vous consultez le compte de <strong>{merchant?.businessName || merchant?.companyName || 'ce marchand'}</strong> en tant que <strong>{user?.teamRole === 'admin' ? 'Administrateur' : user?.teamRole === 'manager' ? 'Gestionnaire' : user?.teamRole === 'support' ? 'Support' : 'Consultant'}</strong>.
+          </p>
         </div>
       )}
 
@@ -378,7 +378,6 @@ export default function GatewayDashboard() {
       {/* ── Transactions ── */}
       <div style={{ background: '#fff', borderRadius: 20, border: '1px solid #f0f0f0', overflow: 'hidden', opacity: !isVerified ? .4 : 1, pointerEvents: !isVerified ? 'none' : 'auto', animation: 'fadeUp .4s ease .1s both' }}>
 
-        {/* Header */}
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f8fafc' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -401,9 +400,7 @@ export default function GatewayDashboard() {
             </div>
           </div>
 
-          {/* Filtres — responsive */}
           <div className="gd-filters" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {/* Search */}
             <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
               <Search size={13} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}/>
               <input type="text" value={search} onChange={e => handleFilter(() => setSearch(e.target.value))} placeholder="Rechercher…"
@@ -417,7 +414,6 @@ export default function GatewayDashboard() {
                 </button>
               )}
             </div>
-            {/* Statut */}
             <div style={{ position: 'relative' }}>
               <select value={statusFilter} onChange={e => handleFilter(() => setStatusFilter(e.target.value))} className="gd-filter-select"
                 style={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: statusFilter !== 'Tous' ? '#fff7ed' : '#f8fafc', paddingLeft: 12, paddingRight: 28, paddingTop: 8, paddingBottom: 8, color: statusFilter !== 'Tous' ? '#f97316' : '#374151', fontWeight: statusFilter !== 'Tous' ? 700 : 500, cursor: 'pointer', outline: 'none', fontFamily: 'inherit', width: '100%' }}>
@@ -425,7 +421,6 @@ export default function GatewayDashboard() {
               </select>
               <ChevronDown size={11} style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }}/>
             </div>
-            {/* Provider */}
             <div style={{ position: 'relative' }}>
               <select value={providerFilter} onChange={e => handleFilter(() => setProviderFilter(e.target.value))} className="gd-filter-select"
                 style={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 10, background: providerFilter !== 'Tous' ? '#fff7ed' : '#f8fafc', paddingLeft: 12, paddingRight: 28, paddingTop: 8, paddingBottom: 8, color: providerFilter !== 'Tous' ? '#f97316' : '#374151', fontWeight: providerFilter !== 'Tous' ? 700 : 500, cursor: 'pointer', outline: 'none', fontFamily: 'inherit', width: '100%' }}>
@@ -436,7 +431,6 @@ export default function GatewayDashboard() {
           </div>
         </div>
 
-        {/* Table header — desktop only */}
         {paginated.length > 0 && (
           <div className="gd-table-header" style={{
             gridTemplateColumns: '1fr 130px 120px 110px 100px',
@@ -445,15 +439,12 @@ export default function GatewayDashboard() {
             textTransform: 'uppercase', letterSpacing: '.08em',
             borderBottom: '1px solid #f8fafc',
           }}>
-            <span>Transaction</span>
-            <span>Méthode</span>
-            <span>Provider</span>
+            <span>Transaction</span><span>Méthode</span><span>Provider</span>
             <span style={{ textAlign: 'right' }}>Montant</span>
             <span style={{ textAlign: 'right' }}>Statut</span>
           </div>
         )}
 
-        {/* Rows */}
         {paginated.length === 0 ? (
           <div style={{ padding: '48px 24px', textAlign: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: 14, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
@@ -468,25 +459,16 @@ export default function GatewayDashboard() {
           <div>
             {paginated.map((tx, i) => (
               <div key={tx.id}>
-                {/* Desktop */}
-                <div className="gd-tx-desktop">
-                  <TxRowDesktop tx={tx} isLast={i === paginated.length - 1}/>
-                </div>
-                {/* Mobile */}
-                <div className="gd-tx-mobile">
-                  <TxRowMobile tx={tx} isLast={i === paginated.length - 1}/>
-                </div>
+                <div className="gd-tx-desktop"><TxRowDesktop tx={tx} isLast={i === paginated.length - 1}/></div>
+                <div className="gd-tx-mobile"><TxRowMobile tx={tx} isLast={i === paginated.length - 1}/></div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div style={{ padding: '14px 16px', borderTop: '1px solid #f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>
-              Page {page} / {totalPages} · {filtered.length} transaction{filtered.length !== 1 ? 's' : ''}
-            </span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>Page {page} / {totalPages} · {filtered.length} transaction{filtered.length !== 1 ? 's' : ''}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: page === 1 ? .35 : 1 }}>
@@ -510,8 +492,8 @@ export default function GatewayDashboard() {
         )}
       </div>
 
-      {/* ── Bannière providers ── */}
-      {isVerified && stats.providersCount === 0 && (
+      {/* ── Bannière providers — masquée pour les membres d'équipe ── */}
+      {isVerified && stats.providersCount === 0 && !isTeamMember && (
         <div style={{ background: 'linear-gradient(135deg, #fff7ed, #fff)', border: '1px solid #fed7aa', borderRadius: 20, padding: '28px', textAlign: 'center', marginTop: 20, animation: 'fadeUp .4s ease .15s both' }}>
           <div style={{ width: 52, height: 52, borderRadius: 14, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
             <Zap size={22} color="#f97316"/>
@@ -524,8 +506,8 @@ export default function GatewayDashboard() {
         </div>
       )}
 
-      {/* ── Bannière vérification ── */}
-      {!isVerified && (
+      {/* ── Bannière vérification bas — masquée pour les membres d'équipe ── */}
+      {!isVerified && !isTeamMember && (
         <div style={{ background: '#fff', border: '1px solid #f0f0f0', borderRadius: 20, padding: '32px 24px', textAlign: 'center', marginTop: 20, animation: 'fadeUp .4s ease .15s both' }}>
           <div style={{ width: 52, height: 52, borderRadius: 14, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
             <Shield size={22} color="#94a3b8"/>
