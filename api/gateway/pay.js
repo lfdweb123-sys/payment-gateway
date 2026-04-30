@@ -875,12 +875,25 @@ export default async function handler(req, res) {
       country,
       method,
       phone:            phone || null,
+      email:            email || null,        // ✅ AJOUTÉ
+      customerName:     customerName || null, // ✅ AJOUTÉ
+      customerSurname:  customerSurname || null, // ✅ AJOUTÉ
       provider:         providerId,
       providerRef:      result.reference || null,
       status:           result.success ? (isCompleted ? 'completed' : 'pending') : 'failed',
       description:      description || 'Paiement',
       providerResponse: result,
       createdAt:        new Date().toISOString(),
+      // ✅ CRUCIAL : Stocker les métadonnées du webhook personnalisé
+      metadata: {
+        paymentId:     req.body.metadata?.paymentId || null,
+        reference:     req.body.metadata?.reference || null,
+        uid:           req.body.metadata?.uid || null,
+        plan:          req.body.metadata?.plan || null,
+        audits:        req.body.metadata?.audits || null,
+        // Conserver toutes les autres métadonnées si présentes
+        ...(req.body.metadata || {})
+      }
     });
 
     await log('pay', 'INFO', 'Transaction enregistrée', {
