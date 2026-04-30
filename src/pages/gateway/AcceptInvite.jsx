@@ -56,7 +56,14 @@ export default function AcceptInvite() {
 
   const verifyAndAccept = async () => {
     setState(STATE.LOADING);
+
     try {
+      // ← Si pas connecté : inutile de lire Firestore, on affiche l'écran auth
+      if (!user) {
+        setState(STATE.NEED_AUTH);
+        return;
+      }
+
       const teamDocRef = doc(db, 'gateway_merchant_teams', teamId);
       const teamSnap   = await getDoc(teamDocRef);
 
@@ -80,12 +87,6 @@ export default function AcceptInvite() {
       // Déjà acceptée
       if (invite.status === 'active' && !invite.userId?.startsWith('pending_')) {
         setState(STATE.ALREADY_DONE);
-        return;
-      }
-
-      // Non connecté
-      if (!user) {
-        setState(STATE.NEED_AUTH);
         return;
       }
 
@@ -122,8 +123,6 @@ export default function AcceptInvite() {
         acceptedAt: serverTimestamp()
       });
 
-      // Recharger le contexte auth après le updateDoc
-      // pour que isTeamMember soit true avant la navigation
       await refreshUser();
 
       setState(STATE.SUCCESS);
