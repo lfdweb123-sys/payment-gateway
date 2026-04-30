@@ -146,6 +146,11 @@ function QRCodeImage({ url, size = 160 }) {
 export default function PaymentLinks() {
   const { user } = useAuth();
 
+  // Utiliser effectiveMerchantData pour les membres d'équipe
+  const merchantData = user?.effectiveMerchantData || user?.merchant || {};
+  const isTeamMember = user?.isTeamMember || false;
+  const teamRole = user?.teamRole || null;
+
   const [apiKey, setApiKey]                   = useState('');
   const [loadingConfig, setLoadingConfig]     = useState(true);
   const [amount, setAmount]                   = useState('');
@@ -161,18 +166,30 @@ export default function PaymentLinks() {
   const primaryColor = '#FF6B00';
 
   /* ─── Charger la clé API du marchand connecté ─── */
-useEffect(() => {
-  if (!user) return;
-  // user.merchant est déjà chargé par AuthContext
-  setApiKey(user.merchant?.apiKey || '');
-  setLoadingConfig(false);
-}, [user]);
+  useEffect(() => {
+    if (!user) return;
+    // user.effectiveMerchantData ou user.merchant est déjà chargé par AuthContext
+    setApiKey(merchantData.apiKey || '');
+    setLoadingConfig(false);
+  }, [user, merchantData]);
 
   const selectedCountryData = COUNTRIES.find(c => c.code === selectedCountry);
   const availableMethods    = selectedCountry ? (METHODS_BY_COUNTRY[selectedCountry] || []) : [];
 
+  // Vérifier si l'utilisateur a le droit de créer des liens de paiement
+  // Seuls Administrateur et Gestionnaire peuvent créer des liens
+  const canCreateLinks = () => {
+    if (!isTeamMember) return true; // Propriétaire
+    return teamRole === 'Administrateur' || teamRole === 'admin' || 
+           teamRole === 'Gestionnaire' || teamRole === 'manager';
+  };
+
   /* ─── Générer le lien via POST /api/gateway/generate-link ─── */
   const generateLink = async () => {
+    if (!canCreateLinks()) {
+      toast.error('Vous n\'avez pas la permission de créer des liens de paiement');
+      return;
+    }
     if (!apiKey) {
       toast.error('Clé API manquante — configurez-la dans Espace Développeur');
       return;
@@ -283,6 +300,24 @@ useEffect(() => {
         }
       `}</style>
 
+      {/* Bannière pour les membres d'équipe */}
+      {isTeamMember && (
+        <div style={{
+          borderRadius: 16, padding: '12px 16px', marginBottom: 20,
+          background: '#f0fdf4', border: '1px solid #bbf7d0',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <CheckCircle2 size={18} color="#16a34a" style={{ flexShrink: 0 }}/>
+          <p style={{ fontSize: 13, color: '#15803d', margin: 0 }}>
+            Vous gérez les liens de paiement en tant que <strong>
+              {teamRole === 'Administrateur' || teamRole === 'admin' ? 'Administrateur' : 
+               teamRole === 'Gestionnaire' || teamRole === 'manager' ? 'Gestionnaire' : 
+               teamRole === 'Consultant' || teamRole === 'consultant' ? 'Consultant' : 'Support'}
+            </strong>.
+          </p>
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -304,8 +339,23 @@ useEffect(() => {
         </div>
       </div>
 
+      {/* Message pour les rôles sans permission */}
+      {isTeamMember && !canCreateLinks() && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '12px 16px', marginBottom: 18,
+          background: '#FEF2F2', border: '1px solid #FEE2E2',
+          borderRadius: 12, fontSize: 12, color: '#991B1B',
+        }}>
+          <Lock size={14} color="#DC2626" style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <strong>Accès limité.</strong> Votre rôle ({teamRole === 'Consultant' || teamRole === 'consultant' ? 'Consultant' : 'Support'}) ne vous permet pas de créer des liens de paiement. Seuls les <strong>Administrateurs</strong> et <strong>Gestionnaires</strong> peuvent le faire.
+          </span>
+        </div>
+      )}
+
       {/* Alerte clé API manquante */}
-      {!apiKey && (
+      {!apiKey && canCreateLinks() && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '12px 16px', marginBottom: 18,
@@ -323,8 +373,8 @@ useEffect(() => {
 
       <div style={{ display: 'grid', gap: 18 }}>
 
-        {/* Formulaire */}
-        <div style={card}>
+        {/* Formulaire - désactivé pour les rôles sans permission */}
+        <div style={{ ...card, opacity: !canCreateLinks() ? 0.6 : 1, pointerEvents: !canCreateLinks() ? 'none' : 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
             <Banknote size={16} color={primaryColor} />
             <span style={{ fontSize: 14, fontWeight: 700, color: '#333' }}>Détails du paiement</span>
@@ -478,16 +528,16 @@ useEffect(() => {
           {/* Bouton générer */}
           <button
             onClick={generateLink}
-            disabled={loading || !amount || !description || !apiKey}
+            disabled={loading || !amount || !description || !apiKey || !canCreateLinks()}
             style={{
               width: '100%', marginTop: 18, padding: '14px',
-              background: (loading || !amount || !description || !apiKey)
+              background: (loading || !amount || !description || !apiKey || !canCreateLinks())
                 ? '#E0E0E0'
                 : `linear-gradient(135deg,${primaryColor},${primaryColor}cc)`,
-              color: (loading || !amount || !description || !apiKey) ? '#AAA' : '#fff',
+              color: (loading || !amount || !description || !apiKey || !canCreateLinks()) ? '#AAA' : '#fff',
               border: 'none', borderRadius: 12,
               fontSize: 14, fontWeight: 700,
-              cursor: (loading || !amount || !description || !apiKey) ? 'not-allowed' : 'pointer',
+              cursor: (loading || !amount || !description || !apiKey || !canCreateLinks()) ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               transition: 'all .2s',
             }}
