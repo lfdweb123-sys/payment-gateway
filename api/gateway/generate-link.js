@@ -1,5 +1,5 @@
 /**
- * api/gateway/create-payment-link.js
+ * api/gateway/generate-link.js
  *
  * ── ARCHITECTURE SÉCURISÉE ────────────────────────────────────────────────
  *
@@ -72,14 +72,16 @@ export default async function handler(req, res) {
 
     await db.collection('payment_links').doc(pid).set({
       merchantId,
-      apiKey,        // ← stockée en Firestore, jamais dans l'URL
+      apiKey,
       amount:        parseFloat(amount),
       description,
       country:       country || null,
       method:        method  || null,
       createdAt:     new Date().toISOString(),
-      expiresAt:     new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
+      expiresAt:     new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       used:          false,
+      // ✅ AJOUTER LES MÉTADONNÉES
+      metadata:      req.body.metadata || {},
     });
 
     // ── Retourner l'URL avec uniquement le pid ────────────────────────────
