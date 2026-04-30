@@ -480,7 +480,7 @@ const pollStatus = (id) => {
     } catch (err) {
       console.error('❌ pollStatus error:', err);
     }
-  }, 5000);
+  }, 10000);
 };
 
 const handleSubmit = async (e) => {
