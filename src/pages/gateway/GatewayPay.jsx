@@ -497,16 +497,17 @@ export default function GatewayPay() {
       const res = await fetch('/api/gateway/pay', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-api-key': apiKey },
-        body: JSON.stringify({
-          amount:          parseFloat(amount),
-          country,
-          method:          selectedMethod?.id,
-          phone:           isMobile ? fullPhone : null,
-          email:           customerEmail || 'client@gateway.local',
-          customerName:    customerFirstName || 'Client',
-          customerSurname: customerLastName  || 'Paiement',
-          description,
-        }),
+      body: JSON.stringify({
+        amount: parseFloat(amount),
+        country,
+        method: selectedMethod?.id,
+        phone: isMobile ? fullPhone : null,
+        email: customerEmail || 'client@gateway.local',
+        customerName: customerFirstName || 'Client',
+        customerSurname: customerLastName || 'Paiement',
+        description,
+        pid: pid,  // ← AJOUTER CETTE LIGNE
+      }),
       });
       const data = await res.json();
       if (data.success) {
