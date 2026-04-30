@@ -472,58 +472,77 @@ export default function GatewayPay() {
     }, 5000);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // 🔍 LOG FRONTEND
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📤 [Frontend] handleSubmit - Début du paiement');
+  console.log('🆔 PID depuis URL:', pid);
+  console.log('💰 Montant:', amount);
+  console.log('📍 Pays:', country);
+  console.log('📱 Méthode:', selectedMethod?.id);
+  console.log('📧 Email:', customerEmail);
+  console.log('👤 Nom:', customerFirstName, customerLastName);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  if (!amount || parseFloat(amount) <= 0) { toast.error('Montant invalide'); return; }
 
-    const isMobile = MOBILE_METHODS.includes(selectedMethod?.id);
-    const isCard   = CARD_METHODS.includes(selectedMethod?.id);
+  const isMobile = MOBILE_METHODS.includes(selectedMethod?.id);
+  const isCard   = CARD_METHODS.includes(selectedMethod?.id);
 
-    if (isCard && !isKkiapayMethod) {
-      if (!customerEmail.trim())     { toast.error("L'email est requis");   return; }
-      if (!customerFirstName.trim()) { toast.error('Le prénom est requis'); return; }
-      if (!customerLastName.trim())  { toast.error('Le nom est requis');    return; }
+  if (isCard && !isKkiapayMethod) {
+    if (!customerEmail.trim())     { toast.error("L'email est requis");   return; }
+    if (!customerFirstName.trim()) { toast.error('Le prénom est requis'); return; }
+    if (!customerLastName.trim())  { toast.error('Le nom est requis');    return; }
+  }
+
+  setLoading(true);
+  try {
+    const fullPhone = isMobile ? getFullPhoneNumber() : null;
+    if (isMobile) {
+      const phoneCheck = validatePhone(fullPhone, country, selectedMethod?.id);
+      if (!phoneCheck.valid) { toast.error(phoneCheck.error); setLoading(false); return; }
     }
 
-    setLoading(true);
-    try {
-      const fullPhone = isMobile ? getFullPhoneNumber() : null;
-      if (isMobile) {
-        const phoneCheck = validatePhone(fullPhone, country, selectedMethod?.id);
-        if (!phoneCheck.valid) { toast.error(phoneCheck.error); setLoading(false); return; }
-      }
+    const requestBody = {
+      amount: parseFloat(amount),
+      country,
+      method: selectedMethod?.id,
+      phone: isMobile ? fullPhone : null,
+      email: customerEmail || 'client@gateway.local',
+      customerName: customerFirstName || 'Client',
+      customerSurname: customerLastName || 'Paiement',
+      description,
+      pid: pid,  // ← AJOUTER CETTE LIGNE
+    };
 
-      /* ── apiKey depuis le state — jamais depuis l'URL ── */
-      const res = await fetch('/api/gateway/pay', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({
-        amount: parseFloat(amount),
-        country,
-        method: selectedMethod?.id,
-        phone: isMobile ? fullPhone : null,
-        email: customerEmail || 'client@gateway.local',
-        customerName: customerFirstName || 'Client',
-        customerSurname: customerLastName || 'Paiement',
-        description,
-        pid: pid,  // ← AJOUTER CETTE LIGNE
-      }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setLoading(false);
-        if (isMobile && fullPhone) savePhoneNumber(fullPhone);
-        if (data.url) window.location.href = data.url;
-        else pollStatus(data.transactionId);
-      } else {
-        toast.error(data.error || 'Une erreur est survenue');
-        setLoading(false);
-      }
-    } catch {
-      toast.error('Erreur de connexion');
+    console.log('📦 [Frontend] Body envoyé à /api/gateway/pay:', JSON.stringify(requestBody, null, 2));
+
+    const res = await fetch('/api/gateway/pay', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify(requestBody),
+    });
+    
+    const data = await res.json();
+    console.log('📡 [Frontend] Réponse de la gateway:', data);
+    
+    if (data.success) {
+      setLoading(false);
+      if (isMobile && fullPhone) savePhoneNumber(fullPhone);
+      if (data.url) window.location.href = data.url;
+      else pollStatus(data.transactionId);
+    } else {
+      toast.error(data.error || 'Une erreur est survenue');
       setLoading(false);
     }
-  };
+  } catch (err) {
+    console.error('❌ [Frontend] Erreur:', err);
+    toast.error('Erreur de connexion');
+    setLoading(false);
+  }
+};
 
   const handleKkiapayPayment = () => {
     if (!window.openKkiapayWidget) { toast.error('Widget KKiaPay non chargé'); return; }
