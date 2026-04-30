@@ -760,6 +760,14 @@ export default async function handler(req, res) {
   }
 
   const { amount, country, method, phone, email, description, currency, customerName, customerSurname, pid } = req.body;
+   // 🔍 LOGS POUR VOIR CE QUI EST REÇU
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📥 [pay.js] REQUÊTE REÇUE');
+  console.log('📦 Body reçu:', JSON.stringify(req.body, null, 2));
+  console.log('🆔 PID reçu:', pid);
+  console.log('📋 Métadonnées dans body:', req.body.metadata);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
   if (!apiKey)                return res.status(401).json({ error: 'Clé API requise' });
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Montant invalide' });
 
@@ -864,22 +872,40 @@ export default async function handler(req, res) {
 
     const isCompleted = result.success && (result.status === 'SUCCESSFUL' || result.status === 'completed');
 
-        // Charger les métadonnées depuis payment_links si un pid est fourni
+    // 🔍 CHARGEMENT DES MÉTADONNÉES DEPUIS PAYMENT_LINKS
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 [pay.js] Chargement des métadonnées');
+    console.log('🆔 PID reçu dans pay.js:', pid);
+    
     let metadataFromLink = {};
     if (pid) {
       try {
+        console.log(`📡 Recherche du payment_link avec PID: ${pid}`);
         const linkSnap = await db.collection('payment_links').doc(pid).get();
-        if (linkSnap.exists && linkSnap.data().metadata) {
-          metadataFromLink = linkSnap.data().metadata;
-          console.log('📦 Métadonnées chargées depuis payment_links:', metadataFromLink);
+        if (linkSnap.exists) {
+          console.log('✅ Payment_link trouvé');
+          console.log('📦 Données du payment_link:', JSON.stringify(linkSnap.data(), null, 2));
+          if (linkSnap.data().metadata) {
+            metadataFromLink = linkSnap.data().metadata;
+            console.log('✅ Métadonnées chargées depuis payment_links:', JSON.stringify(metadataFromLink, null, 2));
+          } else {
+            console.log('⚠️ Aucune métadonnée dans payment_link');
+          }
+        } else {
+          console.log('❌ Payment_link NON trouvé pour ce PID');
         }
       } catch (err) {
-        console.error('Erreur chargement payment_links:', err);
+        console.error('❌ Erreur chargement payment_links:', err);
       }
+    } else {
+      console.log('⚠️ Aucun PID reçu dans la requête');
     }
 
-    // Fusionner les métadonnées (celles du body ont priorité)
+    // Fusionner les métadonnées
     const finalMetadata = { ...metadataFromLink, ...(req.body.metadata || {}) };
+    console.log('📦 Métadonnées finales:', JSON.stringify(finalMetadata, null, 2));
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
 
     const txRef = await db.collection('gateway_transactions').add({
       merchantId:       merchant.id,
@@ -903,13 +929,12 @@ export default async function handler(req, res) {
       createdAt:        new Date().toISOString(),
       // ✅ CRUCIAL : Stocker les métadonnées du webhook personnalisé
       metadata: {
-        paymentId:     req.body.metadata?.paymentId || null,
-        reference:     req.body.metadata?.reference || null,
-        uid:           req.body.metadata?.uid || null,
-        plan:          req.body.metadata?.plan || null,
-        audits:        req.body.metadata?.audits || null,
-        // Conserver toutes les autres métadonnées si présentes
-        ...(req.body.metadata || {})
+        paymentId: finalMetadata.paymentId || null,
+        reference: finalMetadata.reference || null,
+        uid: finalMetadata.uid || null,
+        plan: finalMetadata.plan || null,
+        audits: finalMetadata.audits || null,
+        email: finalMetadata.email || null,
       }
     });
 
