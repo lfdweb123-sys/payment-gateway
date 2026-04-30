@@ -56,6 +56,7 @@ function AppContent() {
   const isAdminRoute = location.pathname.startsWith('/admin');
   const isPublicPage = location.pathname === '/' || location.pathname === '/pay' ||
     location.pathname === '/success' ||
+    location.pathname === '/accept-invite' ||
     location.pathname.startsWith('/api-documentation') ||
     location.pathname === '/help'    || location.pathname === '/privacy' ||
     location.pathname === '/contact' || location.pathname === '/terms'   ||
