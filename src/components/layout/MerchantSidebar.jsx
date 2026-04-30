@@ -9,39 +9,104 @@ export default function MerchantSidebar() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
-  // Utiliser effectiveMerchantData chargé dans AuthContext :
-  // - propriétaire  → son propre document gateway_merchants
-  // - membre équipe → document gateway_merchants du propriétaire
   const merchantData = user?.effectiveMerchantData || user?.merchant || {};
   const isTeamMember = user?.isTeamMember || false;
+  const teamRole = user?.teamRole || null;
 
-  const isVerified = isTeamMember || merchantData?.verificationStatus === 'approved';
-  const isPending  = !isTeamMember && merchantData?.verificationStatus === 'pending';
+  // Vérification selon le rôle (propriétaire ou membre)
+  const hasAccess = (requiredRoles = null) => {
+    // Cas 1 : Propriétaire (non membre d'équipe)
+    if (!isTeamMember) {
+      return merchantData?.verificationStatus === 'approved';
+    }
+    
+    // Cas 2 : Membre d'équipe - vérifier son rôle
+    if (requiredRoles === null) return true;
+    return requiredRoles.includes(teamRole);
+  };
+
+  const isVerified = hasAccess(null); // Pour l'affichage général
+  const isPending = !isTeamMember && merchantData?.verificationStatus === 'pending';
 
   // Fermer le drawer à chaque changement de route
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
+  // Configuration des menus avec les rôles autorisés
   const menuItems = [
-    { title: 'Dashboard',         icon: Layout,     path: '/dashboard',     requireVerification: false },
-    { title: 'Liens de paiement', icon: Link2,      path: '/payment-links', requireVerification: true },
-    { title: 'Providers',         icon: Key,        path: '/providers',     requireVerification: true },
-    { title: 'Transactions',      icon: CreditCard, path: '/transactions',  requireVerification: true },
-    { title: 'Retraits',          icon: Wallet,     path: '/payouts',       requireVerification: true },
-    { title: 'Équipe',            icon: Users,      path: '/team',          requireVerification: true },
-    { title: 'Développeur',       icon: Code,       path: '/developer',     requireVerification: true },
-    { title: 'Paramètres',        icon: Settings,   path: '/settings',      requireVerification: false },
+    { 
+      title: 'Dashboard', 
+      icon: Layout, 
+      path: '/dashboard', 
+      allowedRoles: ['Administrateur', 'Gestionnaire', 'Consultant', 'Support'] 
+    },
+    { 
+      title: 'Liens de paiement', 
+      icon: Link2, 
+      path: '/payment-links', 
+      allowedRoles: ['Administrateur', 'Gestionnaire'] 
+    },
+    { 
+      title: 'Providers', 
+      icon: Key, 
+      path: '/providers', 
+      allowedRoles: ['Administrateur', 'Gestionnaire'] 
+    },
+    { 
+      title: 'Transactions', 
+      icon: CreditCard, 
+      path: '/transactions', 
+      allowedRoles: ['Administrateur', 'Gestionnaire', 'Consultant'] 
+    },
+    { 
+      title: 'Retraits', 
+      icon: Wallet, 
+      path: '/payouts', 
+      allowedRoles: ['Administrateur', 'Gestionnaire'] 
+    },
+    { 
+      title: 'Équipe', 
+      icon: Users, 
+      path: '/team', 
+      allowedRoles: ['Administrateur']  // Seul l'admin peut gérer l'équipe
+    },
+    { 
+      title: 'Développeur', 
+      icon: Code, 
+      path: '/developer', 
+      allowedRoles: ['Administrateur'] 
+    },
+    { 
+      title: 'Paramètres', 
+      icon: Settings, 
+      path: '/settings', 
+      allowedRoles: null  // Accessible à tous les rôles vérifiés
+    },
   ];
+
+  // Vérifier si un item est accessible
+  const isAccessible = (item) => {
+    if (!isTeamMember) {
+      // Propriétaire : vérification requise sauf pour Dashboard et Paramètres
+      if (item.path === '/dashboard' || item.path === '/settings') {
+        return true;
+      }
+      return merchantData?.verificationStatus === 'approved';
+    }
+    // Membre d'équipe : vérifier le rôle
+    if (item.allowedRoles === null) return true;
+    return item.allowedRoles.includes(teamRole);
+  };
 
   // La barre mobile affiche les 4 premiers items + le bouton menu
   const bottomItems = menuItems.slice(0, 4);
 
-  // ── Rendu d'un item de nav (version mobile compacte ou sidebar desktop) ──
+  // Rendu d'un item de nav
   const renderNavItem = (item, { compact = false, onClick } = {}) => {
-    const isActive   = location.pathname === item.path;
-    const isDisabled = item.requireVerification && !isVerified;
-    const Icon       = item.icon;
+    const isActive = location.pathname === item.path;
+    const accessible = isAccessible(item);
+    const Icon = item.icon;
 
-    if (isDisabled) {
+    if (!accessible) {
       return (
         <div key={item.path}
           className={`flex ${compact ? 'flex-col gap-0.5 px-3 py-2 text-xs' : 'items-center gap-3 px-3 py-2.5 text-sm'} font-medium text-gray-300 opacity-40 cursor-not-allowed select-none ${compact ? 'items-center' : ''}`}>
@@ -65,7 +130,7 @@ export default function MerchantSidebar() {
     );
   };
 
-  // ── Item vérification (propriétaire non vérifié uniquement) ──
+  // Item vérification (propriétaire non vérifié uniquement)
   const verificationItem = (collapsed = false, onClick = null) => {
     if (isTeamMember || isVerified) return null;
     return (
@@ -74,7 +139,7 @@ export default function MerchantSidebar() {
           ${location.pathname === '/verification' ? 'bg-amber-50 text-amber-900' : 'text-amber-600 hover:bg-amber-50'}
           ${collapsed ? 'justify-center' : ''}`}>
         <Shield size={20}/>
-        {!collapsed && <span>Vérification</span>}
+        {!collapsed && <span>Vérification KYC</span>}
         {!collapsed && isPending && <span className="ml-auto w-2 h-2 bg-amber-500 rounded-full animate-pulse"/>}
       </Link>
     );
@@ -82,7 +147,7 @@ export default function MerchantSidebar() {
 
   return (
     <>
-      {/* ── Desktop sidebar ── */}
+      {/* Desktop sidebar */}
       <aside className={`hidden lg:flex flex-col fixed left-0 top-16 bottom-0 bg-white border-r border-gray-200 z-30 transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'}`}>
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -92,11 +157,11 @@ export default function MerchantSidebar() {
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-1 mt-2">
           {menuItems.map(item => {
-            const isActive   = location.pathname === item.path;
-            const isDisabled = item.requireVerification && !isVerified;
-            const Icon       = item.icon;
+            const isActive = location.pathname === item.path;
+            const accessible = isAccessible(item);
+            const Icon = item.icon;
 
-            if (isDisabled) {
+            if (!accessible) {
               return (
                 <div key={item.path}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed select-none ${collapsed ? 'justify-center' : ''}`}>
@@ -122,6 +187,13 @@ export default function MerchantSidebar() {
         </nav>
 
         <div className="p-3 border-t border-gray-100">
+          {/* Affichage du rôle pour les membres d'équipe */}
+          {isTeamMember && teamRole && (
+            <div className="mb-3 px-3 py-2 text-xs text-gray-500 border-b border-gray-100">
+              Rôle : <span className="font-semibold text-gray-700">{teamRole}</span>
+            </div>
+          )}
+          
           <a href="/help" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all">
             <HelpCircle size={20}/>
@@ -140,7 +212,7 @@ export default function MerchantSidebar() {
         </div>
       </aside>
 
-      {/* ── Mobile bottom nav ── */}
+      {/* Mobile bottom nav */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-30">
         <div className="flex items-center justify-around h-16">
           {bottomItems.map(item => renderNavItem(item, { compact: true }))}
@@ -153,7 +225,7 @@ export default function MerchantSidebar() {
         </div>
       </nav>
 
-      {/* ── Mobile drawer ── */}
+      {/* Mobile drawer */}
       {drawerOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)}/>
       )}
@@ -166,13 +238,20 @@ export default function MerchantSidebar() {
           </button>
         </div>
 
+        {/* Rôle affiché dans le drawer mobile */}
+        {isTeamMember && teamRole && (
+          <div className="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
+            Rôle : <span className="font-semibold text-gray-700">{teamRole}</span>
+          </div>
+        )}
+
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {menuItems.map(item => {
-            const isActive   = location.pathname === item.path;
-            const isDisabled = item.requireVerification && !isVerified;
-            const Icon       = item.icon;
+            const isActive = location.pathname === item.path;
+            const accessible = isAccessible(item);
+            const Icon = item.icon;
 
-            if (isDisabled) {
+            if (!accessible) {
               return (
                 <div key={item.path} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium opacity-40 cursor-not-allowed select-none">
                   <Icon size={20} className="text-gray-400"/>
