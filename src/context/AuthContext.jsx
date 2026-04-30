@@ -29,18 +29,38 @@ export function AuthProvider({ children }) {
     const merchantData = merchantDoc.exists() ? merchantDoc.data() : null;
 
     let teamMembership = null;
+
     if (!merchantDoc.exists()) {
       try {
-        const teamQuery = query(
+        let teamSnap = null;
+
+        // 1. Cherche d'abord par userId (cas normal après acceptation)
+        const queryByUid = query(
           collection(db, 'gateway_merchant_teams'),
           where('userId', '==', firebaseUser.uid),
           where('status', '==', 'active')
         );
-        const teamSnap = await getDocs(teamQuery);
+        const snapByUid = await getDocs(queryByUid);
 
-        if (!teamSnap.empty) {
+        if (!snapByUid.empty) {
+          teamSnap = snapByUid;
+        } else {
+          // 2. Fallback par email (cas où updateDoc vient juste de tourner
+          //    et refreshUser est appelé dans la foulée)
+          const queryByEmail = query(
+            collection(db, 'gateway_merchant_teams'),
+            where('email', '==', firebaseUser.email.toLowerCase()),
+            where('status', '==', 'active')
+          );
+          const snapByEmail = await getDocs(queryByEmail);
+          if (!snapByEmail.empty) teamSnap = snapByEmail;
+        }
+
+        if (teamSnap && !teamSnap.empty) {
           const teamData = teamSnap.docs[0].data();
-          const ownerMerchantDoc = await getDoc(doc(db, 'gateway_merchants', teamData.merchantId));
+          const ownerMerchantDoc = await getDoc(
+            doc(db, 'gateway_merchants', teamData.merchantId)
+          );
           teamMembership = {
             teamId:       teamSnap.docs[0].id,
             merchantId:   teamData.merchantId,

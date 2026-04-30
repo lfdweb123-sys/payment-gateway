@@ -9,7 +9,10 @@ import {
   updateDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { CheckCircle, XCircle, Loader, Users, LogIn, UserPlus, ArrowRight } from 'lucide-react';
+import {
+  CheckCircle, XCircle, Loader, Users,
+  LogIn, UserPlus, ArrowRight
+} from 'lucide-react';
 
 const ROLE_LABELS = {
   admin:   'Administrateur',
@@ -96,12 +99,13 @@ export default function AcceptInvite() {
         return;
       }
 
-      await acceptInvitation(teamDocRef, invite);
+      await acceptInvitation(teamDocRef);
 
     } catch (err) {
       console.error('Erreur accept-invite :', err.code, err.message);
       if (err.code === 'permission-denied') {
-        setState(STATE.NEED_AUTH);
+        setState(STATE.ERROR);
+        setErrorMessage("Permission refusée. Veuillez réessayer ou contacter le support.");
       } else {
         setState(STATE.ERROR);
         setErrorMessage("Une erreur est survenue. Veuillez réessayer ou contacter le support.");
@@ -109,7 +113,7 @@ export default function AcceptInvite() {
     }
   };
 
-  const acceptInvitation = async (teamDocRef, invite) => {
+  const acceptInvitation = async (teamDocRef) => {
     setState(STATE.ACCEPTING);
     try {
       await updateDoc(teamDocRef, {
@@ -118,7 +122,7 @@ export default function AcceptInvite() {
         acceptedAt: serverTimestamp()
       });
 
-      // Recharger le contexte auth APRÈS le updateDoc
+      // Recharger le contexte auth après le updateDoc
       // pour que isTeamMember soit true avant la navigation
       await refreshUser();
 
@@ -168,28 +172,36 @@ export default function AcceptInvite() {
         width: '100%', maxWidth: 460, overflow: 'hidden'
       }}>
         <div style={{ padding: '20px 32px', borderBottom: '1px solid #f0f0f0' }}>
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316', letterSpacing: '.05em', textTransform: 'uppercase' }}>
+          <span style={{
+            fontSize: 13, fontWeight: 700, color: '#f97316',
+            letterSpacing: '.05em', textTransform: 'uppercase'
+          }}>
             Passerelle de Paiement
           </span>
         </div>
 
         <div style={{ padding: '36px 32px 32px' }}>
 
-          {/* Chargement */}
+          {/* Chargement / Acceptation */}
           {(state === STATE.LOADING || state === STATE.ACCEPTING) && (
             <div style={{ textAlign: 'center' }}>
               <Loader size={32} className="spin" color="#f97316" style={{ marginBottom: 20 }} />
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 8px' }}>
                 {state === STATE.ACCEPTING ? 'Acceptation en cours…' : 'Vérification du lien…'}
               </h2>
-              <p style={{ fontSize: 14, color: '#71717a', margin: 0 }}>Quelques secondes, s'il vous plaît.</p>
+              <p style={{ fontSize: 14, color: '#71717a', margin: 0 }}>
+                Quelques secondes, s'il vous plaît.
+              </p>
             </div>
           )}
 
           {/* Non connecté */}
           {state === STATE.NEED_AUTH && (
             <div>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: 14, background: '#fff7ed',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20
+              }}>
                 <Users size={24} color="#f97316" />
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
@@ -202,7 +214,12 @@ export default function AcceptInvite() {
               )}
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 24px', lineHeight: 1.6 }}>
                 Rôle attribué :{' '}
-                <span style={{ display: 'inline-block', padding: '2px 10px', background: '#fff7ed', color: '#c2410c', borderRadius: 4, fontSize: 13, fontWeight: 600, border: '1px solid #fed7aa' }}>
+                <span style={{
+                  display: 'inline-block', padding: '2px 10px',
+                  background: '#fff7ed', color: '#c2410c',
+                  borderRadius: 4, fontSize: 13, fontWeight: 600,
+                  border: '1px solid #fed7aa'
+                }}>
                   {ROLE_LABELS[role] || role}
                 </span>
               </p>
@@ -233,14 +250,19 @@ export default function AcceptInvite() {
           {/* Succès */}
           {state === STATE.SUCCESS && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: '50%', background: '#f0fdf4',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 20px'
+              }}>
                 <CheckCircle size={30} color="#16a34a" />
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
                 Invitation acceptée !
               </h2>
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 28px', lineHeight: 1.6 }}>
-                Vous faites maintenant partie de l'équipe <strong>{merchantName}</strong> en tant que <strong>{ROLE_LABELS[role] || role}</strong>.
+                Vous faites maintenant partie de l'équipe <strong>{merchantName}</strong> en tant
+                que <strong>{ROLE_LABELS[role] || role}</strong>.
               </p>
               <button
                 className="btn-primary"
@@ -255,14 +277,19 @@ export default function AcceptInvite() {
           {/* Déjà membre */}
           {state === STATE.ALREADY_DONE && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: '50%', background: '#eff6ff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 20px'
+              }}>
                 <CheckCircle size={30} color="#2563eb" />
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
                 Vous êtes déjà membre
               </h2>
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 28px', lineHeight: 1.6 }}>
-                Cette invitation a déjà été acceptée. Votre accès à <strong>{merchantName}</strong> est actif.
+                Cette invitation a déjà été acceptée. Votre accès
+                à <strong>{merchantName}</strong> est actif.
               </p>
               <button
                 className="btn-primary"
@@ -277,7 +304,11 @@ export default function AcceptInvite() {
           {/* Erreur */}
           {state === STATE.ERROR && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: '50%', background: '#fef2f2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                margin: '0 auto 20px'
+              }}>
                 <XCircle size={30} color="#dc2626" />
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: '#18181b', margin: '0 0 10px' }}>
@@ -286,7 +317,11 @@ export default function AcceptInvite() {
               <p style={{ fontSize: 14, color: '#52525b', margin: '0 0 28px', lineHeight: 1.6 }}>
                 {errorMessage || "Ce lien d'invitation est invalide ou a expiré."}
               </p>
-              <Link to="/" className="btn-secondary" style={{ margin: '0 auto', justifyContent: 'center' }}>
+              <Link
+                to="/"
+                className="btn-secondary"
+                style={{ margin: '0 auto', justifyContent: 'center' }}
+              >
                 Retour à l'accueil
               </Link>
             </div>
