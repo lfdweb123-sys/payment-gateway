@@ -24,6 +24,7 @@ const db = admin.firestore();
 async function sendBrevoEmail({ to, toName, subject, htmlContent }) {
   const apiKey = process.env.VITE_BREVO_API_KEY;
   if (!apiKey) { console.warn('VITE_BREVO_API_KEY manquant'); return; }
+  if (!to) { console.warn('Email destinataire manquant'); return; }
   try {
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -49,6 +50,44 @@ async function sendBrevoEmail({ to, toName, subject, htmlContent }) {
   } catch (e) {
     console.error('Brevo exception:', e.message);
   }
+}
+
+/* ─── Récupérer l'email du marchand (depuis gateway_merchants ou users) ─── */
+async function getMerchantEmailAndName(merchantId) {
+  // 1. Chercher d'abord dans gateway_merchants
+  const merchantSnap = await db.collection('gateway_merchants').doc(merchantId).get();
+  if (merchantSnap.exists) {
+    const data = merchantSnap.data();
+    if (data.email) {
+      return { email: data.email, name: data.name || data.email };
+    }
+  }
+  
+  // 2. Chercher dans users (car l'email est stocké là)
+  const userSnap = await db.collection('users').doc(merchantId).get();
+  if (userSnap.exists) {
+    const data = userSnap.data();
+    if (data.email) {
+      console.log(`📧 Email marchand trouvé dans users: ${data.email}`);
+      return { email: data.email, name: data.name || data.displayName || data.email };
+    }
+  }
+  
+  // 3. Tentative de recherche par uid dans payments
+  const paymentSnap = await db.collection('payments')
+    .where('uid', '==', merchantId)
+    .limit(1)
+    .get();
+  if (!paymentSnap.empty) {
+    const paymentData = paymentSnap.docs[0].data();
+    if (paymentData.email) {
+      console.log(`📧 Email marchand trouvé dans payments: ${paymentData.email}`);
+      return { email: paymentData.email, name: paymentData.name || paymentData.email };
+    }
+  }
+  
+  console.warn(`⚠️ Aucun email trouvé pour le marchand ${merchantId}`);
+  return { email: null, name: null };
 }
 
 /* ─── Templates email ────────────────────────────────────────────────────── */
@@ -586,21 +625,22 @@ export default async function handler(req, res) {
       await sendToMerchantWebhooks(tx.merchantId, eventType, transactionDataForWebhook, provider);
     }
 
-    // ── Récupérer les infos du marchand pour l'email ──────────────────
+    // ── Récupérer les infos du marchand pour l'email (CORRIGÉ) ──────────────
     if (tx.merchantId) {
-      const merchantSnap = await db.collection('gateway_merchants').doc(tx.merchantId).get();
-      if (merchantSnap.exists) {
-        const merchant  = merchantSnap.data();
+      const { email: merchantEmail, name: merchantName } = await getMerchantEmailAndName(tx.merchantId);
+      
+      if (merchantEmail) {
         const netAmount = tx.netAmount || tx.amount || 0;
         const currency  = tx.currency || 'XOF';
 
         if (isSuccessful) {
+          console.log(`📧 Envoi email notification au marchand: ${merchantEmail}`);
           await sendBrevoEmail({
-            to:          merchant.email,
-            toName:      merchant.name || merchant.email,
+            to:          merchantEmail,
+            toName:      merchantName || merchantEmail,
             subject:     `💰 Paiement reçu — ${Number(netAmount).toLocaleString('fr-FR')} ${currency}`,
             htmlContent: tplPaymentReceived(
-              merchant.name || merchant.email,
+              merchantName || merchantEmail,
               netAmount,
               currency,
               reference,
@@ -609,11 +649,11 @@ export default async function handler(req, res) {
           });
         } else {
           await sendBrevoEmail({
-            to:          merchant.email,
-            toName:      merchant.name || merchant.email,
+            to:          merchantEmail,
+            toName:      merchantName || merchantEmail,
             subject:     `❌ Paiement échoué — ${Number(netAmount).toLocaleString('fr-FR')} ${currency}`,
             htmlContent: tplPaymentFailed(
-              merchant.name || merchant.email,
+              merchantName || merchantEmail,
               netAmount,
               currency,
               reference,
@@ -621,6 +661,8 @@ export default async function handler(req, res) {
             ),
           });
         }
+      } else {
+        console.warn(`⚠️ Impossible d'envoyer l'email au marchand ${tx.merchantId}: aucun email trouvé`);
       }
     }
 
