@@ -8,7 +8,6 @@
 
 import { log, logError } from '../logs/logger.js';
 import admin from 'firebase-admin';
-import crypto from 'crypto';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -93,18 +92,9 @@ function tplPaymentFailed(name, amount, currency, reference, reason) {
     </div>`;
 }
 
-/* ─── Générer signature pour webhooks personnalisés ────────────────────── */
-function generateWebhookSignature(payload, secret) {
-  return crypto
-    .createHmac('sha256', secret)
-    .update(JSON.stringify(payload))
-    .digest('hex');
-}
-
 /* ─── Envoyer aux webhooks personnalisés du marchand ───────────────────── */
 async function sendToMerchantWebhooks(merchantId, event, transactionData, provider) {
   try {
-    // Récupérer les webhooks du marchand
     const merchantSnap = await db.collection('gateway_merchants').doc(merchantId).get();
     if (!merchantSnap.exists) {
       console.log(`Marchand ${merchantId} non trouvé`);
@@ -120,11 +110,10 @@ async function sendToMerchantWebhooks(merchantId, event, transactionData, provid
       return;
     }
     
-    console.log(`Envoi à ${activeWebhooks.length} webhook(s) pour l'événement ${event}`);
+    console.log(`📤 Envoi à ${activeWebhooks.length} webhook(s) pour l'événement ${event}`);
     
-    // Construire le payload
     const payload = {
-      event: event, // 'payment.completed', 'payment.failed', 'payment.pending', 'payment.refunded'
+      event: event,
       timestamp: new Date().toISOString(),
       merchantId: merchantId,
       transaction: {
@@ -148,102 +137,33 @@ async function sendToMerchantWebhooks(merchantId, event, transactionData, provid
       }
     };
     
-    // Envoyer à chaque webhook
-    const results = await Promise.allSettled(
-      activeWebhooks.map(async (webhook) => {
-        const startTime = Date.now();
-        try {
-          // Générer signature si un secret est configuré
-          const signature = webhook.secret 
-            ? generateWebhookSignature(payload, webhook.secret)
-            : null;
-          
-          const headers = {
+    for (const webhook of activeWebhooks) {
+      try {
+        console.log(`📡 Envoi à ${webhook.url}...`);
+        
+        const response = await fetch(webhook.url, {
+          method: 'POST',
+          headers: {
             'Content-Type': 'application/json',
             'User-Agent': 'PaymentGateway/1.0',
-            'X-Webhook-Event': event,
-            'X-Webhook-Timestamp': new Date().toISOString()
-          };
-          
-          if (signature) {
-            headers['X-Webhook-Signature'] = signature;
-          }
-          
-          const response = await fetch(webhook.url, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload),
-            timeout: 10000 // 10 secondes timeout
-          });
-          
-          const duration = Date.now() - startTime;
-          
-          let responseBody = null;
-          try {
-            responseBody = await response.text();
-          } catch (e) {
-            responseBody = 'Unable to read response';
-          }
-          
-          if (!response.ok) {
-            console.error(`Webhook ${webhook.url} a retourné ${response.status}: ${responseBody.substring(0, 200)}`);
-          } else {
-            console.log(`Webhook ${webhook.url} OK (${duration}ms)`);
-          }
-          
-          // Logger la tentative
-          await db.collection('gateway_webhook_logs').add({
-            merchantId: merchantId,
-            webhookId: webhook.id,
-            url: webhook.url,
-            event: event,
-            transactionId: transactionData.id,
-            status: response.ok ? 'success' : 'failed',
-            statusCode: response.status,
-            duration: duration,
-            responsePreview: responseBody.substring(0, 500),
-            timestamp: new Date().toISOString()
-          });
-          
-          return { url: webhook.url, ok: response.ok, status: response.status, duration };
-          
-        } catch (error) {
-          const duration = Date.now() - startTime;
-          console.error(`Erreur webhook ${webhook.url}:`, error.message);
-          
-          // Logger l'erreur
-          await db.collection('gateway_webhook_logs').add({
-            merchantId: merchantId,
-            webhookId: webhook.id,
-            url: webhook.url,
-            event: event,
-            transactionId: transactionData.id,
-            status: 'error',
-            error: error.message,
-            duration: duration,
-            timestamp: new Date().toISOString()
-          });
-          
-          return { url: webhook.url, ok: false, error: error.message, duration };
+            'X-Webhook-Event': event
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+          console.log(`✅ Webhook ${webhook.url} envoyé avec succès (${response.status})`);
+        } else {
+          console.error(`❌ Webhook ${webhook.url} a retourné ${response.status}`);
+          const responseText = await response.text().catch(() => '');
+          if (responseText) console.error(`   Réponse: ${responseText.substring(0, 200)}`);
         }
-      })
-    );
-    
-    // Logger récapitulatif
-    const successCount = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-    const failCount = results.length - successCount;
-    
-    await log('webhook', 'INFO', `Webhooks envoyés: ${successCount} succès, ${failCount} échecs`, {
-      merchantId,
-      event,
-      totalWebhooks: activeWebhooks.length,
-      successCount,
-      failCount
-    });
-    
+      } catch (error) {
+        console.error(`❌ Erreur envoi webhook ${webhook.url}:`, error.message);
+      }
+    }
   } catch (error) {
     console.error('Erreur envoi webhooks personnalisés:', error);
-    await logError('webhook_custom', error, { merchantId, event });
   }
 }
 
@@ -528,8 +448,7 @@ export default async function handler(req, res) {
   const { provider } = req.query;
 
   console.log(`📨 Webhook reçu pour ${provider}`, { 
-    method: req.method, 
-    headers: req.headers,
+    method: req.method,
     body: req.body 
   });
 
@@ -561,8 +480,9 @@ export default async function handler(req, res) {
               : null;
 
             if (whsecret) {
+              const crypto = await import('crypto');
               const payload  = JSON.stringify(req.body);
-              const expected = crypto
+              const expected = crypto.default
                 .createHmac('sha256', whsecret)
                 .update(`${timestamp}.${payload}`)
                 .digest('hex');
@@ -619,22 +539,15 @@ export default async function handler(req, res) {
     const isSuccessful = status === 'SUCCESSFUL';
 
     // ── Mettre à jour la transaction ───────────────────────────────────
-    const updateData = {
+    await db.collection('gateway_transactions').doc(txDoc.id).update({
       status:      newStatus,
       webhookData: req.body,
       completedAt: isSuccessful ? new Date().toISOString() : null,
       failedAt:    !isSuccessful ? new Date().toISOString() : null,
       updatedAt:   new Date().toISOString(),
-    };
-    
-    await db.collection('gateway_transactions').doc(txDoc.id).update(updateData);
-
-    await log('webhook', 'INFO', `Transaction ${newStatus}`, { 
-      provider, 
-      reference, 
-      transactionId: txDoc.id, 
-      newStatus 
     });
+
+    await log('webhook', 'INFO', `Transaction ${newStatus}`, { provider, reference, transactionId: txDoc.id, newStatus });
 
     // ── Mettre à jour le solde marchand (si succès) ────────────────────
     if (isSuccessful && tx.merchantId) {
@@ -669,10 +582,8 @@ export default async function handler(req, res) {
       metadata: tx.metadata || {}
     };
     
-    // Envoyer asynchrone (ne pas bloquer la réponse)
     if (tx.merchantId) {
-      sendToMerchantWebhooks(tx.merchantId, eventType, transactionDataForWebhook, provider)
-        .catch(error => console.error('Erreur envoi webhooks personnalisés:', error));
+      await sendToMerchantWebhooks(tx.merchantId, eventType, transactionDataForWebhook, provider);
     }
 
     // ── Récupérer les infos du marchand pour l'email ──────────────────
@@ -713,7 +624,7 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log(`✅ Webhook traité avec succès: transaction ${txDoc.id} -> ${newStatus}`);
+    console.log(`✅ Webhook traité: transaction ${txDoc.id} -> ${newStatus}`);
     return res.status(200).json({ success: true, message: `Transaction ${newStatus}` });
 
   } catch (error) {
