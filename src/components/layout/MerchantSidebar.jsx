@@ -32,56 +32,57 @@ export default function MerchantSidebar() {
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
   // Configuration des menus avec les rôles autorisés
-  const menuItems = [
-    { 
-      title: 'Dashboard', 
-      icon: Layout, 
-      path: '/dashboard', 
-      allowedRoles: ['Administrateur', 'Gestionnaire', 'Consultant', 'Support'] 
-    },
-    { 
-      title: 'Liens de paiement', 
-      icon: Link2, 
-      path: '/payment-links', 
-      allowedRoles: ['Administrateur', 'Gestionnaire'] 
-    },
-    { 
-      title: 'Providers', 
-      icon: Key, 
-      path: '/providers', 
-      allowedRoles: ['Administrateur', 'Gestionnaire'] 
-    },
-    { 
-      title: 'Transactions', 
-      icon: CreditCard, 
-      path: '/transactions', 
-      allowedRoles: ['Administrateur', 'Gestionnaire', 'Consultant'] 
-    },
-    { 
-      title: 'Retraits', 
-      icon: Wallet, 
-      path: '/payouts', 
-      allowedRoles: ['Administrateur', 'Gestionnaire'] 
-    },
-    { 
-      title: 'Équipe', 
-      icon: Users, 
-      path: '/team', 
-      allowedRoles: ['Administrateur']  // Seul l'admin peut gérer l'équipe
-    },
-    { 
-      title: 'Développeur', 
-      icon: Code, 
-      path: '/developer', 
-      allowedRoles: ['Administrateur'] 
-    },
-    { 
-      title: 'Paramètres', 
-      icon: Settings, 
-      path: '/settings', 
-      allowedRoles: null  // Accessible à tous les rôles vérifiés
-    },
-  ];
+  // Configuration des menus avec les rôles autorisés
+const menuItems = [
+  { 
+    title: 'Dashboard', 
+    icon: Layout, 
+    path: '/dashboard', 
+    allowedRoles: ['Administrateur', 'Gestionnaire', 'Consultant', 'Support']  // ✅ Tous
+  },
+  { 
+    title: 'Liens de paiement', 
+    icon: Link2, 
+    path: '/payment-links', 
+    allowedRoles: ['Administrateur', 'Gestionnaire']  // ✅ Administrateur + Gestionnaire
+  },
+  { 
+    title: 'Providers', 
+    icon: Key, 
+    path: '/providers', 
+    allowedRoles: ['Administrateur', 'Gestionnaire']  // ✅ Administrateur + Gestionnaire
+  },
+  { 
+    title: 'Transactions', 
+    icon: CreditCard, 
+    path: '/transactions', 
+    allowedRoles: ['Administrateur', 'Gestionnaire', 'Consultant']  // ✅ Administrateur + Gestionnaire + Consultant
+  },
+  { 
+    title: 'Retraits', 
+    icon: Wallet, 
+    path: '/payouts', 
+    allowedRoles: ['Administrateur']  // ❌ Seul l'Administrateur (pas Gestionnaire !)
+  },
+  { 
+    title: 'Équipe', 
+    icon: Users, 
+    path: '/team', 
+    allowedRoles: ['Administrateur']  // ❌ Seul l'Administrateur
+  },
+  { 
+    title: 'Développeur', 
+    icon: Code, 
+    path: '/developer', 
+    allowedRoles: ['Administrateur']  // ❌ Seul l'Administrateur
+  },
+  { 
+    title: 'Paramètres', 
+    icon: Settings, 
+    path: '/settings', 
+    allowedRoles: ['Administrateur']  // ❌ Seul l'Administrateur (pas Gestionnaire !)
+  },
+];
 
   // Vérifier si un item est accessible
   const isAccessible = (item) => {
