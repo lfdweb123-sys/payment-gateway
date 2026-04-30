@@ -533,7 +533,7 @@ const handleSubmit = async (e) => {
       setLoading(false);
       if (isMobile && fullPhone) savePhoneNumber(fullPhone);
       if (data.url) window.location.href = data.url;
-      else pollStatus(data.reference);
+      else pollStatus(data.transactionId);
     } else {
       toast.error(data.error || 'Une erreur est survenue');
       setLoading(false);
