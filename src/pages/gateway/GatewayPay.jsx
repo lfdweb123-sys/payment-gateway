@@ -453,25 +453,35 @@ export default function GatewayPay() {
     localStorage.setItem('gw_saved_phones', JSON.stringify(updated));
   };
 
-  const pollStatus = (id) => {
-    console.log('🔄 pollStatus - ID reçu:', id);
-    setStatus('pending');
-    const msgs = ['Paiement en cours…','En attente de confirmation…','Vérification en cours…','Presque terminé…'];
-    let mi = 0;
-    const mi_ = setInterval(() => { mi=(mi+1)%msgs.length; setPollMsg(msgs[mi]); }, 3500);
-    let attempts = 0;
-    const iv = setInterval(async () => {
-      attempts++;
-      if (attempts > 24) { clearInterval(iv); clearInterval(mi_); setStatus('failed'); return; }
-      try {
-        /* ── apiKey depuis le state — jamais depuis l'URL ── */
-        const r = await fetch(`/api/gateway/verify/${id}`, { headers:{'x-api-key': apiKey} });
-        const d = await r.json();
-        if (d.status === 'completed') { clearInterval(iv); clearInterval(mi_); setStatus('completed'); }
-        else if (d.status === 'failed') { clearInterval(iv); clearInterval(mi_); setStatus('failed'); }
-      } catch {}
-    }, 5000);
-  };
+const pollStatus = (id) => {
+  console.log('🔄 pollStatus - ID reçu:', id);
+  setStatus('pending');
+  const msgs = ['Paiement en cours…','En attente de confirmation…','Vérification en cours…','Presque terminé…'];
+  let mi = 0;
+  const mi_ = setInterval(() => { mi=(mi+1)%msgs.length; setPollMsg(msgs[mi]); }, 3500);
+  let attempts = 0;
+  const iv = setInterval(async () => {
+    attempts++;
+    if (attempts > 24) { clearInterval(iv); clearInterval(mi_); setStatus('failed'); return; }
+    try {
+      const r = await fetch(`/api/gateway/verify/${id}`, { headers:{'x-api-key': apiKey} });
+      const d = await r.json();
+      console.log(`📡 Tentative ${attempts}:`, d); // ← AJOUTE CE LOG
+      if (d.status === 'completed') { 
+        console.log('✅ Paiement détecté comme completed !');
+        clearInterval(iv); 
+        clearInterval(mi_); 
+        setStatus('completed'); 
+      } else if (d.status === 'failed') { 
+        clearInterval(iv); 
+        clearInterval(mi_); 
+        setStatus('failed'); 
+      }
+    } catch (err) {
+      console.error('❌ pollStatus error:', err);
+    }
+  }, 5000);
+};
 
 const handleSubmit = async (e) => {
   e.preventDefault();
