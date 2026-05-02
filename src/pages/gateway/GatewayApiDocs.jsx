@@ -1,57 +1,64 @@
-import { useState } from 'react';
-import {
-  Code, Key, Shield, Zap, Server, Copy, CheckCircle, Globe,
-  Smartphone, Terminal, Monitor, QrCode, Mail,
-  BookOpen, Layers, Lock
-} from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState, useCallback } from 'react';
 
-/* ─── URL de base depuis la variable d'environnement Vite ────────────────── */
-const BASE_URL = import.meta.env.VITE_APP_URL || 'https://votre-domaine.vercel.app';
+/* ─── CONFIG ────────────────────────────────────────────────────────────── */
+const BASE_URL = import.meta.env?.VITE_APP_URL || 'https://votre-domaine.vercel.app';
 
-/*
-  ─── COMMENT FONCTIONNE LA GÉNÉRATION DE LIEN ────────────────────────────
-  
-  Le marchand appelle POST /api/gateway/generate-link avec sa clé API.
-  La gateway crée un enregistrement dans Firestore (collection payment_links)
-  et retourne une URL avec un pid (UUID opaque).
+/* ─── LANG BADGES ───────────────────────────────────────────────────────── */
+const LANG_COLORS = {
+  html:       { bg: '#fff3ea', color: '#c2410c', label: 'HTML'  },
+  javascript: { bg: '#fffbeb', color: '#b45309', label: 'JS'    },
+  jsx:        { bg: '#eff6ff', color: '#1d4ed8', label: 'JSX'   },
+  php:        { bg: '#faf5ff', color: '#7c3aed', label: 'PHP'   },
+  python:     { bg: '#f0fdf4', color: '#166534', label: 'PY'    },
+  bash:       { bg: '#f1f5f9', color: '#475569', label: 'cURL'  },
+  dart:       { bg: '#ecfeff', color: '#0e7490', label: 'Dart'  },
+  text:       { bg: '#f8fafc', color: '#64748b', label: 'TEXT'  },
+};
 
-  URL générée : /pay?pid=a1b2c3d4-e5f6-4abc-8def-...
-  
-  - Le pid est un UUID v4 aléatoire → impossible à deviner
-  - Il expire après 15 minutes
-  - La clé API du marchand reste dans Firestore, jamais dans l'URL
-  - Le GATEWAY_SECRET est uniquement dans les variables Vercel du propriétaire
-    de la passerelle — les marchands n'y ont pas accès
-  ─────────────────────────────────────────────────────────────────────────
-*/
-
-const TABS = [
-  { id: 'quickstart',  label: 'Démarrage',   icon: Zap,        color: '#FF6B00' },
-  { id: 'html',        label: 'HTML',         icon: Monitor,    color: '#0057FF' },
-  { id: 'javascript',  label: 'JavaScript',   icon: Code,       color: '#F59E0B' },
-  { id: 'php',         label: 'PHP',          icon: Server,     color: '#9B00E8' },
-  { id: 'python',      label: 'Python',       icon: Terminal,   color: '#00A550' },
-  { id: 'wordpress',   label: 'WordPress',    icon: Globe,      color: '#0057FF' },
-  { id: 'api',         label: 'API REST',     icon: Key,        color: '#EF4444' },
-  { id: 'webhooks',    label: 'Webhooks',     icon: Shield,     color: '#6366F1' },
-  { id: 'mobile',      label: 'Mobile',       icon: Smartphone, color: '#0EA5E9' },
-  { id: 'qrcode',      label: 'QR Code',      icon: QrCode,     color: '#14B8A6' },
+/* ─── NAV TABS ──────────────────────────────────────────────────────────── */
+const NAV = [
+  {
+    group: 'Getting started',
+    items: [{ id: 'quickstart', label: 'Démarrage rapide' }],
+  },
+  {
+    group: 'Intégration',
+    items: [
+      { id: 'html',       label: 'HTML'              },
+      { id: 'javascript', label: 'JavaScript / Node' },
+      { id: 'php',        label: 'PHP'               },
+      { id: 'python',     label: 'Python'            },
+      { id: 'wordpress',  label: 'WordPress'         },
+      { id: 'mobile',     label: 'Mobile'            },
+      { id: 'qrcode',     label: 'QR Code'           },
+    ],
+  },
+  {
+    group: 'API Reference',
+    items: [
+      { id: 'api',       label: 'REST API'         },
+      { id: 'webhooks',  label: 'Webhooks'         },
+      { id: 'providers', label: 'Providers (30)'   },
+    ],
+  },
 ];
 
-const METHODS = {
+/* ─── CONTENT DATA ──────────────────────────────────────────────────────── */
+const TABS = {
   quickstart: {
     title: 'Démarrage rapide',
-    sub: "Appelez generate-link avec votre clé API — la gateway génère un lien sécurisé avec pid.",
+    sub:   "Appelez generate-link avec votre clé API — pid UUID sécurisé retourné.",
+    alerts: [
+      { type: 'info',  text: `URL sécurisée : les liens générés contiennent un <code>?pid=UUID</code> opaque — la clé API n'est jamais dans l'URL. Le pid expire après 15 minutes.` },
+      { type: 'warn',  text: `Clé API : toujours dans le header <code>x-api-key</code> — jamais dans le corps de la requête ni dans l'URL.` },
+    ],
     items: [
       {
         name: '① Générer un lien de paiement',
-        desc: "Appelez POST /api/gateway/generate-link avec votre clé API. La gateway crée un pid (UUID opaque) et retourne l'URL complète. Le pid expire après 15 minutes.",
+        desc: "Appelez POST /api/gateway/generate-link. La gateway crée un pid (UUID opaque) expirant après 15 minutes.",
         lang: 'javascript',
-        code: `// Appelez cet endpoint depuis votre backend ou serveur
-// Votre clé API (gw_xxx) dans le header x-api-key — jamais dans l'URL
-
-const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
+        code:
+`const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -60,62 +67,57 @@ const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
   body: JSON.stringify({
     amount: 5000,
     description: 'Facture #123',
-    country: 'bj',      // optionnel — prérempli côté client
-    method: 'mtn_money' // optionnel — prérempli côté client
+    country: 'bj',
+    method: 'mtn_money'
   })
 });
 
 const data = await response.json();
 console.log(data.url);
-// → ${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-ef1234567890
-// Le pid est un UUID opaque — la clé API n'apparaît JAMAIS dans l'URL`,
+// → ${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-ef1234567890`,
       },
       {
         name: '② Envoyer le lien (Email / SMS)',
-        desc: "L'URL générée contient uniquement un pid UUID — aucune donnée sensible lisible.",
+        desc: "Le pid est opaque — aucune donnée sensible lisible dans l'URL.",
         lang: 'text',
-        code: `// Lien de paiement sécurisé — à envoyer par email ou SMS
+        code:
+`// Lien sécurisé à envoyer par email ou SMS
 ${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-ef1234567890
 
 // Ce pid :
-// ✅ Ne contient aucune donnée — c'est juste une référence Firestore
+// ✅ Ne contient aucune donnée — c'est une référence Firestore
 // ✅ Expire après 15 minutes
-// ✅ La clé API reste dans Firestore côté serveur
+// ✅ La clé API reste côté serveur
 // ✅ Impossible à deviner (UUID v4 = 2^122 combinaisons)`,
       },
       {
-        name: '③ Redirection vers la page de paiement',
-        desc: "Après génération, redirigez l'utilisateur vers l'URL retournée.",
+        name: '③ Rediriger après génération',
         lang: 'javascript',
-        code: `// Route Express — générer le lien et rediriger
-app.post('/payer', async (req, res) => {
+        code:
+`app.post('/payer', async (req, res) => {
   const { amount, description } = req.body;
-  
   const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.GATEWAY_API_KEY // gw_xxx depuis variable d'env
+      'x-api-key': process.env.GATEWAY_API_KEY
     },
     body: JSON.stringify({ amount, description })
   });
-  
   const data = await response.json();
-  
   if (data.success) {
     res.redirect(data.url);
-    // → ${BASE_URL}/pay?pid=a1b2c3d4-...
   } else {
     res.status(400).json({ error: data.error });
   }
 });`,
       },
       {
-        name: '④ Paiement direct via API (sans page intermédiaire)',
-        desc: "Alternative au lien — initier directement un paiement mobile money ou carte.",
+        name: '④ Paiement direct via API',
+        desc: "Alternative au lien — initier directement un paiement mobile money.",
         lang: 'javascript',
-        code: `// Pour les paiements directs (vous connaissez déjà le pays, méthode, téléphone)
-const res = await fetch('${BASE_URL}/api/gateway/pay', {
+        code:
+`const res = await fetch('${BASE_URL}/api/gateway/pay', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -139,19 +141,17 @@ const data = await res.json();
 
   html: {
     title: 'Intégration HTML',
-    sub: "Le lien est généré par votre backend — le bouton HTML redirige vers l'URL avec pid.",
+    sub:   "Le lien est généré côté serveur — le bouton HTML redirige vers l'URL avec pid.",
     items: [
       {
         name: 'Bouton de paiement (lien pré-généré)',
         desc: "Générez l'URL côté serveur et injectez-la dans le bouton HTML.",
         lang: 'html',
-        code: `<!-- L'URL avec ?pid= est générée côté serveur et injectée dans la page -->
-<!-- Exemple avec PHP : -->
+        code:
+`<!-- L'URL avec ?pid= est générée côté serveur et injectée dans la page -->
 <a href="<?php echo $paymentUrl; ?>" class="btn-payer">
-  💳 Payer 5 000 XOF
+  Payer 5 000 XOF
 </a>
-
-<!-- URL injectée : ${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-... -->
 
 <style>
 .btn-payer {
@@ -167,22 +167,19 @@ const data = await res.json();
 </style>`,
       },
       {
-        name: 'Bouton avec génération dynamique (JavaScript)',
-        desc: "Votre page appelle votre backend pour obtenir le pid avant la redirection.",
+        name: 'Génération dynamique (JavaScript)',
         lang: 'html',
-        code: `<button onclick="startPayment()">💳 Payer 5 000 XOF</button>
+        code:
+`<button onclick="startPayment()">Payer 5 000 XOF</button>
 
 <script>
 async function startPayment() {
-  // Appel à VOTRE backend (qui appelle generate-link)
   const res = await fetch('/api/creer-lien', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ amount: 5000, description: 'Facture #123' })
   });
   const { url } = await res.json();
-  
-  // Redirection vers ${BASE_URL}/pay?pid=...
   window.location.href = url;
 }
 </script>`,
@@ -190,7 +187,8 @@ async function startPayment() {
       {
         name: 'Plusieurs produits',
         lang: 'html',
-        code: `<button onclick="pay(5000, 'Formation HTML')">Formation HTML — 5 000 XOF</button>
+        code:
+`<button onclick="pay(5000, 'Formation HTML')">Formation HTML — 5 000 XOF</button>
 <button onclick="pay(15000, 'Pack Complet')">Pack Complet — 15 000 XOF</button>
 <button onclick="pay(50000, 'Accompagnement')">Accompagnement — 50 000 XOF</button>
 
@@ -211,34 +209,30 @@ async function pay(amount, description) {
 
   javascript: {
     title: 'JavaScript / Node.js',
-    sub: "Appelez generate-link depuis votre backend — la clé API reste côté serveur.",
+    sub:   "Appelez generate-link depuis votre backend — la clé API reste côté serveur.",
     items: [
       {
-        name: 'Générer un lien de paiement (Node.js / Express)',
+        name: 'Express — générer un lien',
         lang: 'javascript',
-        code: `const express = require('express');
+        code:
+`const express = require('express');
 const fetch   = require('node-fetch');
 const app     = express();
 app.use(express.json());
 
-// Route qui génère un lien de paiement sécurisé
 app.post('/creer-lien', async (req, res) => {
   const { amount, description, country, method } = req.body;
-  
   const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.GATEWAY_API_KEY // gw_xxx — jamais côté client
+      'x-api-key': process.env.GATEWAY_API_KEY
     },
     body: JSON.stringify({ amount, description, country, method })
   });
-  
   const data = await response.json();
-  
   if (data.success) {
     res.json({ url: data.url });
-    // data.url = ${BASE_URL}/pay?pid=a1b2c3d4-...
   } else {
     res.status(400).json({ error: data.error });
   }
@@ -247,45 +241,39 @@ app.post('/creer-lien', async (req, res) => {
       {
         name: 'Popup + vérification de statut',
         lang: 'javascript',
-        code: `async function payerEtSuivre(amount, description) {
-  // 1. Générer le lien via votre backend
+        code:
+`async function payerEtSuivre(amount, description) {
   const linkRes = await fetch('/creer-lien', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ amount, description })
   });
   const { url, transactionId } = await linkRes.json();
-  
-  // 2. Ouvrir la page de paiement dans une popup
   const popup = window.open(url, 'payment', 'width=480,height=700');
-  
-  // 3. Vérifier le statut toutes les 5 secondes
+
   const interval = setInterval(async () => {
     const statusRes = await fetch('/verifier-paiement/' + transactionId);
     const { status } = await statusRes.json();
-    
     if (status === 'completed') {
       clearInterval(interval);
       popup?.close();
-      alert('✅ Paiement réussi !');
+      alert('Paiement réussi !');
     } else if (status === 'failed') {
       clearInterval(interval);
       popup?.close();
-      alert('❌ Paiement échoué');
+      alert('Paiement échoué');
     }
   }, 5000);
 }`,
       },
       {
-        name: 'Route de vérification (Node.js)',
+        name: 'Route de vérification',
         lang: 'javascript',
-        code: `// Vérifier le statut d'une transaction
-app.get('/verifier-paiement/:id', async (req, res) => {
+        code:
+`app.get('/verifier-paiement/:id', async (req, res) => {
   const response = await fetch(
     '${BASE_URL}/api/gateway/verify/' + req.params.id,
-    {
-      headers: { 'x-api-key': process.env.GATEWAY_API_KEY }
-    }
+    { headers: { 'x-api-key': process.env.GATEWAY_API_KEY } }
   );
   const data = await response.json();
   res.json(data);
@@ -294,21 +282,19 @@ app.get('/verifier-paiement/:id', async (req, res) => {
       {
         name: 'Next.js API Route',
         lang: 'jsx',
-        code: `// pages/api/creer-lien.js (ou app/api/creer-lien/route.js)
+        code:
+`// pages/api/creer-lien.js
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  
   const { amount, description } = req.body;
-  
   const response = await fetch('${BASE_URL}/api/gateway/generate-link', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.GATEWAY_API_KEY // dans .env.local
+      'x-api-key': process.env.GATEWAY_API_KEY
     },
     body: JSON.stringify({ amount, description })
   });
-  
   const data = await response.json();
   res.json(data);
 }`,
@@ -318,21 +304,22 @@ export default async function handler(req, res) {
 
   php: {
     title: 'PHP',
-    sub: "Appelez generate-link côté serveur PHP — clé API dans les variables d'environnement.",
+    sub:   "Appelez generate-link côté serveur — clé API dans les variables d'environnement.",
     items: [
       {
         name: 'Générer un lien de paiement',
         lang: 'php',
-        code: `<?php
+        code:
+`<?php
 function creerLienPaiement($amount, $description, $country = null, $method = null) {
   $ch = curl_init('${BASE_URL}/api/gateway/generate-link');
   curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => [
+    CURLOPT_POST           => true,
+    CURLOPT_HTTPHEADER     => [
       'Content-Type: application/json',
-      'x-api-key: ' . getenv('GATEWAY_API_KEY') // gw_xxx depuis variable d'env
+      'x-api-key: ' . getenv('GATEWAY_API_KEY')
     ],
-    CURLOPT_POSTFIELDS => json_encode(array_filter([
+    CURLOPT_POSTFIELDS     => json_encode(array_filter([
       'amount'      => $amount,
       'description' => $description,
       'country'     => $country,
@@ -345,52 +332,46 @@ function creerLienPaiement($amount, $description, $country = null, $method = nul
   curl_close($ch);
   $data = json_decode($response, true);
   return $data['url'] ?? null;
-  // → ${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-...
 }
 
-// Utilisation — rediriger vers la page de paiement
 $url = creerLienPaiement(5000, 'Facture #123', 'bj', 'mtn_money');
-if ($url) {
-  header('Location: ' . $url);
-  exit;
-}`,
+if ($url) { header('Location: ' . $url); exit; }`,
       },
       {
-        name: 'Paiement direct via API',
+        name: 'Paiement direct',
         lang: 'php',
-        code: `<?php
+        code:
+`<?php
 function initierPaiement($amount, $description, $country = 'bj', $method = 'mtn_money', $phone = '') {
   $ch = curl_init('${BASE_URL}/api/gateway/pay');
   curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => [
+    CURLOPT_POST           => true,
+    CURLOPT_HTTPHEADER     => [
       'Content-Type: application/json',
       'x-api-key: ' . getenv('GATEWAY_API_KEY')
     ],
-    CURLOPT_POSTFIELDS => json_encode([
+    CURLOPT_POSTFIELDS     => json_encode([
       'amount'      => $amount,
       'description' => $description,
       'country'     => $country,
       'method'      => $method,
       'phone'       => $phone,
     ]),
-    CURLOPT_RETURNTRANSFER => true
+    CURLOPT_RETURNTRANSFER => true,
   ]);
   $response = curl_exec($ch);
   curl_close($ch);
   return json_decode($response, true);
 }
 
-$paiement = initierPaiement(5000, 'Facture #123', 'bj', 'mtn_money', '22961000000');
-if ($paiement['success']) {
-  header('Location: ' . $paiement['url']);
-  exit;
-}`,
+$p = initierPaiement(5000, 'Facture #123', 'bj', 'mtn_money', '22961000000');
+if ($p['success']) { header('Location: ' . $p['url']); exit; }`,
       },
       {
         name: 'Webhook callback',
         lang: 'php',
-        code: `<?php
+        code:
+`<?php
 $payload = json_decode(file_get_contents('php://input'), true);
 $event   = $payload['event'] ?? '';
 $tx      = $payload['transaction'] ?? [];
@@ -398,7 +379,8 @@ $tx      = $payload['transaction'] ?? [];
 if ($event === 'payment.completed') {
   $pdo->prepare("UPDATE commandes SET statut='paye' WHERE reference=?")
       ->execute([$tx['reference']]);
-  mail($tx['email'] ?? '', 'Paiement confirmé', "Paiement de {$tx['amount']} XOF reçu.");
+  mail($tx['email'] ?? '', 'Paiement confirmé',
+    "Paiement de {$tx['amount']} XOF reçu.");
 }
 
 http_response_code(200);
@@ -409,12 +391,13 @@ echo json_encode(['received' => true]);`,
 
   python: {
     title: 'Python',
-    sub: "generate-link depuis Flask/Django — clé API dans os.environ.",
+    sub:   "generate-link depuis Flask/Django — clé API dans os.environ.",
     items: [
       {
         name: 'Générer un lien de paiement',
         lang: 'python',
-        code: `import requests, os
+        code:
+`import requests, os
 
 GATEWAY_URL = '${BASE_URL}'
 
@@ -422,19 +405,17 @@ def creer_lien_paiement(amount, description, country=None, method=None):
     payload = {'amount': amount, 'description': description}
     if country: payload['country'] = country
     if method:  payload['method']  = method
-    
     response = requests.post(
         f'{GATEWAY_URL}/api/gateway/generate-link',
         headers={
             'Content-Type': 'application/json',
-            'x-api-key': os.environ['GATEWAY_API_KEY']  # gw_xxx
+            'x-api-key': os.environ['GATEWAY_API_KEY']
         },
         json=payload,
         timeout=10
     )
     data = response.json()
     return data.get('url') if data.get('success') else None
-    # → ${BASE_URL}/pay?pid=a1b2c3d4-...
 
 # Vue Django
 def payer(request):
@@ -444,32 +425,10 @@ def payer(request):
     return HttpResponse('Erreur', status=400)`,
       },
       {
-        name: 'Paiement direct via API',
-        lang: 'python',
-        code: `import requests, os
-
-def initier_paiement(amount, description, country='bj', method='mtn_money', phone=''):
-    response = requests.post(
-        f'${BASE_URL}/api/gateway/pay',
-        headers={
-            'Content-Type': 'application/json',
-            'x-api-key': os.environ['GATEWAY_API_KEY']
-        },
-        json={
-            'amount': amount, 'description': description,
-            'country': country, 'method': method, 'phone': phone,
-        }
-    )
-    return response.json()
-
-paiement = initier_paiement(5000, 'Facture #123', 'bj', 'mtn_money', '22961000000')
-if paiement['success']:
-    return redirect(paiement['url'])`,
-      },
-      {
         name: 'Webhook receiver (Flask)',
         lang: 'python',
-        code: `from flask import Flask, request, jsonify
+        code:
+`from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
@@ -487,24 +446,24 @@ def webhook():
 
   wordpress: {
     title: 'WordPress',
-    sub: "Shortcode qui appelle generate-link côté serveur PHP.",
+    sub:   "Shortcode qui appelle generate-link côté serveur PHP.",
     items: [
       {
-        name: 'Shortcode avec generate-link',
+        name: 'Shortcode bouton de paiement',
         lang: 'php',
-        code: `// Dans functions.php de votre thème
-// Stockez GATEWAY_API_KEY dans wp-config.php :
+        code:
+`// Dans functions.php — stocker la clé dans wp-config.php :
 // define('GATEWAY_API_KEY', 'gw_votre_cle_api');
 
 function creer_lien_gateway($amount, $description) {
   $ch = curl_init('${BASE_URL}/api/gateway/generate-link');
   curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_HTTPHEADER => [
+    CURLOPT_POST           => true,
+    CURLOPT_HTTPHEADER     => [
       'Content-Type: application/json',
       'x-api-key: ' . GATEWAY_API_KEY
     ],
-    CURLOPT_POSTFIELDS => json_encode([
+    CURLOPT_POSTFIELDS     => json_encode([
       'amount'      => (int) $amount,
       'description' => $description,
     ]),
@@ -514,7 +473,6 @@ function creer_lien_gateway($amount, $description) {
   $data = json_decode(curl_exec($ch), true);
   curl_close($ch);
   return $data['url'] ?? '#';
-  // → ${BASE_URL}/pay?pid=a1b2c3d4-...
 }
 
 add_shortcode('bouton_paiement', function($atts) {
@@ -524,21 +482,126 @@ add_shortcode('bouton_paiement', function($atts) {
        . 'Payer ' . number_format($atts['montant']) . ' XOF</a>';
 });
 
-// Usage dans une page WordPress :
-// [bouton_paiement montant="10000" desc="Formation"]`,
+// Usage : [bouton_paiement montant="10000" desc="Formation"]`,
+      },
+    ],
+  },
+
+  mobile: {
+    title: 'Mobile — Flutter & React Native',
+    sub:   "Le lien est généré par votre backend — jamais côté application mobile.",
+    alerts: [
+      { type: 'warn', text: "La clé API ne doit <strong>jamais</strong> être dans le code mobile. Appelez votre propre backend qui appelle <code>generate-link</code>." },
+    ],
+    items: [
+      {
+        name: 'Flutter (Dart)',
+        lang: 'dart',
+        code:
+`import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+
+Future<String?> creerLien(double amount, String description) async {
+  final res = await http.post(
+    Uri.parse('https://votre-api.com/creer-lien'),
+    headers: {'Content-Type': 'application/json'},
+    body: jsonEncode({'amount': amount, 'description': description})
+  );
+  final data = jsonDecode(res.body);
+  return data['url'];
+}
+
+Future<void> payer(double amount, String description) async {
+  final url = await creerLien(amount, description);
+  if (url != null) await launchUrl(Uri.parse(url));
+}`,
+      },
+      {
+        name: 'React Native',
+        lang: 'jsx',
+        code:
+`import { Linking } from 'react-native';
+
+async function creerLien(amount, description) {
+  const res = await fetch('https://votre-api.com/creer-lien', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, description })
+  });
+  const data = await res.json();
+  return data.url;
+}
+
+async function payer(amount, description) {
+  const url = await creerLien(amount, description);
+  if (url) Linking.openURL(url);
+}`,
+      },
+    ],
+  },
+
+  qrcode: {
+    title: 'QR Code',
+    sub:   "Le pid dans le QR code — opaque et expirant en 15 minutes.",
+    items: [
+      {
+        name: 'QR Code avec pid (lien sécurisé)',
+        lang: 'html',
+        code:
+`<img id="qrcode" alt="QR Code de paiement" />
+
+<script>
+async function loadQR() {
+  const res = await fetch('/api/creer-lien', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: 5000, description: 'Facture #123' })
+  });
+  const { url } = await res.json();
+  document.getElementById('qrcode').src =
+    'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='
+    + encodeURIComponent(url);
+}
+loadQR();
+</script>`,
+      },
+      {
+        name: 'QR Code avec montant variable',
+        lang: 'html',
+        code:
+`<input type="number" id="qrAmount" placeholder="Montant (XOF)" />
+<button onclick="generateQR()">Générer QR Code</button>
+<img id="qrcode" style="margin-top:10px" />
+
+<script>
+async function generateQR() {
+  const amount = document.getElementById('qrAmount').value;
+  const res = await fetch('/api/creer-lien', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: parseInt(amount), description: 'Paiement' })
+  });
+  const { url } = await res.json();
+  document.getElementById('qrcode').src =
+    'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='
+    + encodeURIComponent(url);
+}
+</script>`,
       },
     ],
   },
 
   api: {
-    title: 'API REST',
-    sub: "Référence complète — clé API en header x-api-key pour tous les appels.",
+    title: 'REST API',
+    sub:   "Référence complète — clé API en header x-api-key pour tous les appels.",
     items: [
       {
-        name: 'POST /api/gateway/generate-link — Générer un lien sécurisé',
-        desc: "Crée un pid UUID dans Firestore et retourne l'URL de paiement. La clé API du marchand ne sera jamais dans l'URL.",
+        name: 'POST /api/gateway/generate-link',
+        desc: "Crée un pid UUID opaque et retourne l'URL de paiement. Expire dans 15 min.",
         lang: 'bash',
-        code: `curl -X POST ${BASE_URL}/api/gateway/generate-link \\
+        code:
+`curl -X POST ${BASE_URL}/api/gateway/generate-link \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: gw_votre_cle_api" \\
   -d '{
@@ -553,14 +616,14 @@ add_shortcode('bouton_paiement', function($atts) {
   "success": true,
   "url": "${BASE_URL}/pay?pid=a1b2c3d4-e5f6-4abc-8def-ef1234567890",
   "pid": "a1b2c3d4-e5f6-4abc-8def-ef1234567890"
-}
-# Le pid expire dans 15 minutes.`,
+}`,
       },
       {
-        name: 'POST /api/gateway/pay — Initier un paiement direct',
+        name: 'POST /api/gateway/pay',
+        desc: "Initier un paiement direct sans page intermédiaire.",
         lang: 'bash',
-        code: `# Paiement direct sans page intermédiaire
-curl -X POST ${BASE_URL}/api/gateway/pay \\
+        code:
+`curl -X POST ${BASE_URL}/api/gateway/pay \\
   -H "Content-Type: application/json" \\
   -H "x-api-key: gw_votre_cle_api" \\
   -d '{
@@ -579,14 +642,14 @@ curl -X POST ${BASE_URL}/api/gateway/pay \\
   "reference": "GW-1714000000000",
   "url": "https://...",
   "status": "pending",
-  "provider": "feexpay",
-  "message": "Paiement initié."
+  "provider": "feexpay"
 }`,
       },
       {
-        name: 'GET /api/gateway/verify/:id — Vérifier un paiement',
+        name: 'GET /api/gateway/verify/:id',
         lang: 'bash',
-        code: `curl ${BASE_URL}/api/gateway/verify/abc123 \\
+        code:
+`curl ${BASE_URL}/api/gateway/verify/abc123 \\
   -H "x-api-key: gw_votre_cle_api"
 
 # Réponse
@@ -599,10 +662,11 @@ curl -X POST ${BASE_URL}/api/gateway/pay \\
 }`,
       },
       {
-        name: 'GET /api/gateway/methods/:country — Méthodes par pays',
+        name: 'GET /api/gateway/methods/:country',
+        desc: "Endpoint public — pas de clé API requise.",
         lang: 'bash',
-        code: `# Endpoint public — pas besoin de clé API
-curl ${BASE_URL}/api/gateway/methods/bj
+        code:
+`curl ${BASE_URL}/api/gateway/methods/bj
 
 # Réponse
 {
@@ -610,17 +674,18 @@ curl ${BASE_URL}/api/gateway/methods/bj
   "name": "Bénin",
   "currency": "XOF",
   "methods": [
-    {"id": "mtn_money",    "name": "MTN Mobile Money"},
-    {"id": "moov_money",   "name": "Moov Money"},
-    {"id": "celtiis_money","name": "CELTIIS Money"},
-    {"id": "card",         "name": "Carte Bancaire"}
+    {"id": "mtn_money",     "name": "MTN Mobile Money"},
+    {"id": "moov_money",    "name": "Moov Money"},
+    {"id": "celtiis_money", "name": "CELTIIS Money"},
+    {"id": "card",          "name": "Carte Bancaire"}
   ]
 }`,
       },
       {
-        name: 'GET /api/gateway/balance — Solde du compte',
+        name: 'GET /api/gateway/balance',
         lang: 'bash',
-        code: `curl ${BASE_URL}/api/gateway/balance \\
+        code:
+`curl ${BASE_URL}/api/gateway/balance \\
   -H "x-api-key: gw_votre_cle_api"
 
 # Réponse
@@ -635,12 +700,13 @@ curl ${BASE_URL}/api/gateway/methods/bj
 
   webhooks: {
     title: 'Webhooks',
-    sub: 'Recevez des événements en temps réel sur votre serveur.',
+    sub:   'Recevez des événements en temps réel sur votre serveur.',
     items: [
       {
         name: 'Événements disponibles',
         lang: 'text',
-        code: `payment.completed   → Paiement réussi (solde crédité)
+        code:
+`payment.completed   → Paiement réussi (solde crédité)
 payment.failed      → Paiement échoué ou refusé
 payment.pending     → Paiement en attente de confirmation
 payment.refunded    → Paiement remboursé`,
@@ -648,7 +714,8 @@ payment.refunded    → Paiement remboursé`,
       {
         name: 'Format du payload',
         lang: 'javascript',
-        code: `{
+        code:
+`{
   "event": "payment.completed",
   "transaction": {
     "id": "abc123",
@@ -668,9 +735,9 @@ payment.refunded    → Paiement remboursé`,
       {
         name: 'Récepteur Node.js (Express)',
         lang: 'javascript',
-        code: `app.post('/webhook', express.json(), (req, res) => {
+        code:
+`app.post('/webhook', express.json(), (req, res) => {
   const { event, transaction } = req.body;
-
   switch (event) {
     case 'payment.completed':
       updateOrder(transaction.reference, 'paid');
@@ -681,14 +748,14 @@ payment.refunded    → Paiement remboursé`,
       notifyCustomer(transaction.reference);
       break;
   }
-
   res.json({ received: true });
 });`,
       },
       {
         name: 'Récepteur PHP',
         lang: 'php',
-        code: `<?php
+        code:
+`<?php
 $payload = json_decode(file_get_contents('php://input'), true);
 $event   = $payload['event'] ?? '';
 $tx      = $payload['transaction'] ?? [];
@@ -703,171 +770,50 @@ echo json_encode(['received' => true]);`,
     ],
   },
 
-  mobile: {
-    title: 'Mobile — Flutter & React Native',
-    sub: "Le lien est généré par votre backend — jamais côté application mobile.",
-    items: [
-      {
-        name: 'Flutter (Dart)',
-        lang: 'dart',
-        code: `import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:url_launcher/url_launcher.dart';
-
-const gatewayUrl = '${BASE_URL}';
-
-// ⚠️ La clé API ne doit PAS être dans le code mobile.
-// Appelez votre propre backend qui appelle generate-link.
-
-Future<String?> creerLien(double amount, String description) async {
-  // Appel à VOTRE backend (pas directement à la gateway)
-  final res = await http.post(
-    Uri.parse('https://votre-api.com/creer-lien'),
-    headers: {'Content-Type': 'application/json'},
-    body: jsonEncode({'amount': amount, 'description': description})
-  );
-  final data = jsonDecode(res.body);
-  return data['url']; // ${BASE_URL}/pay?pid=...
-}
-
-Future<void> payer(double amount, String description) async {
-  final url = await creerLien(amount, description);
-  if (url != null) await launchUrl(Uri.parse(url));
-}`,
-      },
-      {
-        name: 'React Native',
-        lang: 'jsx',
-        code: `import { Linking } from 'react-native';
-
-const GATEWAY_URL = '${BASE_URL}';
-
-// ⚠️ La clé API ne doit PAS être dans le code React Native.
-// Appelez votre propre backend (Next.js, Express, etc.)
-
-async function creerLien(amount, description) {
-  // Appel à VOTRE backend — pas directement à la gateway
-  const res = await fetch('https://votre-api.com/creer-lien', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount, description })
-  });
-  const data = await res.json();
-  return data.url; // \${GATEWAY_URL}/pay?pid=...}
-
-async function payer(amount, description) {
-  const url = await creerLien(amount, description);
-  if (url) Linking.openURL(url);
-}`,
-      },
-    ],
-  },
-
-  qrcode: {
-    title: 'QR Code',
-    sub: "Le pid dans le QR code — opaque et expirant en 15 minutes.",
-    items: [
-      {
-        name: 'QR Code avec pid (lien sécurisé)',
-        lang: 'html',
-        code: `<img id="qrcode" alt="QR Code de paiement" />
-
-<script>
-async function loadQR() {
-  // Appel à VOTRE backend pour générer le lien
-  const res = await fetch('/api/creer-lien', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount: 5000, description: 'Facture #123' })
-  });
-  const { url } = await res.json();
-  // url = ${BASE_URL}/pay?pid=a1b2c3d4-...
-
-  document.getElementById('qrcode').src =
-    'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='
-    + encodeURIComponent(url);
-}
-
-loadQR();
-</script>`,
-      },
-      {
-        name: 'QR Code avec montant variable',
-        lang: 'html',
-        code: `<input type="number" id="qrAmount" placeholder="Montant (XOF)" />
-<button onclick="generateQR()">Générer QR Code</button>
-<img id="qrcode" style="margin-top:10px" />
-
-<script>
-async function generateQR() {
-  const amount = document.getElementById('qrAmount').value;
-  
-  const res = await fetch('/api/creer-lien', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount: parseInt(amount), description: 'Paiement' })
-  });
-  const { url } = await res.json();
-  // url = ${BASE_URL}/pay?pid=...
-
-  document.getElementById('qrcode').src =
-    'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data='
-    + encodeURIComponent(url);
-}
-</script>`,
-      },
-    ],
-  },
+  providers: { title: 'Providers supportés', sub: '30 intégrations disponibles.', items: [] },
 };
 
-const LANG_COLORS = {
-  html:       { bg: '#FFF3EA', color: '#FF6B00', label: 'HTML'  },
-  javascript: { bg: '#FFFBEB', color: '#D97706', label: 'JS'    },
-  jsx:        { bg: '#EBF0FF', color: '#0057FF', label: 'JSX'   },
-  php:        { bg: '#F4EBFF', color: '#9B00E8', label: 'PHP'   },
-  python:     { bg: '#EDFAF3', color: '#00A550', label: 'PY'    },
-  bash:       { bg: '#F7F8FC', color: '#555',    label: 'cURL'  },
-  dart:       { bg: '#E0F7FA', color: '#0097A7', label: 'Dart'  },
-  text:       { bg: '#F7F8FC', color: '#888',    label: 'TEXT'  },
-};
-
+/* ─── PROVIDERS DATA ────────────────────────────────────────────────────── */
 const PROVIDERS = [
-  { name:'FeexPay',      zone:'BJ · CI · TG · SN · BF',    color:'#FF6B00', section:'Agrégateurs'    },
-  { name:'KKiaPay',      zone:'UEMOA + CEMAC · 11 pays',    color:'#6366F1', section:'Agrégateurs'    },
-  { name:'CinetPay',     zone:'11 pays Afrique',             color:'#14B8A6', section:'Agrégateurs'    },
-  { name:'Hub2',         zone:'10 pays Afrique',             color:'#F59E0B', section:'Agrégateurs'    },
-  { name:'FedaPay',      zone:'10 pays Afrique',             color:'#EF4444', section:'Agrégateurs'    },
-  { name:'Qosic',        zone:'12 pays Afrique',             color:'#9B00E8', section:'Agrégateurs'    },
-  { name:'Lygos',        zone:'12 pays Afrique',             color:'#EC4899', section:'Agrégateurs'    },
-  { name:'Bizao',        zone:'11 pays Afrique',             color:'#00A550', section:'Agrégateurs'    },
-  { name:'PayDunya',     zone:'UEMOA · 8 pays',              color:'#0EA5E9', section:'Agrégateurs'    },
-  { name:'MbiyoPay',     zone:'11 pays Afrique',             color:'#FF6B00', section:'Agrégateurs'    },
-  { name:'GeniusPay',    zone:"CI · SN · BJ · CM · 12 pays",color:'#00A550', section:'Agrégateurs'    },
-  { name:'Wave',         zone:'SN · CI · ML · UG · CM',     color:'#00A550', section:'Mobile Money'   },
-  { name:'MTN MoMo',     zone:'12 pays africains',           color:'#F59E0B', section:'Mobile Money'   },
-  { name:'M-Pesa Daraja',zone:'KE · TZ · MZ',               color:'#00A550', section:'Mobile Money'   },
-  { name:'Orange Money', zone:'CI · SN · ML · CM · GN',     color:'#FF6B00', section:'Mobile Money'   },
-  { name:'Airtel Money', zone:'14 pays Afrique',             color:'#EF4444', section:'Mobile Money'   },
-  { name:'Paystack',     zone:'NG · GH · KE · ZA',          color:'#00A550', section:'Anglophone'     },
-  { name:'Flutterwave',  zone:'11 pays africains',           color:'#F59E0B', section:'Anglophone'     },
-  { name:'Flouci',       zone:'Tunisie',                     color:'#0EA5E9', section:'Tunisie'        },
-  { name:'Paymee',       zone:'Tunisie',                     color:'#6366F1', section:'Tunisie'        },
-  { name:'Yoco',         zone:'Afrique du Sud · ZAR',        color:'#0057FF', section:'Afrique du Sud' },
-  { name:'PayPal',       zone:'200+ pays',                   color:'#0057FF', section:'International'  },
-  { name:'Stripe',       zone:'Europe · USA · Canada',       color:'#6366F1', section:'International'  },
-  { name:'Mollie',       zone:'Europe · 15 pays',            color:'#0057FF', section:'International'  },
-  { name:'Adyen',        zone:'Mondial · 50+ pays',          color:'#14B8A6', section:'International'  },
-  { name:'Checkout.com', zone:'Mondial · 60+ pays',          color:'#0A0A0A', section:'International'  },
-  { name:'Braintree',    zone:'USA · Europe · AU',           color:'#0057FF', section:'International'  },
-  { name:'Razorpay',     zone:'Inde',                        color:'#0057FF', section:'Inde'           },
-  { name:'Square',       zone:'USA · CA · UK · AU',          color:'#0A0A0A', section:'USA / Canada'   },
-  { name:'Authorize.net',zone:'USA · Canada',                color:'#0057FF', section:'USA / Canada'   },
+  { name: 'FeexPay',       zone: 'BJ · CI · TG · SN · BF',      section: 'Agrégateurs'    },
+  { name: 'KKiaPay',       zone: 'UEMOA + CEMAC · 11 pays',      section: 'Agrégateurs'    },
+  { name: 'CinetPay',      zone: '11 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'Hub2',          zone: '10 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'FedaPay',       zone: '10 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'Qosic',         zone: '12 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'Lygos',         zone: '12 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'Bizao',         zone: '11 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'PayDunya',      zone: 'UEMOA · 8 pays',               section: 'Agrégateurs'    },
+  { name: 'MbiyoPay',      zone: '11 pays Afrique',              section: 'Agrégateurs'    },
+  { name: 'GeniusPay',     zone: 'CI · SN · BJ · CM · 12 pays', section: 'Agrégateurs'    },
+  { name: 'Wave',          zone: 'SN · CI · ML · UG · CM',       section: 'Mobile Money'   },
+  { name: 'MTN MoMo',      zone: '12 pays africains',            section: 'Mobile Money'   },
+  { name: 'M-Pesa Daraja', zone: 'KE · TZ · MZ',                section: 'Mobile Money'   },
+  { name: 'Orange Money',  zone: 'CI · SN · ML · CM · GN',       section: 'Mobile Money'   },
+  { name: 'Airtel Money',  zone: '14 pays Afrique',              section: 'Mobile Money'   },
+  { name: 'Paystack',      zone: 'NG · GH · KE · ZA',            section: 'Anglophone'     },
+  { name: 'Flutterwave',   zone: '11 pays africains',            section: 'Anglophone'     },
+  { name: 'Flouci',        zone: 'Tunisie',                      section: 'Tunisie'        },
+  { name: 'Paymee',        zone: 'Tunisie',                      section: 'Tunisie'        },
+  { name: 'Yoco',          zone: 'Afrique du Sud · ZAR',          section: 'Afrique du Sud' },
+  { name: 'PayPal',        zone: '200+ pays',                    section: 'International'  },
+  { name: 'Stripe',        zone: 'Europe · USA · Canada',         section: 'International'  },
+  { name: 'Mollie',        zone: 'Europe · 15 pays',             section: 'International'  },
+  { name: 'Adyen',         zone: 'Mondial · 50+ pays',           section: 'International'  },
+  { name: 'Checkout.com',  zone: 'Mondial · 60+ pays',           section: 'International'  },
+  { name: 'Braintree',     zone: 'USA · Europe · AU',            section: 'International'  },
+  { name: 'Razorpay',      zone: 'Inde',                         section: 'Inde'           },
+  { name: 'Square',        zone: 'USA · CA · UK · AU',            section: 'USA / Canada'   },
+  { name: 'Authorize.net', zone: 'USA · Canada',                 section: 'USA / Canada'   },
 ];
 
-const PROVIDER_SECTIONS = ['Agrégateurs','Mobile Money','Anglophone','Tunisie','Afrique du Sud','International','Inde','USA / Canada'];
+const PROVIDER_SECTIONS = [
+  'Agrégateurs', 'Mobile Money', 'Anglophone',
+  'Tunisie', 'Afrique du Sud', 'International', 'Inde', 'USA / Canada',
+];
 const SECTION_LABELS = {
   'Agrégateurs':    "Agrégateurs Afrique de l'Ouest",
-  'Mobile Money':   'Mobile Money direct (opérateurs)',
+  'Mobile Money':   'Mobile Money (opérateurs)',
   'Anglophone':     'Afrique anglophone',
   'Tunisie':        'Tunisie',
   'Afrique du Sud': 'Afrique du Sud',
@@ -876,181 +822,408 @@ const SECTION_LABELS = {
   'USA / Canada':   'USA / Canada',
 };
 
+/* ─── ICONS (inline SVG strings as components) ───────────────────────────── */
+const Icon = ({ path, size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="none"
+       stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d={path} />
+  </svg>
+);
+
+const CheckIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 9l4 4 8-8" />
+  </svg>
+);
+
+const CopyIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"
+       stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="5" y="5" width="9" height="9" rx="1.5" />
+    <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" />
+  </svg>
+);
+
+const MenuIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+       stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <path d="M2 4h12M2 8h12M2 12h12" />
+  </svg>
+);
+
+/* ─── CODE BLOCK ────────────────────────────────────────────────────────── */
 function CodeBlock({ code, lang }) {
   const [copied, setCopied] = useState(false);
   const lc = LANG_COLORS[lang] || LANG_COLORS.text;
-  const copy = () => {
-    navigator.clipboard.writeText(code);
-    toast.success('Copié !');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1800);
-  };
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }, [code]);
+
   return (
-    <div style={{ borderRadius:14, overflow:'hidden', border:'1px solid #1E2433' }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', background:'#161B27', padding:'10px 16px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ display:'flex', gap:5 }}>
-            {['#FF5F56','#FFBD2E','#27C93F'].map((c,i) => <div key={i} style={{ width:9, height:9, borderRadius:'50%', background:c }}/>)}
+    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #1e2430' }}>
+      {/* Bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#1e2430', padding: '8px 14px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {['#ff5f56', '#ffbd2e', '#27c93f'].map((c, i) => (
+              <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />
+            ))}
           </div>
-          <span style={{ fontSize:10, fontWeight:800, letterSpacing:'.06em', background:lc.bg, color:lc.color, padding:'2px 8px', borderRadius:5 }}>{lc.label}</span>
+          <span style={{
+            fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4,
+            background: lc.bg, color: lc.color, letterSpacing: '.04em',
+          }}>{lc.label}</span>
         </div>
-        <button onClick={copy} style={{ display:'flex', alignItems:'center', gap:5, background:copied?'rgba(0,165,80,.15)':'rgba(255,255,255,.06)', border:`1px solid ${copied?'rgba(0,165,80,.3)':'rgba(255,255,255,.08)'}`, borderRadius:7, padding:'5px 11px', fontSize:11, fontWeight:600, color:copied?'#00A550':'#8899AA', cursor:'pointer', transition:'all .2s' }}>
-          {copied ? <CheckCircle size={12}/> : <Copy size={12}/>}
+        <button onClick={handleCopy} style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '4px 10px', borderRadius: 5,
+          border: `1px solid ${copied ? 'rgba(34,197,94,.3)' : 'rgba(255,255,255,.12)'}`,
+          background: copied ? 'rgba(34,197,94,.12)' : 'rgba(255,255,255,.06)',
+          color: copied ? '#4ade80' : 'rgba(255,255,255,.5)',
+          fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+          transition: 'all .15s',
+        }}>
+          {copied ? <CheckIcon /> : <CopyIcon />}
           {copied ? 'Copié !' : 'Copier'}
         </button>
       </div>
-      <div style={{ background:'#0D1117', padding:'16px 20px', overflowX:'auto', maxHeight:340, overflowY:'auto' }}>
-        <pre style={{ fontFamily:"'Fira Code','Cascadia Code','Courier New',monospace", fontSize:12, lineHeight:1.8, color:'#E6EDF3', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word' }}>{code}</pre>
-      </div>
+      {/* Code */}
+      <pre style={{
+        background: '#0d1117', margin: 0,
+        padding: '16px 18px',
+        fontFamily: "'Fira Code', 'Cascadia Code', 'Courier New', monospace",
+        fontSize: 12, lineHeight: 1.8, color: '#e2e8f0',
+        overflowX: 'auto', maxHeight: 340, overflowY: 'auto',
+        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      }}>{code}</pre>
     </div>
   );
 }
 
+/* ─── ITEM CARD ─────────────────────────────────────────────────────────── */
 function ItemCard({ item }) {
   return (
-    <div style={{ border:'1px solid #EBEBEB', borderRadius:18, overflow:'hidden', background:'#fff' }}>
-      <div style={{ display:'flex', alignItems:'flex-start', gap:10, padding:'16px 20px', background:'#FAFAFA', borderBottom:'1px solid #F0F0F0', flexWrap:'wrap' }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:14, fontWeight:800, color:'#111' }}>{item.name}</div>
-          {item.desc && <div style={{ fontSize:12, color:'#AAA', marginTop:3, lineHeight:1.5 }}>{item.desc}</div>}
+    <div style={{
+      border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden',
+      background: '#fff', marginBottom: 16,
+    }}>
+      <div style={{
+        padding: '12px 18px', borderBottom: '1px solid #f3f4f6',
+        background: '#f9fafb',
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#111', marginBottom: item.desc ? 3 : 0 }}>
+          {item.name}
         </div>
+        {item.desc && (
+          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>{item.desc}</div>
+        )}
       </div>
-      <div style={{ padding:'14px' }}>
-        <CodeBlock code={item.code} lang={item.lang}/>
+      <div style={{ padding: 14 }}>
+        <CodeBlock code={item.code} lang={item.lang} />
       </div>
     </div>
   );
 }
 
+/* ─── ALERT ─────────────────────────────────────────────────────────────── */
+function Alert({ type, text }) {
+  const styles = {
+    info: { bg: '#f0fdf4', border: '#86efac', color: '#166534' },
+    warn: { bg: '#fff7ed', border: '#fdba74', color: '#9a3412' },
+  };
+  const s = styles[type] || styles.info;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '10px 14px', borderRadius: 8,
+      background: s.bg, border: `1px solid ${s.border}`,
+      color: s.color, fontSize: 12, lineHeight: 1.6, marginBottom: 8,
+    }}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"
+           stroke="currentColor" strokeWidth="1.5" style={{ flexShrink: 0, marginTop: 1 }}>
+        {type === 'info'
+          ? <><circle cx="8" cy="8" r="6" /><path d="M8 7v4M8 5.5v.01" /></>
+          : <><path d="M8 2L1.5 13.5h13L8 2z" /><path d="M8 7v3M8 11.5v.01" /></>
+        }
+      </svg>
+      <span dangerouslySetInnerHTML={{ __html: text }} />
+    </div>
+  );
+}
+
+/* ─── PROVIDERS PAGE ────────────────────────────────────────────────────── */
+function ProvidersPage() {
+  return (
+    <div>
+      {PROVIDER_SECTIONS.map(section => {
+        const list = PROVIDERS.filter(p => p.section === section);
+        if (!list.length) return null;
+        return (
+          <div key={section}>
+            <div style={{
+              fontSize: 10, fontWeight: 600, color: '#9ca3af',
+              textTransform: 'uppercase', letterSpacing: '.06em',
+              margin: '20px 0 8px',
+            }}>{SECTION_LABELS[section]}</div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 8,
+            }}>
+              {list.map(p => (
+                <div key={p.name} style={{
+                  padding: '10px 12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  transition: 'border-color .15s',
+                  cursor: 'default',
+                }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#111', marginBottom: 2 }}>
+                    {p.name}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#9ca3af' }}>{p.zone}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── SUPPORT BAR ───────────────────────────────────────────────────────── */
+function SupportBar() {
+  return (
+    <div style={{
+      marginTop: 28, padding: '20px 24px',
+      background: '#fff7ed', border: '1px solid #fdba74',
+      borderRadius: 12,
+      display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+    }}>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#9a3412', marginBottom: 2 }}>
+          Besoin d'aide pour intégrer ?
+        </div>
+        <div style={{ fontSize: 12, color: '#c2410c' }}>
+          Notre équipe technique est disponible 24/7.
+        </div>
+      </div>
+      <a href="mailto:support@paymentgateway.com" style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '8px 16px', borderRadius: 8,
+        background: '#ea580c', color: '#fff',
+        fontSize: 12, fontWeight: 600, textDecoration: 'none',
+      }}>
+        <Icon path="M1 3h14v10H1zM1 5l7 5 7-5" size={14} />
+        Contacter le support
+      </a>
+    </div>
+  );
+}
+
+/* ─── MAIN COMPONENT ────────────────────────────────────────────────────── */
 export default function GatewayApiDocs() {
   const [activeTab, setActiveTab] = useState('quickstart');
-  const active        = METHODS[activeTab];
-  const activeTabMeta = TABS.find(t => t.id === activeTab);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const tab = TABS[activeTab];
+
+  const handleTabClick = (id) => {
+    setActiveTab(id);
+    setSidebarOpen(false);
+  };
 
   return (
-    <div style={{ maxWidth:900, margin:'0 auto', padding:'20px 16px 48px', fontFamily:"'Plus Jakarta Sans','DM Sans',sans-serif" }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#f9fafb', fontFamily: "'Inter', system-ui, sans-serif" }}>
+
+      {/* ── Mobile overlay ── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)',
+            zIndex: 40, display: 'none',
+          }}
+          className="mobile-overlay"
+        />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside style={{
+        width: 220, flexShrink: 0,
+        background: '#fff',
+        borderRight: '1px solid #e5e7eb',
+        display: 'flex', flexDirection: 'column',
+        position: 'sticky', top: 0, height: '100vh',
+        overflowY: 'auto',
+      }}>
+        {/* Logo */}
+        <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: '#ea580c',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon path="M3 8h10M8 3l5 5-5 5" size={13} />
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>Payment Gateway</div>
+              <div style={{ fontSize: 10, color: '#9ca3af' }}>API Reference v1.0</div>
+            </div>
+          </div>
+          <div style={{
+            marginTop: 10, padding: '6px 10px',
+            background: '#f9fafb', borderRadius: 6,
+            fontFamily: "'Fira Code', monospace",
+            fontSize: 10, color: '#6b7280', wordBreak: 'break-all',
+          }}>
+            {BASE_URL.replace('https://', '')}
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav style={{ padding: '8px 8px', flex: 1 }}>
+          {NAV.map(group => (
+            <div key={group.group} style={{ marginBottom: 4 }}>
+              <div style={{
+                fontSize: 10, fontWeight: 600,
+                color: '#9ca3af',
+                textTransform: 'uppercase', letterSpacing: '.06em',
+                padding: '10px 10px 4px',
+              }}>{group.group}</div>
+              {group.items.map(item => {
+                const isActive = activeTab === item.id;
+                return (
+                  <button key={item.id}
+                    onClick={() => handleTabClick(item.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center',
+                      width: '100%', padding: '7px 10px',
+                      borderRadius: 6, border: 'none',
+                      background: isActive ? '#fff7ed' : 'transparent',
+                      color: isActive ? '#ea580c' : '#6b7280',
+                      fontWeight: isActive ? 600 : 400,
+                      fontSize: 12.5, cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'inherit',
+                      transition: 'background .12s, color .12s',
+                    }}
+                  >
+                    <span style={{
+                      width: 5, height: 5, borderRadius: '50%',
+                      background: isActive ? '#ea580c' : '#d1d5db',
+                      marginRight: 9, flexShrink: 0,
+                      transition: 'background .12s',
+                    }} />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      {/* ── Main content ── */}
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+
+        {/* Topbar */}
+        <div style={{
+          padding: '12px 28px',
+          background: '#fff', borderBottom: '1px solid #e5e7eb',
+          display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky', top: 0, zIndex: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{
+                display: 'none', /* shown via CSS on mobile */
+                alignItems: 'center', justifyContent: 'center',
+                width: 34, height: 34,
+                borderRadius: 6, border: '1px solid #e5e7eb',
+                background: '#f9fafb', cursor: 'pointer',
+              }}
+              className="menu-toggle"
+            >
+              <MenuIcon />
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>
+              {tab?.title || 'Documentation'}
+            </span>
+          </div>
+          <span style={{
+            fontSize: 11, padding: '3px 10px', borderRadius: 20,
+            background: '#fff7ed', color: '#ea580c', fontWeight: 600,
+          }}>
+            v1.0 · REST API
+          </span>
+        </div>
+
+        {/* Content area */}
+        <div style={{ padding: '28px 32px', maxWidth: 860 }}>
+
+          {/* Page header */}
+          {tab && (
+            <div style={{ marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid #e5e7eb' }}>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: '#111', marginBottom: 6 }}>
+                {tab.title}
+              </h1>
+              <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, maxWidth: 560 }}>
+                {tab.sub}
+              </p>
+            </div>
+          )}
+
+          {/* Alerts */}
+          {tab?.alerts?.map((a, i) => <Alert key={i} {...a} />)}
+
+          {/* Items */}
+          {activeTab !== 'providers' && tab?.items.map((item, i) => (
+            <ItemCard key={i} item={item} />
+          ))}
+
+          {/* Providers */}
+          {activeTab === 'providers' && <ProvidersPage />}
+
+          {/* Support bar */}
+          <SupportBar />
+        </div>
+      </main>
+
+      {/* ── Responsive styles ── */}
       <style>{`
-        @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        .doc-tab::-webkit-scrollbar { display:none; }
-        .doc-tab { scrollbar-width:none; }
-        .provider-card:hover { border-color:var(--hc) !important; background:var(--hb) !important; }
-        .provider-section-title { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; margin:18px 0 8px; }
-        .provider-section-title:first-child { margin-top:0; }
+        @media (max-width: 900px) {
+          aside {
+            position: fixed !important;
+            left: ${sidebarOpen ? '0' : '-240px'} !important;
+            top: 0 !important;
+            z-index: 50 !important;
+            height: 100% !important;
+            transition: left .2s ease !important;
+            box-shadow: ${sidebarOpen ? '4px 0 20px rgba(0,0,0,.12)' : 'none'} !important;
+          }
+          .mobile-overlay { display: ${sidebarOpen ? 'block' : 'none'} !important; }
+          .menu-toggle { display: flex !important; }
+          main > div:last-child { padding: 16px !important; }
+        }
+        @media (max-width: 520px) {
+          main > div:last-child { padding: 12px !important; }
+        }
+        aside::-webkit-scrollbar { width: 4px; }
+        aside::-webkit-scrollbar-track { background: transparent; }
+        aside::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
       `}</style>
-
-      {/* Hero */}
-      <div style={{ background:'linear-gradient(135deg,#0A0A0F 0%,#1A1A2E 100%)', borderRadius:22, padding:'32px 28px', marginBottom:24, position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', top:-40, right:-40, width:200, height:200, borderRadius:'50%', background:'rgba(255,107,0,.07)', pointerEvents:'none' }}/>
-        <div style={{ position:'absolute', bottom:-60, right:80, width:140, height:140, borderRadius:'50%', background:'rgba(0,87,255,.07)', pointerEvents:'none' }}/>
-        <div style={{ position:'relative' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-            <div style={{ width:40, height:40, borderRadius:12, background:'linear-gradient(135deg,#FF6B00,#FFAA00)', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 4px 16px rgba(255,107,0,.4)' }}>
-              <BookOpen size={18} color="#fff"/>
-            </div>
-            <div>
-              <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,.4)', textTransform:'uppercase', letterSpacing:'.1em' }}>Référence</div>
-              <div style={{ fontSize:18, fontWeight:900, color:'#fff', letterSpacing:'-.02em', lineHeight:1 }}>Documentation API</div>
-            </div>
-          </div>
-          <p style={{ fontSize:13, color:'rgba(255,255,255,.5)', maxWidth:520, lineHeight:1.6, marginBottom:14 }}>
-            Intégrez la passerelle en 2 étapes : appelez <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>generate-link</code> avec votre clé API, redirigez vers l'URL retournée.
-          </p>
-
-          {/* Base URL */}
-          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, padding:'8px 14px', background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, width:'fit-content' }}>
-            <Key size={12} color="#FF6B00"/>
-            <span style={{ fontSize:12, color:'rgba(255,255,255,.4)', fontFamily:"'DM Mono',monospace" }}>Base URL :</span>
-            <span style={{ fontSize:12, color:'#FF6B00', fontFamily:"'DM Mono',monospace", fontWeight:700 }}>{BASE_URL}</span>
-          </div>
-
-          {/* Note sécurité pid */}
-          <div style={{ display:'flex', alignItems:'flex-start', gap:8, marginBottom:8, padding:'10px 14px', background:'rgba(0,165,80,.08)', border:'1px solid rgba(0,165,80,.2)', borderRadius:10, maxWidth:600 }}>
-            <Lock size={13} color="#00A550" style={{ flexShrink:0, marginTop:1 }}/>
-            <span style={{ fontSize:12, color:'rgba(255,255,255,.55)', lineHeight:1.5 }}>
-              <strong style={{ color:'#00A550' }}>URL sécurisée :</strong> les liens générés contiennent un <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>?pid=UUID</code> opaque — la clé API n'est jamais dans l'URL. Le pid expire après 15 minutes.
-            </span>
-          </div>
-
-          <div style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'10px 14px', background:'rgba(255,107,0,.08)', border:'1px solid rgba(255,107,0,.2)', borderRadius:10, maxWidth:600 }}>
-            <Shield size={13} color="#FF6B00" style={{ flexShrink:0, marginTop:1 }}/>
-            <span style={{ fontSize:12, color:'rgba(255,255,255,.55)', lineHeight:1.5 }}>
-              <strong style={{ color:'#FF6B00' }}>Clé API :</strong> toujours dans le header <code style={{ color:'#FF6B00', fontFamily:"'DM Mono',monospace" }}>x-api-key</code> — jamais dans le corps de la requête ni dans l'URL.
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs + contenu */}
-      <div style={{ display:'flex', gap:18, alignItems:'flex-start' }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div className="doc-tab" style={{ display:'flex', gap:4, overflowX:'auto', WebkitOverflowScrolling:'touch', background:'#F3F4F6', borderRadius:14, padding:4, marginBottom:20 }}>
-            {TABS.map(t => {
-              const on = activeTab === t.id;
-              return (
-                <button key={t.id} onClick={() => setActiveTab(t.id)} style={{ flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:10, border:'none', background:on?'#fff':'transparent', color:on?'#111':'#888', fontWeight:on?700:500, fontSize:12, cursor:'pointer', transition:'all .18s', whiteSpace:'nowrap', boxShadow:on?'0 1px 6px rgba(0,0,0,.08)':'none', fontFamily:'inherit' }}>
-                  <t.icon size={13} color={on?t.color:'#CCC'}/>
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:18, animation:'fadeUp .3s ease' }}>
-            <div style={{ width:42, height:42, borderRadius:12, flexShrink:0, background:`${activeTabMeta?.color}18`, display:'flex', alignItems:'center', justifyContent:'center' }}>
-              {activeTabMeta && <activeTabMeta.icon size={18} color={activeTabMeta.color}/>}
-            </div>
-            <div>
-              <div style={{ fontSize:17, fontWeight:900, color:'#0A0A0A', letterSpacing:'-.015em' }}>{active.title}</div>
-              <div style={{ fontSize:12, color:'#AAA', marginTop:2 }}>{active.sub}</div>
-            </div>
-          </div>
-
-          <div style={{ display:'flex', flexDirection:'column', gap:14, animation:'fadeUp .35s ease' }}>
-            {active.items.map((item, idx) => <ItemCard key={idx} item={item}/>)}
-          </div>
-        </div>
-      </div>
-
-      {/* Providers */}
-      <div style={{ marginTop:28, background:'#fff', border:'1px solid #EBEBEB', borderRadius:20, padding:'24px' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
-          <div style={{ width:38, height:38, borderRadius:11, background:'#FFF3EA', display:'flex', alignItems:'center', justifyContent:'center' }}>
-            <Globe size={16} color="#FF6B00"/>
-          </div>
-          <div>
-            <div style={{ fontSize:15, fontWeight:800, color:'#111' }}>Providers supportés</div>
-            <div style={{ fontSize:12, color:'#AAA', marginTop:1 }}>{PROVIDERS.length} intégrations disponibles</div>
-          </div>
-        </div>
-        {PROVIDER_SECTIONS.map(section => {
-          const list = PROVIDERS.filter(p => p.section === section);
-          if (!list.length) return null;
-          return (
-            <div key={section}>
-              <div className="provider-section-title">{SECTION_LABELS[section]}</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:8, marginBottom:4 }}>
-                {list.map(p => (
-                  <div key={p.name} className="provider-card" style={{ '--hc':p.color, '--hb':`${p.color}0D`, border:'1.5px solid #EBEBEB', borderRadius:12, padding:'10px 12px', transition:'all .2s', cursor:'default' }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#222', marginBottom:2 }}>{p.name}</div>
-                    <div style={{ fontSize:10, color:'#AAA', fontWeight:500 }}>{p.zone}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Support */}
-      <div style={{ marginTop:20, background:'linear-gradient(135deg,#FF6B00,#FFAA00)', borderRadius:20, padding:'24px 28px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:16 }}>
-        <div>
-          <div style={{ fontSize:16, fontWeight:900, color:'#fff', marginBottom:4 }}>Besoin d'aide pour intégrer ?</div>
-          <div style={{ fontSize:13, color:'rgba(255,255,255,.75)' }}>Notre équipe technique est disponible 24/7.</div>
-        </div>
-        <a href="mailto:support@paymentgateway.com" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'#fff', color:'#FF6B00', padding:'11px 22px', borderRadius:12, fontSize:13, fontWeight:800, textDecoration:'none', boxShadow:'0 4px 16px rgba(0,0,0,.12)', flexShrink:0 }}>
-          <Mail size={15}/> Contacter le support
-        </a>
-      </div>
     </div>
   );
 }
