@@ -835,6 +835,176 @@ if ($transactionId && $event === 'payment.completed') {
 http_response_code(200);
 echo json_encode(['received' => true]);`,
       },
+      {
+        name: '✅ Solution avec MySQL / PostgreSQL',
+        desc: "Même logique qu'avec Firestore — stocker votre ID en base avant d'appeler generate-link, le passer dans metadata, le récupérer dans le webhook.",
+        lang: 'javascript',
+        code: `// Étape 1 — Créer la transaction en base AVANT generate-link
+const [result] = await db.query(
+  "INSERT INTO transactions (uid, amount, status, created_at) VALUES (?, ?, 'pending', NOW())",
+  [userId, 5000]
+);
+const transactionId = result.insertId; // Votre ID MySQL
+
+// Étape 2 — Passer cet ID dans metadata
+const response = await fetch('https://paymentgateway.lfdweb.com/api/gateway/generate-link', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-api-key': process.env.GATEWAY_API_KEY
+  },
+  body: JSON.stringify({
+    amount: 5000,
+    description: 'Recharge compte',
+    metadata: {
+      transactionId: transactionId.toString(), // ✅ Retourné dans le webhook
+      uid: userId
+    }
+  })
+});
+const { url, pid } = await response.json();
+
+// Étape 3 — Stocker le pid
+await db.query(
+  "UPDATE transactions SET pid = ?, pay_url = ? WHERE id = ?",
+  [pid, url, transactionId]
+);`,
+      },
+      {
+        name: '✅ Récepteur webhook robuste (MySQL)',
+        desc: "Trois niveaux de fallback pour retrouver la transaction.",
+        lang: 'javascript',
+        code: `// Node.js Express + MySQL2
+app.post('/webhook', express.json(), async (req, res) => {
+  const { event, transaction } = req.body;
+
+  const rawStatus = (transaction?.status || event || '').toLowerCase();
+  const isSuccess = ['successful','success','completed','paid','payment.completed'].includes(rawStatus);
+  const isFailed  = ['failed','failure','cancelled','rejected','payment.failed'].includes(rawStatus);
+
+  let tx = null;
+
+  // ✅ 1. Méthode fiable — votre ID passé dans metadata
+  const txId = transaction?.metadata?.transactionId;
+  if (txId) {
+    const [rows] = await db.query(
+      "SELECT * FROM transactions WHERE id = ? LIMIT 1", [txId]
+    );
+    tx = rows[0] || null;
+  }
+
+  // 2. Fallback — chercher par pid
+  if (!tx) {
+    const ref = transaction?.reference || transaction?.id;
+    if (ref) {
+      const [rows] = await db.query(
+        "SELECT * FROM transactions WHERE pid = ? LIMIT 1", [ref]
+      );
+      tx = rows[0] || null;
+    }
+  }
+
+  // 3. Fallback — dernière transaction pending du même montant
+  if (!tx && transaction?.amount) {
+    const [rows] = await db.query(
+      "SELECT * FROM transactions WHERE status = 'pending' AND amount = ? ORDER BY created_at DESC LIMIT 1",
+      [transaction.amount]
+    );
+    tx = rows[0] || null;
+  }
+
+  if (!tx) return res.json({ received: true });
+
+  // Anti double-traitement
+  if (tx.status === 'success') return res.json({ received: true });
+
+  if (isSuccess) {
+    await db.query(
+      "UPDATE transactions SET status = 'success' WHERE id = ?", [tx.id]
+    );
+    await db.query(
+      "UPDATE users SET balance = balance + ? WHERE id = ?", [tx.amount, tx.uid]
+    );
+  } else if (isFailed) {
+    await db.query(
+      "UPDATE transactions SET status = 'failed' WHERE id = ?", [tx.id]
+    );
+  }
+
+  res.json({ received: true });
+});`,
+      },
+      {
+        name: 'Schéma SQL recommandé',
+        desc: "Structure de table optimisée pour les trois niveaux de recherche.",
+        lang: 'bash',
+        code: `CREATE TABLE transactions (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  uid        VARCHAR(128)   NOT NULL,
+  amount     INT            NOT NULL,
+  pid        VARCHAR(64),                    -- pid retourné par generate-link
+  pay_url    TEXT,                           -- URL de paiement
+  status     ENUM('pending','success','failed') DEFAULT 'pending',
+  created_at DATETIME       DEFAULT NOW(),
+  INDEX idx_pid    (pid),                   -- fallback 2
+  INDEX idx_status_amount (status, amount)  -- fallback 3
+);`,
+      },
+      {
+        name: 'Récepteur PHP + PDO (MySQL)',
+        lang: 'php',
+        code: `<?php
+$payload = json_decode(file_get_contents('php://input'), true);
+$event   = $payload['event'] ?? '';
+$tx      = $payload['transaction'] ?? [];
+$meta    = $tx['metadata'] ?? [];
+$status  = strtolower($tx['status'] ?? $event ?? '');
+
+$isSuccess = in_array($status, ['successful','success','completed','paid','payment.completed']);
+$isFailed  = in_array($status, ['failed','failure','cancelled','rejected','payment.failed']);
+
+$row = null;
+
+// ✅ 1. Via metadata.transactionId (fiable)
+if (!empty($meta['transactionId'])) {
+  $stmt = $pdo->prepare("SELECT * FROM transactions WHERE id = ? LIMIT 1");
+  $stmt->execute([$meta['transactionId']]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// 2. Fallback — par pid
+if (!$row && !empty($tx['reference'])) {
+  $stmt = $pdo->prepare("SELECT * FROM transactions WHERE pid = ? LIMIT 1");
+  $stmt->execute([$tx['reference']]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// 3. Fallback — dernière pending du même montant
+if (!$row && !empty($tx['amount'])) {
+  $stmt = $pdo->prepare(
+    "SELECT * FROM transactions WHERE status='pending' AND amount=?
+     ORDER BY created_at DESC LIMIT 1"
+  );
+  $stmt->execute([$tx['amount']]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+if (!$row || $row['status'] === 'success') {
+  http_response_code(200);
+  echo json_encode(['received' => true]);
+  exit;
+}
+
+if ($isSuccess) {
+  $pdo->prepare("UPDATE transactions SET status='success' WHERE id=?")->execute([$row['id']]);
+  $pdo->prepare("UPDATE users SET balance = balance + ? WHERE id=?")->execute([$row['amount'], $row['uid']]);
+} elseif ($isFailed) {
+  $pdo->prepare("UPDATE transactions SET status='failed' WHERE id=?")->execute([$row['id']]);
+}
+
+http_response_code(200);
+echo json_encode(['received' => true]);`,
+      },
     ],
   },
   providers: { title: 'Providers supportés', sub: '30 intégrations disponibles.', items: [] },
