@@ -656,7 +656,7 @@ async function generateQR() {
       },
     ],
   },
-  webhooks: {
+webhooks: {
     title: 'Webhooks',
     sub:   'Recevez des événements en temps réel sur votre serveur.',
     items: [
@@ -669,13 +669,14 @@ payment.pending     → Paiement en attente de confirmation
 payment.refunded    → Paiement remboursé`,
       },
       {
-        name: 'Format du payload',
+        name: 'Format du payload reçu',
+        desc: "Le gateway envoie l'événement et la transaction. Notez que transaction.reference peut être un UUID interne différent du pid retourné par generate-link. Utilisez metadata.transactionId pour retrouver votre enregistrement.",
         lang: 'javascript',
         code: `{
   "event": "payment.completed",
   "transaction": {
     "id": "abc123",
-    "reference": "GW-1714000000000",
+    "reference": "GW-1714000000000",  // ⚠️ Peut différer du pid de generate-link
     "amount": 5000,
     "netAmount": 4950,
     "commission": 50,
@@ -683,28 +684,136 @@ payment.refunded    → Paiement remboursé`,
     "method": "mtn_money",
     "provider": "feexpay",
     "status": "completed",
+    "metadata": {
+      "transactionId": "votre_id_firestore",  // ✅ Votre référence interne
+      "uid": "user_uid"
+    },
     "createdAt": "2026-01-01T12:00:00.000Z",
     "completedAt": "2026-01-01T12:01:30.000Z"
   }
 }`,
       },
       {
-        name: 'Récepteur Node.js (Express)',
+        name: '⚠️ Problème courant : pid ≠ reference',
+        desc: "Le pid retourné par generate-link et la reference envoyée dans le webhook sont deux UUIDs différents générés par le provider sous-jacent (ex: feexpay). Ne pas utiliser reference pour retrouver votre transaction.",
+        lang: 'text',
+        code: `// generate-link retourne :
+{ "pid": "2e865b0c-5072-483b-a15c-66bcc1879c06" }
+
+// Webhook reçu plus tard :
+{ "transaction": { "reference": "8394c0a9-c097-4532-9abf-9ddc15922c4d" } }
+
+// ❌ Ces deux valeurs sont DIFFÉRENTES — ne pas chercher par reference
+// ✅ Solution : passer votre propre ID dans metadata lors du generate-link`,
+      },
+      {
+        name: '✅ Solution : passer votre ID dans les metadata',
+        desc: "Lors de la création du lien, passez votre propre identifiant dans metadata. Le webhook vous le retournera intact dans transaction.metadata.",
         lang: 'javascript',
-        code: `app.post('/webhook', express.json(), (req, res) => {
-  const { event, transaction } = req.body;
-  switch (event) {
-    case 'payment.completed':
-      updateOrder(transaction.reference, 'paid');
-      sendConfirmationEmail(transaction.email);
-      break;
-    case 'payment.failed':
-      updateOrder(transaction.reference, 'failed');
-      notifyCustomer(transaction.reference);
-      break;
+        code: `// Étape 1 — Créer votre enregistrement en base AVANT d'appeler generate-link
+const txRef = await db.collection('transactions').add({
+  uid: userId,
+  amount: 5000,
+  status: 'pending',
+  createdAt: new Date()
+});
+const transactionId = txRef.id; // Votre ID Firestore
+
+// Étape 2 — Passer cet ID dans les metadata
+const response = await fetch('https://paymentgateway.lfdweb.com/api/gateway/generate-link', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-api-key': process.env.GATEWAY_API_KEY
+  },
+  body: JSON.stringify({
+    amount: 5000,
+    description: 'Recharge compte',
+    metadata: {
+      transactionId,  // ✅ Sera retourné dans transaction.metadata.transactionId
+      uid: userId
+    }
+  })
+});
+const { url, pid } = await response.json();
+
+// Étape 3 — Stocker le pid pour référence
+await txRef.update({ pid, payUrl: url });`,
+      },
+      {
+        name: '✅ Récepteur webhook robuste (Next.js)',
+        desc: "Trois niveaux de fallback pour retrouver la transaction : metadata.transactionId (fiable), puis pid, puis montant.",
+        lang: 'jsx',
+        code: `// app/api/payment/webhook/route.ts
+export async function POST(req) {
+  const body = await req.json();
+  const { event, transaction } = body;
+
+  const rawStatus = (transaction?.status || event || '').toLowerCase();
+  const isSuccess = ['successful','success','completed','paid','payment.completed'].includes(rawStatus);
+  const isFailed  = ['failed','failure','cancelled','rejected','payment.failed'].includes(rawStatus);
+
+  let snap = null;
+
+  // ✅ 1. Méthode fiable — votre ID passé dans metadata
+  const txId = transaction?.metadata?.transactionId;
+  if (txId) {
+    const doc = await db.collection('transactions').doc(txId).get();
+    if (doc.exists) snap = { docs: [doc], empty: false };
   }
-  res.json({ received: true });
-});`,
+
+  // 2. Fallback — chercher par pid
+  if (!snap || snap.empty) {
+    const ref = transaction?.reference || transaction?.id;
+    if (ref) {
+      snap = await db.collection('transactions')
+        .where('pid', '==', ref).limit(1).get();
+    }
+  }
+
+  // 3. Fallback — dernière transaction pending du même montant
+  if (!snap || snap.empty) {
+    snap = await db.collection('transactions')
+      .where('status', '==', 'pending')
+      .where('amount', '==', transaction?.amount)
+      .orderBy('createdAt', 'desc')
+      .limit(1).get();
+    // ⚠️ Nécessite un index composite Firestore :
+    // transactions → amount (asc) + status (asc) + createdAt (desc)
+  }
+
+  if (!snap || snap.empty) return Response.json({ received: true });
+
+  const doc = snap.docs[0];
+  const tx  = doc.data();
+
+  // Anti double-traitement
+  if (tx.status === 'success') return Response.json({ received: true });
+
+  if (isSuccess) {
+    await doc.ref.update({ status: 'success' });
+    await db.collection('users').doc(tx.uid)
+      .update({ balance: FieldValue.increment(tx.amount) });
+  } else if (isFailed) {
+    await doc.ref.update({ status: 'failed' });
+  }
+
+  return Response.json({ received: true });
+}`,
+      },
+      {
+        name: 'Index Firestore requis',
+        desc: "Le fallback par montant nécessite un index composite. Créez-le dans Firebase Console → Firestore → Index.",
+        lang: 'text',
+        code: `// Index composite à créer dans Firebase Console :
+Collection : transactions
+Champs     :
+  - amount     (Croissant)
+  - status     (Croissant)
+  - createdAt  (Décroissant)
+
+// Ou cliquez le lien fourni dans les logs Vercel quand l'erreur apparaît :
+// "The query requires an index. You can create it here: https://..."`,
       },
       {
         name: 'Récepteur PHP',
@@ -714,8 +823,13 @@ $payload = json_decode(file_get_contents('php://input'), true);
 $event   = $payload['event'] ?? '';
 $tx      = $payload['transaction'] ?? [];
 
-if ($event === 'payment.completed') {
-  $db->query("UPDATE orders SET status='paid' WHERE ref='{$tx['reference']}'");
+// ✅ Retrouver votre enregistrement via metadata
+$transactionId = $tx['metadata']['transactionId'] ?? null;
+
+if ($transactionId && $event === 'payment.completed') {
+  $pdo->prepare("UPDATE transactions SET status='success' WHERE id=?")
+      ->execute([$transactionId]);
+  // Créditer le solde utilisateur...
 }
 
 http_response_code(200);
